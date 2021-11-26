@@ -13,3 +13,8 @@ keywords = ["ssh", "openssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+ssh_format = "0.5.1"
+tokio = { version = "1.11.0", features = ["io-util"] }
+tokio-pipe = "0.2.1"
+thiserror = "1.0.29"
