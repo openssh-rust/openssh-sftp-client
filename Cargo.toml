@@ -18,3 +18,4 @@ ssh_format = "0.5.1"
 tokio = { version = "1.11.0", features = ["io-util"] }
 tokio-pipe = "0.2.3"
 thiserror = "1.0.29"
+parking_lot = "0.11.2"
