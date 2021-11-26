@@ -15,7 +15,9 @@ use tokio_pipe::PipeRead;
 struct ResponseCallback {}
 
 impl ResponseCallback {
-    async fn call(&mut self, response: u8) -> io::Result<()> {
+    /// reader is used to read additional variable length data, especially
+    /// one that can be very long (response body of read request).
+    async fn call(&mut self, response: u8, reader: CountedReader<'_>) -> io::Result<()> {
         todo!()
     }
 }
