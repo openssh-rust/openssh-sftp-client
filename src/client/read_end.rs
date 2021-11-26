@@ -51,6 +51,15 @@ pub(crate) struct ReadEnd {
     request_id: AtomicU32,
 }
 impl ReadEnd {
+    pub(crate) fn new(reader: PipeRead) -> Self {
+        Self {
+            reader,
+            buffer: Vec::new(),
+            response_callbacks: DashMap::new(),
+            request_id: AtomicU32::new(0),
+        }
+    }
+
     fn get_request_id(&self) -> u32 {
         self.request_id.fetch_add(1, Ordering::Relaxed)
     }
