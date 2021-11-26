@@ -14,7 +14,7 @@ use tokio_pipe::{AtomicWriteBuffer, PipeWrite};
 pub(crate) struct WriteEnd(RwLock<PipeWrite>);
 
 impl WriteEnd {
-    fn new(writer: PipeWrite) -> Self {
+    pub(crate) fn new(writer: PipeWrite) -> Self {
         Self(RwLock::new(writer))
     }
 
