@@ -10,7 +10,11 @@ pub struct Client {
     read_end: read_end::ReadEnd,
 }
 impl Client {
-    fn new(reader: PipeRead, writer: PipeWrite) -> Self {
+    async fn negotiate(reader: &mut PipeRead, writer: &mut PipeWrite) {}
+
+    pub async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
+        Self::negotiate(&mut reader, &mut writer).await;
+
         Self {
             read_end: read_end::ReadEnd::new(reader),
             write_end: write_end::WriteEnd::new(writer),
