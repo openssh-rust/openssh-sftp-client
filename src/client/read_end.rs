@@ -1,5 +1,6 @@
+use super::threadsafe_waker::ThreadSafeWaker;
+
 use core::sync::atomic::{AtomicU32, Ordering};
-use core::task::Waker;
 
 use std::io;
 
@@ -44,7 +45,7 @@ impl Drop for CountedReader<'_> {
 pub(crate) struct ReadEnd {
     reader: PipeRead,
     buffer: Vec<u8>,
-    response_callbacks: DashMap<u32, (Waker, ResponseCallback)>,
+    response_callbacks: DashMap<u32, (ThreadSafeWaker, ResponseCallback)>,
     request_id: AtomicU32,
 }
 impl ReadEnd {
