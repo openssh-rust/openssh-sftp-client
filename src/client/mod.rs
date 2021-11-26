@@ -1,4 +1,5 @@
 mod read_end;
+mod threadsafe_waker;
 mod write_end;
 
 #[derive(Debug)]
