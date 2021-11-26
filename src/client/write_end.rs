@@ -1,21 +1,17 @@
 use core::future::Future;
 use core::pin::Pin;
-use core::sync::atomic::{AtomicU32, Ordering};
-use core::task::{Context, Poll, Waker};
+use core::task::{Context, Poll};
 
 use std::io;
-
-use serde::Deserialize;
-use ssh_format::from_bytes;
 
 use dashmap::DashMap;
 use parking_lot::RwLock;
 
 use tokio::io::AsyncWriteExt;
-use tokio_pipe::{AtomicWriteBuffer, PipeRead, PipeWrite};
+use tokio_pipe::{AtomicWriteBuffer, PipeWrite};
 
 #[derive(Debug)]
-struct WriteEnd(RwLock<PipeWrite>);
+pub(crate) struct WriteEnd(RwLock<PipeWrite>);
 
 impl WriteEnd {
     fn new(writer: PipeWrite) -> Self {
@@ -54,51 +50,4 @@ impl WriteEnd {
             None => self.write_locked(buf).await,
         }
     }
-}
-
-/// Prototype
-#[derive(Debug)]
-struct ResponseCallback {}
-
-impl ResponseCallback {
-    async fn call(&mut self, response: u8) -> io::Result<()> {
-        todo!()
-    }
-}
-
-#[derive(Debug)]
-struct CountedReader<'a>(&'a PipeRead, usize);
-impl CountedReader<'_> {
-    fn get_bytes_left(&self) -> usize {
-        self.1
-    }
-
-    /// Read at most get_bytes_left()
-    fn read(&mut self, len: usize) -> io::Result<usize> {
-        todo!()
-    }
-}
-impl Drop for CountedReader<'_> {
-    fn drop(&mut self) {
-        // consume all bytes left readable
-    }
-}
-
-#[derive(Debug)]
-struct ReadEnd {
-    reader: PipeRead,
-    buffer: Vec<u8>,
-    response_callbacks: DashMap<u32, (Waker, ResponseCallback)>,
-    request_id: AtomicU32,
-}
-impl ReadEnd {
-    fn get_request_id(&self) -> u32 {
-        self.request_id.fetch_add(1, Ordering::Relaxed)
-    }
-}
-
-#[derive(Debug)]
-pub struct Client {
-    write_end: WriteEnd,
-    read_end: ReadEnd,
 }
