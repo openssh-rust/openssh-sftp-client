@@ -72,7 +72,7 @@ impl ResponseCallbacks {
         }
 
         match self.0.read().get_by_slot(slot) {
-            None => return Ok(()),
+            None => panic!("Slot is removed while do_callback is ongoing"),
             Some((_index, value)) => value.0.done(),
         };
 
