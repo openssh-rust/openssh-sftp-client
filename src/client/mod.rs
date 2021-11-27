@@ -12,7 +12,7 @@ pub struct Client {
 impl Client {
     async fn negotiate(reader: &mut PipeRead, writer: &mut PipeWrite) {}
 
-    pub async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
+    pub async fn connect(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
         Self::negotiate(&mut reader, &mut writer).await;
 
         Self {
