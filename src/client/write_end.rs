@@ -18,17 +18,17 @@ impl WriteEnd {
     }
 
     async fn write_atomic(&self, buf: AtomicWriteBuffer<'_>, len: usize) -> io::Result<()> {
-        struct AtomicWriteFuture<'pipe, 'a>(&'pipe PipeWrite, Option<AtomicWriteBuffer<'a>>);
+        struct AtomicWriteFuture<'a, 'b>(&'a RwLock<PipeWrite>, Option<AtomicWriteBuffer<'b>>);
 
-        impl<'pipe, 'a> Future for AtomicWriteFuture<'pipe, 'a> {
+        impl Future for AtomicWriteFuture<'_, '_> {
             type Output = io::Result<usize>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                Pin::new(self.0).poll_write_atomic(cx, self.1.take().unwrap())
+                Pin::new(&*self.0.read()).poll_write_atomic(cx, self.1.take().unwrap())
             }
         }
 
-        let bytes = AtomicWriteFuture(&*self.0.read(), Some(buf)).await?;
+        let bytes = AtomicWriteFuture(&self.0, Some(buf)).await?;
         if bytes != len {
             Err(io::Error::new(
                 io::ErrorKind::Other,
