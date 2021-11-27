@@ -46,7 +46,6 @@ impl Client {
                 loop {
                     read_end.read_one_response().await?;
                 }
-                Ok(())
             }),
             write_end: WriteEnd::new(writer),
             response_callbacks,
