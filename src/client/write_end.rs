@@ -31,13 +31,10 @@ impl WriteEnd {
 
         let bytes = AtomicWriteFuture(&*self.0.read().await, buf).await?;
         if bytes != buf.len() {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "tokio_pipe::PipeWrite::poll_write_atomic isn't atomic",
-            ))
-        } else {
-            Ok(())
+            panic!("tokio_pipe::PipeWrite::poll_write_atomic isn't atomic")
         }
+
+        Ok(())
     }
 
     async fn write_locked(&self, buf: &[u8]) -> io::Result<()> {
