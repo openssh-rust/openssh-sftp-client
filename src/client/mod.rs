@@ -22,7 +22,7 @@ type ResponseCallbacks = DashMap<u32, (ThreadSafeWaker, ResponseCallback)>;
 #[derive(Debug)]
 pub struct Client {
     write_end: WriteEnd,
-    read_task: JoinHandle<()>,
+    read_task: JoinHandle<io::Result<()>>,
 
     response_callbacks: Arc<ResponseCallbacks>,
     request_id: AtomicU32,
@@ -44,8 +44,9 @@ impl Client {
         Self {
             read_task: tokio::spawn(async move {
                 loop {
-                    read_end.read_one_response().await;
+                    read_end.read_one_response().await?;
                 }
+                Ok(())
             }),
             write_end: WriteEnd::new(writer),
             response_callbacks,
