@@ -1,8 +1,8 @@
 use super::{ResponseCallback, ThreadSafeWaker};
 
-use dashmap::DashMap;
+use thunderdome::Arena;
 
 #[derive(Debug, Default)]
-pub(crate) struct ResponseCallbacks(DashMap<u32, (ThreadSafeWaker, ResponseCallback)>);
+pub(crate) struct ResponseCallbacks(Arena<(ThreadSafeWaker, ResponseCallback)>);
 
 impl ResponseCallbacks {}
