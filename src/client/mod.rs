@@ -2,6 +2,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use std::io;
 
 use dashmap::DashMap;
+use parking_lot::Mutex;
 
 use tokio_pipe::{PipeRead, PipeWrite};
 
@@ -48,7 +49,7 @@ impl Drop for CountedReader<'_> {
 #[derive(Debug)]
 pub struct Client {
     write_end: WriteEnd,
-    read_end: ReadEnd,
+    read_end: Mutex<ReadEnd>,
 
     response_callbacks: DashMap<u32, (ThreadSafeWaker, ResponseCallback)>,
     request_id: AtomicU32,
@@ -64,7 +65,7 @@ impl Client {
         Self::negotiate(&mut reader, &mut writer).await;
 
         Self {
-            read_end: ReadEnd::new(reader),
+            read_end: Mutex::new(ReadEnd::new(reader)),
             write_end: WriteEnd::new(writer),
             response_callbacks: DashMap::new(),
             request_id: AtomicU32::new(0),
