@@ -4,7 +4,6 @@ use core::task::{Context, Poll};
 
 use std::io;
 
-use dashmap::DashMap;
 use parking_lot::RwLock;
 
 use tokio::io::AsyncWriteExt;
