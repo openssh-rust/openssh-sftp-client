@@ -1,5 +1,9 @@
 use super::{CountedReader, ResponseCallback, ThreadSafeWaker};
 
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+
 use std::io;
 use std::sync::Arc;
 
@@ -16,6 +20,34 @@ impl ResponseCallbacks {
         let val = (ThreadSafeWaker::new(), Mutex::new(Some(callback)));
 
         self.0.write().insert(val).slot()
+    }
+
+    /// Return false if slot is invalid.
+    pub(crate) fn remove(&self, slot: u32) -> bool {
+        self.0.write().remove_by_slot(slot).is_some()
+    }
+
+    pub(crate) async fn wait(&self, slot: u32) {
+        struct WaitFuture<'a>(&'a RwLock<Arena<Value>>, u32);
+
+        impl Future for WaitFuture<'_> {
+            type Output = ();
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let waker = cx.waker().clone();
+
+                let guard = self.0.read();
+                let (_index, value) = guard.get_by_slot(self.1).expect("Invalid slot");
+
+                if value.0.install_waker(waker) {
+                    Poll::Ready(())
+                } else {
+                    Poll::Pending
+                }
+            }
+        }
+
+        WaitFuture(&self.0, slot).await;
     }
 
     /// Prototype
@@ -40,10 +72,5 @@ impl ResponseCallbacks {
         };
 
         Ok(())
-    }
-
-    /// Return false if slot is invalid.
-    pub(crate) fn remove(&self, slot: u32) -> bool {
-        self.0.write().remove_by_slot(slot).is_some()
     }
 }
