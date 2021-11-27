@@ -1,6 +1,6 @@
 macro_rules! def_constants {
     ( $name:ident, $val:literal ) => {
-        pub const $name: u32 = $val;
+        pub(crate) const $name: u32 = $val;
     };
 }
 
