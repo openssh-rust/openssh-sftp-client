@@ -11,7 +11,11 @@ impl ResponseCallback {
     /// one that can be very long (response body of read request).
     ///
     /// Return true if the callback is already called and should be removed.
-    async fn call(&mut self, response: u8, reader: CountedReader<'_>) -> io::Result<bool> {
+    pub(crate) async fn call(
+        &mut self,
+        response: u8,
+        reader: CountedReader<'_>,
+    ) -> io::Result<bool> {
         todo!()
     }
 }
