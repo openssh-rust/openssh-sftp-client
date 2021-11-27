@@ -16,18 +16,18 @@ pub(crate) type Value = (ThreadSafeWaker, Mutex<Option<ResponseCallback>>);
 pub(crate) struct ResponseCallbacks(RwLock<Arena<Value>>);
 
 impl ResponseCallbacks {
-    pub(crate) fn insert(&self, callback: ResponseCallback) -> u32 {
+    fn insert_impl(&self, callback: ResponseCallback) -> u32 {
         let val = (ThreadSafeWaker::new(), Mutex::new(Some(callback)));
 
         self.0.write().insert(val).slot()
     }
 
     /// Return false if slot is invalid.
-    pub(crate) fn remove(&self, slot: u32) -> bool {
+    fn remove_impl(&self, slot: u32) -> bool {
         self.0.write().remove_by_slot(slot).is_some()
     }
 
-    pub(crate) async fn wait(&self, slot: u32) {
+    async fn wait_impl(&self, slot: u32) {
         struct WaitFuture<'a>(&'a RwLock<Arena<Value>>, u32, bool);
 
         impl Future for WaitFuture<'_> {
@@ -55,6 +55,10 @@ impl ResponseCallbacks {
         WaitFuture(&self.0, slot, false).await;
     }
 
+    pub fn insert(&self, callback: ResponseCallback) -> SlotGuard {
+        SlotGuard(self, self.insert_impl(callback))
+    }
+
     /// Prototype
     pub(crate) async fn do_callback(
         &self,
@@ -77,5 +81,26 @@ impl ResponseCallbacks {
         };
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SlotGuard<'a>(&'a ResponseCallbacks, u32);
+
+impl SlotGuard<'_> {
+    pub(crate) fn get_slot_id(&self) -> u32 {
+        self.1
+    }
+
+    pub(crate) async fn wait(&self) {
+        self.0.wait_impl(self.1).await
+    }
+}
+
+impl Drop for SlotGuard<'_> {
+    fn drop(&mut self) {
+        if !self.0.remove_impl(self.1) {
+            panic!("Slot is removed before SlotGuard is dropped");
+        }
     }
 }
