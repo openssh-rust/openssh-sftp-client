@@ -1,4 +1,4 @@
-use super::{CountedReader, ResponseCallback, ThreadSafeWaker};
+use super::{CountedReader, Response, ResponseCallback, ThreadSafeWaker};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -64,7 +64,7 @@ impl ResponseCallbacks {
     pub(crate) async fn do_callback(
         &self,
         slot: u32,
-        response: u8,
+        response: Response,
         reader: CountedReader<'_>,
     ) -> io::Result<()> {
         let callback = match self.0.read().get_by_slot(slot) {

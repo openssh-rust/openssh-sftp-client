@@ -1,3 +1,5 @@
+use super::Response;
+
 use core::sync::atomic::{AtomicU32, Ordering};
 use std::io;
 use std::sync::Arc;

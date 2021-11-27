@@ -1,4 +1,4 @@
-use super::CountedReader;
+use super::{CountedReader, Response};
 
 use std::io;
 
@@ -13,7 +13,7 @@ impl ResponseCallback {
     /// Return true if the callback is already called and should be removed.
     pub(crate) async fn call(
         &mut self,
-        response: u8,
+        response: Response,
         reader: CountedReader<'_>,
     ) -> io::Result<bool> {
         todo!()
