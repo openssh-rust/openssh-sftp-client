@@ -7,12 +7,14 @@ use dashmap::DashMap;
 use tokio::task::JoinHandle;
 use tokio_pipe::{PipeRead, PipeWrite};
 
+mod counted_reader;
 mod read_end;
 mod response_callback;
 mod threadsafe_waker;
 mod write_end;
 
-use read_end::{CountedReader, ReadEnd};
+use counted_reader::CountedReader;
+use read_end::ReadEnd;
 use response_callback::ResponseCallback;
 use threadsafe_waker::ThreadSafeWaker;
 use write_end::WriteEnd;
