@@ -40,7 +40,7 @@ impl WriteEnd {
         self.0.write().await.write_all(buf).await
     }
 
-    async fn write(&self, buf: &[u8]) -> io::Result<()> {
+    pub(crate) async fn write(&self, buf: &[u8]) -> io::Result<()> {
         match AtomicWriteBuffer::new(buf) {
             Some(atomic_buf) => self.write_atomic(atomic_buf).await,
             None => self.write_locked(buf).await,
