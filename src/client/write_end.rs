@@ -17,19 +17,20 @@ impl WriteEnd {
         Self(RwLock::new(writer))
     }
 
-    async fn write_atomic(&self, buf: AtomicWriteBuffer<'_>, len: usize) -> io::Result<()> {
-        struct AtomicWriteFuture<'a, 'b>(&'a PipeWrite, Option<AtomicWriteBuffer<'b>>);
+    async fn write_atomic(&self, buf: &[u8]) -> io::Result<()> {
+        struct AtomicWriteFuture<'a, 'b>(&'a PipeWrite, &'b [u8]);
 
         impl Future for AtomicWriteFuture<'_, '_> {
             type Output = io::Result<usize>;
 
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                Pin::new(self.0).poll_write_atomic(cx, self.1.take().unwrap())
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let buf = AtomicWriteBuffer::new(self.1).unwrap();
+                Pin::new(self.0).poll_write_atomic(cx, buf)
             }
         }
 
-        let bytes = AtomicWriteFuture(&*self.0.read().await, Some(buf)).await?;
-        if bytes != len {
+        let bytes = AtomicWriteFuture(&*self.0.read().await, buf).await?;
+        if bytes != buf.len() {
             Err(io::Error::new(
                 io::ErrorKind::Other,
                 "tokio_pipe::PipeWrite::poll_write_atomic isn't atomic",
@@ -45,7 +46,7 @@ impl WriteEnd {
 
     async fn write(&self, buf: &[u8]) -> io::Result<()> {
         match AtomicWriteBuffer::new(buf) {
-            Some(atomic_buf) => self.write_atomic(atomic_buf, buf.len()).await,
+            Some(_atomic_buf) => self.write_atomic(buf).await,
             None => self.write_locked(buf).await,
         }
     }
