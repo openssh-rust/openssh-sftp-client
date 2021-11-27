@@ -3,17 +3,17 @@ use super::{CountedReader, ResponseCallback, ThreadSafeWaker};
 use std::io;
 use std::sync::Arc;
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use thunderdome::Arena;
 
-pub(crate) type Value = (ThreadSafeWaker, Option<ResponseCallback>);
+pub(crate) type Value = (ThreadSafeWaker, Mutex<Option<ResponseCallback>>);
 
 #[derive(Debug, Default)]
 pub(crate) struct ResponseCallbacks(RwLock<Arena<Value>>);
 
 impl ResponseCallbacks {
     pub(crate) fn insert(&self, callback: ResponseCallback) -> u32 {
-        let val = (ThreadSafeWaker::new(), Some(callback));
+        let val = (ThreadSafeWaker::new(), Mutex::new(Some(callback)));
 
         self.0.write().insert(val).slot()
     }
@@ -25,9 +25,9 @@ impl ResponseCallbacks {
         response: u8,
         reader: CountedReader<'_>,
     ) -> io::Result<()> {
-        let callback = match self.0.write().get_by_slot_mut(slot) {
+        let callback = match self.0.read().get_by_slot(slot) {
             None => return Ok(()),
-            Some((_index, value)) => value.1.take(),
+            Some((_index, value)) => value.1.lock().take(),
         };
 
         if let Some(mut callback) = callback {
