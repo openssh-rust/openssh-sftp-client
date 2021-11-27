@@ -28,31 +28,32 @@ impl ResponseCallbacks {
     }
 
     async fn wait_impl(&self, slot: u32) {
-        struct WaitFuture<'a>(&'a RwLock<Arena<Value>>, u32, bool);
+        struct WaitFuture<'a>(Option<&'a RwLock<Arena<Value>>>, u32);
 
         impl Future for WaitFuture<'_> {
             type Output = ();
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                if self.2 {
+                let rwlock = if let Some(rwlock) = self.0.take() {
+                    rwlock
+                } else {
                     return Poll::Ready(());
-                }
+                };
 
                 let waker = cx.waker().clone();
 
-                let guard = self.0.read();
+                let guard = rwlock.read();
                 let (_index, value) = guard.get_by_slot(self.1).expect("Invalid slot");
 
                 if value.0.install_waker(waker) {
                     Poll::Ready(())
                 } else {
-                    self.2 = true;
                     Poll::Pending
                 }
             }
         }
 
-        WaitFuture(&self.0, slot, false).await;
+        WaitFuture(Some(&self.0), slot).await;
     }
 
     pub fn insert(&self, callback: ResponseCallback) -> SlotGuard {
