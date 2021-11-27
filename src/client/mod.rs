@@ -2,24 +2,22 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use std::io;
 use std::sync::Arc;
 
-use dashmap::DashMap;
-
 use tokio::task::JoinHandle;
 use tokio_pipe::{PipeRead, PipeWrite};
 
 mod counted_reader;
 mod read_end;
 mod response_callback;
+mod response_callbacks;
 mod threadsafe_waker;
 mod write_end;
 
 use counted_reader::CountedReader;
 use read_end::ReadEnd;
 use response_callback::ResponseCallback;
+use response_callbacks::ResponseCallbacks;
 use threadsafe_waker::ThreadSafeWaker;
 use write_end::WriteEnd;
-
-type ResponseCallbacks = DashMap<u32, (ThreadSafeWaker, ResponseCallback)>;
 
 #[derive(Debug)]
 pub struct Client {
@@ -39,7 +37,7 @@ impl Client {
     pub async fn connect(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
         Self::negotiate(&mut reader, &mut writer).await;
 
-        let response_callbacks = Arc::new(DashMap::new());
+        let response_callbacks = Arc::new(ResponseCallbacks::default());
 
         let mut read_end = ReadEnd::new(reader, response_callbacks.clone());
 
