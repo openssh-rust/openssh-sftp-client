@@ -4,7 +4,7 @@ use core::task::{Context, Poll};
 
 use std::io;
 
-use parking_lot::RwLock;
+use tokio::sync::RwLock;
 
 use tokio::io::AsyncWriteExt;
 use tokio_pipe::{AtomicWriteBuffer, PipeWrite};
@@ -18,17 +18,17 @@ impl WriteEnd {
     }
 
     async fn write_atomic(&self, buf: AtomicWriteBuffer<'_>, len: usize) -> io::Result<()> {
-        struct AtomicWriteFuture<'a, 'b>(&'a RwLock<PipeWrite>, Option<AtomicWriteBuffer<'b>>);
+        struct AtomicWriteFuture<'a, 'b>(&'a PipeWrite, Option<AtomicWriteBuffer<'b>>);
 
         impl Future for AtomicWriteFuture<'_, '_> {
             type Output = io::Result<usize>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                Pin::new(&*self.0.read()).poll_write_atomic(cx, self.1.take().unwrap())
+                Pin::new(self.0).poll_write_atomic(cx, self.1.take().unwrap())
             }
         }
 
-        let bytes = AtomicWriteFuture(&self.0, Some(buf)).await?;
+        let bytes = AtomicWriteFuture(&*self.0.read().await, Some(buf)).await?;
         if bytes != len {
             Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -40,7 +40,7 @@ impl WriteEnd {
     }
 
     async fn write_locked(&self, buf: &[u8]) -> io::Result<()> {
-        self.0.write().write_all(buf).await
+        self.0.write().await.write_all(buf).await
     }
 
     async fn write(&self, buf: &[u8]) -> io::Result<()> {
