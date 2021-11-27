@@ -28,12 +28,16 @@ impl ResponseCallbacks {
     }
 
     pub(crate) async fn wait(&self, slot: u32) {
-        struct WaitFuture<'a>(&'a RwLock<Arena<Value>>, u32);
+        struct WaitFuture<'a>(&'a RwLock<Arena<Value>>, u32, bool);
 
         impl Future for WaitFuture<'_> {
             type Output = ();
 
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                if self.2 {
+                    return Poll::Ready(());
+                }
+
                 let waker = cx.waker().clone();
 
                 let guard = self.0.read();
@@ -42,12 +46,13 @@ impl ResponseCallbacks {
                 if value.0.install_waker(waker) {
                     Poll::Ready(())
                 } else {
+                    self.2 = true;
                     Poll::Pending
                 }
             }
         }
 
-        WaitFuture(&self.0, slot).await;
+        WaitFuture(&self.0, slot, false).await;
     }
 
     /// Prototype
