@@ -11,7 +11,7 @@ mod response_callback;
 mod threadsafe_waker;
 mod write_end;
 
-use read_end::ReadEnd;
+use read_end::{CountedReader, ReadEnd};
 use response_callback::ResponseCallback;
 use threadsafe_waker::ThreadSafeWaker;
 use write_end::WriteEnd;
