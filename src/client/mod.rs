@@ -7,13 +7,11 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_pipe::{PipeRead, PipeWrite};
 
-mod counted_reader;
 mod read_end;
 mod response_callbacks;
 mod threadsafe_waker;
 mod write_end;
 
-use counted_reader::CountedReader;
 use read_end::ReadEnd;
 use response_callbacks::ResponseCallbacks;
 use threadsafe_waker::ThreadSafeWaker;
