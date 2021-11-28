@@ -14,9 +14,9 @@ pub(crate) type Value = (ThreadSafeWaker, Mutex<Option<(Response, Vec<u8>)>>);
 // TODO: Simplify this
 
 #[derive(Debug, Default)]
-pub(crate) struct ResponseCallbacks(RwLock<Arena<Value>>);
+pub(crate) struct Responses(RwLock<Arena<Value>>);
 
-impl ResponseCallbacks {
+impl Responses {
     fn insert_impl(&self) -> u32 {
         let val = (ThreadSafeWaker::new(), Mutex::new(None));
 
@@ -76,7 +76,7 @@ impl ResponseCallbacks {
 }
 
 #[derive(Debug)]
-pub(crate) struct SlotGuard<'a>(&'a ResponseCallbacks, Option<u32>);
+pub(crate) struct SlotGuard<'a>(&'a Responses, Option<u32>);
 
 impl SlotGuard<'_> {
     pub(crate) fn get_slot_id(&self) -> u32 {

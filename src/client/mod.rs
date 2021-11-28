@@ -8,12 +8,12 @@ use tokio::task::JoinHandle;
 use tokio_pipe::{PipeRead, PipeWrite};
 
 mod read_end;
-mod response_callbacks;
+mod responses;
 mod threadsafe_waker;
 mod write_end;
 
 use read_end::ReadEnd;
-use response_callbacks::ResponseCallbacks;
+use responses::Responses;
 use threadsafe_waker::ThreadSafeWaker;
 use write_end::WriteEnd;
 
@@ -22,7 +22,7 @@ pub struct Client {
     write_end: WriteEnd,
     read_task: JoinHandle<io::Result<()>>,
 
-    response_callbacks: Arc<ResponseCallbacks>,
+    responses: Arc<Responses>,
     request_id: AtomicU32,
 }
 impl Client {
@@ -35,9 +35,9 @@ impl Client {
     pub async fn connect(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
         Self::negotiate(&mut reader, &mut writer).await;
 
-        let response_callbacks = Arc::new(ResponseCallbacks::default());
+        let responses = Arc::new(Responses::default());
 
-        let mut read_end = ReadEnd::new(reader, response_callbacks.clone());
+        let mut read_end = ReadEnd::new(reader, responses.clone());
 
         Self {
             read_task: tokio::spawn(async move {
@@ -46,7 +46,7 @@ impl Client {
                 }
             }),
             write_end: WriteEnd::new(writer),
-            response_callbacks,
+            responses,
             request_id: AtomicU32::new(0),
         }
     }

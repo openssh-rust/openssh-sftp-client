@@ -1,4 +1,4 @@
-use super::ResponseCallbacks;
+use super::Responses;
 
 use std::io;
 use std::sync::Arc;
@@ -12,12 +12,12 @@ use tokio_pipe::PipeRead;
 pub(crate) struct ReadEnd {
     reader: PipeRead,
     buffer: Vec<u8>,
-    response_callbacks: Arc<ResponseCallbacks>,
+    responses: Arc<Responses>,
 }
 impl ReadEnd {
-    pub(crate) fn new(reader: PipeRead, response_callbacks: Arc<ResponseCallbacks>) -> Self {
+    pub(crate) fn new(reader: PipeRead, responses: Arc<Responses>) -> Self {
         Self {
-            response_callbacks,
+            responses,
             reader,
             buffer: Vec::new(),
         }
