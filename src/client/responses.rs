@@ -6,10 +6,10 @@ use core::task::{Context, Poll};
 
 use std::io;
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use thunderdome::Arena;
 
-pub(crate) type Value = (ThreadSafeWaker, Mutex<Option<(Response, Vec<u8>)>>);
+pub(crate) type Value = ThreadSafeWaker<(Response, Vec<u8>)>;
 
 // TODO: Simplify this
 
@@ -18,7 +18,7 @@ pub(crate) struct Responses(RwLock<Arena<Value>>);
 
 impl Responses {
     fn insert_impl(&self) -> u32 {
-        let val = (ThreadSafeWaker::new(), Mutex::new(None));
+        let val = ThreadSafeWaker::new();
 
         self.0.write().insert(val).slot()
     }
@@ -41,7 +41,7 @@ impl Responses {
                 let guard = rwlock.read();
                 let (_index, value) = guard.get_by_slot(self.1).expect("Invalid slot");
 
-                if value.0.install_waker(waker) {
+                if value.install_waker(waker) {
                     Poll::Ready(())
                 } else {
                     Poll::Pending
@@ -66,8 +66,7 @@ impl Responses {
         match self.0.read().get_by_slot(slot) {
             None => return Ok(()),
             Some((_index, value)) => {
-                *value.1.lock() = Some((response, buffer));
-                value.0.done();
+                value.done((response, buffer));
             }
         };
 
@@ -95,7 +94,9 @@ impl SlotGuard<'_> {
     pub(crate) async fn wait(mut self) -> (Response, Vec<u8>) {
         let slot = self.1.take().unwrap();
         self.0.wait_impl(slot).await;
-        self.remove(slot).1.into_inner().unwrap()
+        self.remove(slot)
+            .get_value()
+            .expect("Response is already processed and get_value should return a value")
     }
 }
 

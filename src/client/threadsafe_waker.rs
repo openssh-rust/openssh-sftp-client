@@ -4,16 +4,16 @@ use core::task::Waker;
 use parking_lot::Mutex;
 
 #[derive(Debug)]
-enum InnerState {
+enum InnerState<T> {
     None,
-    Done,
+    Done(T),
     Waiting(Waker),
 }
 
 #[derive(Debug)]
-pub(crate) struct ThreadSafeWaker(Mutex<InnerState>);
+pub(crate) struct ThreadSafeWaker<T>(Mutex<InnerState<T>>);
 
-impl ThreadSafeWaker {
+impl<T> ThreadSafeWaker<T> {
     pub(crate) fn new() -> Self {
         Self(Mutex::new(InnerState::None))
     }
@@ -27,7 +27,7 @@ impl ThreadSafeWaker {
         let done = match &*guard {
             Waiting(_waker) => panic!("Waker is installed twice"),
             None => false,
-            Done => true,
+            Done(_) => true,
         };
         if !done {
             *guard = Waiting(waker);
@@ -35,16 +35,25 @@ impl ThreadSafeWaker {
         done
     }
 
-    pub(crate) fn done(&self) {
+    pub(crate) fn done(&self, value: T) {
         use InnerState::*;
 
         // Release the lock ASAP
-        let prev_state = mem::replace(&mut *self.0.lock(), Done);
+        let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
 
         match prev_state {
-            Done => panic!("ThreadSafeWaker is marked as done twice"),
+            Done(_) => panic!("ThreadSafeWaker is marked as done twice"),
             None => (),
             Waiting(waker) => waker.wake(),
+        }
+    }
+
+    pub(crate) fn get_value(self) -> Option<T> {
+        use InnerState::Done;
+
+        match self.0.into_inner() {
+            Done(value) => Some(value),
+            _ => None,
         }
     }
 }
