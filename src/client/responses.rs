@@ -1,4 +1,4 @@
-use super::{Response, ThreadSafeWaker};
+use super::{awaitable::Awaitable, Response};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -9,7 +9,7 @@ use std::io;
 use parking_lot::RwLock;
 use thunderdome::Arena;
 
-pub(crate) type Value = ThreadSafeWaker<(Response, Vec<u8>)>;
+pub(crate) type Value = Awaitable<(Response, Vec<u8>)>;
 
 // TODO: Simplify this
 
@@ -18,7 +18,7 @@ pub(crate) struct Responses(RwLock<Arena<Value>>);
 
 impl Responses {
     fn insert_impl(&self) -> u32 {
-        let val = ThreadSafeWaker::new();
+        let val = Awaitable::new();
 
         self.0.write().insert(val).slot()
     }

@@ -11,9 +11,9 @@ enum InnerState<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct ThreadSafeWaker<T>(Mutex<InnerState<T>>);
+pub(crate) struct Awaitable<T>(Mutex<InnerState<T>>);
 
-impl<T> ThreadSafeWaker<T> {
+impl<T> Awaitable<T> {
     pub(crate) fn new() -> Self {
         Self(Mutex::new(InnerState::None))
     }
@@ -42,7 +42,7 @@ impl<T> ThreadSafeWaker<T> {
         let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
 
         match prev_state {
-            Done(_) => panic!("ThreadSafeWaker is marked as done twice"),
+            Done(_) => panic!("Awaitable is marked as done twice"),
             None => (),
             Waiting(waker) => waker.wake(),
         }
