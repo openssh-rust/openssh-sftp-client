@@ -26,5 +26,5 @@ thiserror = "1.0.29"
 pin-project = "1"
 
 tokio = { version = "1.11.0", features = ["io-util", "rt", "sync", "parking_lot"] }
-tokio-pipe = "0.2.5"
+tokio-pipe = "0.2.6"
 tokio-async-write-utility = "0.1"
