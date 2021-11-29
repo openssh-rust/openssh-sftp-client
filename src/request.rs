@@ -13,6 +13,9 @@ pub(crate) enum Request<'a> {
         version: u32,
     },
 
+    /// The response to this message will be either SSH_FXP_HANDLE
+    /// (if the operation is successful) or SSH_FXP_STATUS
+    /// (if the operation fails).
     Open {
         request_id: u32,
         params: OpenFile<'a>,
