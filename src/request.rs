@@ -63,14 +63,14 @@ pub(crate) enum Request<'a> {
     /// Responds with a SSH_FXP_STATUS message.
     Remove {
         request_id: u32,
-        filename: Cow<'a, str>,
+        filename: Cow<'a, Path>,
     },
 
     /// Responds with a SSH_FXP_STATUS message.
     Rename {
         request_id: u32,
-        oldpath: Cow<'a, str>,
-        newpath: Cow<'a, str>,
+        oldpath: Cow<'a, Path>,
+        newpath: Cow<'a, Path>,
     },
 
     /// Responds with a SSH_FXP_STATUS message.
