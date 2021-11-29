@@ -9,11 +9,18 @@ use serde::Serialize;
 #[derive(Debug)]
 pub(crate) enum Request<'a> {
     /// Response with `Response::Version`.
-    Hello { version: u32 },
+    Hello {
+        version: u32,
+    },
 
     Open {
         request_id: u32,
         params: OpenFile<'a>,
+    },
+
+    Close {
+        request_id: u32,
+        handle: &'a str,
     },
 }
 
