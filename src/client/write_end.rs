@@ -26,8 +26,7 @@ impl WriteEnd {
             type Output = io::Result<usize>;
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                //Pin::new(self.0).poll_write_vectored_atomic(cx, self.1)
-                todo!()
+                Pin::new(self.0).poll_write_vectored_atomic(cx, self.1)
             }
         }
 
