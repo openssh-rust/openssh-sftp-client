@@ -1,40 +1,71 @@
-use super::constants;
+use super::{constants, FileAttrs};
+
+use std::borrow::Cow;
+use std::path::Path;
 
 use bitflags::bitflags;
 use serde::Serialize;
 
 #[derive(Debug)]
-pub(crate) enum Request {
+pub(crate) enum Request<'a> {
     /// Response with `Response::Version`.
     Hello { version: u32 },
+
+    Open {
+        request_id: u32,
+        params: OpenFile<'a>,
+    },
 }
 
 bitflags! {
-    #[derive(Serialize)]
-    pub(crate) struct OpenFlags: u32 {
+    pub struct FileMode: u32 {
         /// Open the file for reading.
-        const Read = constants::SSH_FXF_READ;
+        const READ = constants::SSH_FXF_READ;
 
         /// Open the file for writing.
         /// If both this and Read are specified; the file is opened for both
         /// reading and writing.
-        const Write = constants::SSH_FXF_WRITE;
+        const WRITE = constants::SSH_FXF_WRITE;
 
         /// Force all writes to append data at the end of the file.
-        const Append = constants::SSH_FXF_APPEND;
+        const APPEND = constants::SSH_FXF_APPEND;
+    }
 
-        /// If this flag is specified; then a new file will be created if one does not
-        /// already exist (if Trunc is specified; the new file will
-        /// be truncated to zero length if it previously exists).
-        const Create = constants::SSH_FXF_CREAT;
-
+    pub struct CreateFlags: u32 {
         /// Forces an existing file with the same name to be truncated to zero
         /// length when creating a file by specifying Create.
-        /// Create MUST also be specified if this flag is used.
-        const Trunc = constants::SSH_FXF_TRUNC;
+        const TRUNC = constants::SSH_FXF_TRUNC;
 
         /// Causes the request to fail if the named file already exists.
-        /// Create MUST also be specified if this flag is used.
-        const Excl = constants::SSH_FXF_EXCL;
+        const EXCL = constants::SSH_FXF_EXCL;
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct OpenFile<'a> {
+    filename: Cow<'a, Path>,
+    flags: u32,
+    attrs: Option<FileAttrs>,
+}
+impl<'a> OpenFile<'a> {
+    pub fn open(filename: Cow<'a, Path>, mode: FileMode) -> Self {
+        Self {
+            filename,
+            flags: mode.bits(),
+            attrs: None,
+        }
+    }
+
+    pub fn create(
+        filename: Cow<'a, Path>,
+        mode: FileMode,
+        create_flags: CreateFlags,
+        attrs: FileAttrs,
+    ) -> Self {
+        Self {
+            filename,
+            flags: mode.bits() | constants::SSH_FXF_CREAT | create_flags.bits(),
+            attrs: Some(attrs),
+        }
     }
 }
