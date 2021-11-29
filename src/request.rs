@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use bitflags::bitflags;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 #[derive(Debug)]
 pub(crate) enum Request<'a> {
@@ -21,6 +21,21 @@ pub(crate) enum Request<'a> {
 
     /// Response will be SSH_FXP_STATUS.
     Close { request_id: u32, handle: &'a str },
+}
+impl Serialize for Request<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use Request::*;
+
+        match self {
+            Hello { version } => (constants::SSH_FXP_INIT, *version).serialize(serializer),
+            Open { request_id, params } => {
+                (constants::SSH_FXP_OPEN, *request_id, params).serialize(serializer)
+            }
+            Close { request_id, handle } => {
+                (constants::SSH_FXP_CLOSE, *request_id, *handle).serialize(serializer)
+            }
+        }
+    }
 }
 
 bitflags! {
