@@ -21,6 +21,22 @@ pub(crate) enum Request<'a> {
 
     /// Response will be SSH_FXP_STATUS.
     Close { request_id: u32, handle: &'a str },
+
+    /// In response to this request, the server will read as many bytes as it
+    /// can from the file (up to `len'), and return them in a SSH_FXP_DATA
+    /// message.  If an error occurs or EOF is encountered before reading any
+    /// data, the server will respond with SSH_FXP_STATUS.
+    ///
+    /// For normal disk files, it is guaranteed that this will read the specified
+    /// number of bytes, or up to end of file.
+    ///
+    /// For e.g. device files this may return fewer bytes than requested.
+    Read {
+        request_id: u32,
+        handle: &'a str,
+        offset: u64,
+        len: u32,
+    },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -33,6 +49,14 @@ impl Serialize for Request<'_> {
             }
             Close { request_id, handle } => {
                 (constants::SSH_FXP_CLOSE, *request_id, *handle).serialize(serializer)
+            }
+            Read {
+                request_id,
+                handle,
+                offset,
+                len,
+            } => {
+                (constants::SSH_FXP_READ, *request_id, *handle, *offset, *len).serialize(serializer)
             }
         }
     }
