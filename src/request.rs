@@ -9,9 +9,7 @@ use serde::Serialize;
 #[derive(Debug)]
 pub(crate) enum Request<'a> {
     /// Response with `Response::Version`.
-    Hello {
-        version: u32,
-    },
+    Hello { version: u32 },
 
     /// The response to this message will be either SSH_FXP_HANDLE
     /// (if the operation is successful) or SSH_FXP_STATUS
@@ -21,10 +19,8 @@ pub(crate) enum Request<'a> {
         params: OpenFile<'a>,
     },
 
-    Close {
-        request_id: u32,
-        handle: &'a str,
-    },
+    /// Response will be SSH_FXP_STATUS.
+    Close { request_id: u32, handle: &'a str },
 }
 
 bitflags! {
