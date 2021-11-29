@@ -3,6 +3,7 @@
 mod client;
 mod constants;
 mod error;
+mod file;
 mod request;
 mod response;
 
@@ -11,3 +12,4 @@ use response::Response;
 
 pub use client::Client;
 pub use error::Error;
+pub use file::FileAttrs;
