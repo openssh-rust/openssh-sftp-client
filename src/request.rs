@@ -56,6 +56,12 @@ pub(crate) enum Request<'a> {
         handle: &'a str,
         offset: u64,
     },
+
+    /// Responds with a SSH_FXP_STATUS message.
+    Remove {
+        request_id: u32,
+        filename: Cow<'a, str>,
+    },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -82,6 +88,11 @@ impl Serialize for Request<'_> {
                 handle,
                 offset,
             } => (constants::SSH_FXP_WRITE, *request_id, *handle, *offset).serialize(serializer),
+
+            Remove {
+                request_id,
+                filename,
+            } => (constants::SSH_FXP_REMOVE, *request_id, filename).serialize(serializer),
         }
     }
 }
