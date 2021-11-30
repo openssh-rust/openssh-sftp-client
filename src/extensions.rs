@@ -6,6 +6,7 @@ use serde::Serialize;
 pub use vec_strings::Strings;
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Hash, Serialize)]
+#[serde(transparent)]
 pub struct Extensions(Strings);
 
 impl Extensions {
