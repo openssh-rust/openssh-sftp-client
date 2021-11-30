@@ -90,12 +90,16 @@ impl<'de> Deserialize<'de> for FileAttrs {
         struct FileAttrVisitor(usize);
 
         impl FileAttrVisitor {
-            fn get_next<'de, T: Deserialize<'de>, V: SeqAccess<'de>>(
-                &self,
-                seq: &mut V,
-            ) -> Result<T, V::Error> {
-                seq.next_element()?
-                    .ok_or_else(|| Error::invalid_length(0, self))
+            fn get_next<'de, T, V>(&mut self, seq: &mut V) -> Result<T, V::Error>
+            where
+                T: Deserialize<'de>,
+                V: SeqAccess<'de>,
+            {
+                let res = seq
+                    .next_element()?
+                    .ok_or_else(|| Error::invalid_length(self.0, self));
+                self.0 += 1;
+                res
             }
         }
 
@@ -106,7 +110,7 @@ impl<'de> Deserialize<'de> for FileAttrs {
                 write!(formatter, "A u32 length and &[str]")
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+            fn visit_seq<V>(mut self, mut seq: V) -> Result<Self::Value, V::Error>
             where
                 V: SeqAccess<'de>,
             {
