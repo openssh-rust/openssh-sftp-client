@@ -25,11 +25,13 @@ pub struct Connection {
     responses: Arc<Responses>,
 }
 impl Connection {
-    fn get_request_id(&self) -> SlotGuard<'_> {
+    pub(crate) fn get_request_id(&self) -> SlotGuard<'_> {
         self.responses.insert()
     }
 
-    fn get_request_id_no_await(&self) -> SlotGuardNoAwait<'_> {
+    /// Return a SlotGuardNoAwait that is automatically removed
+    /// when the request is done.
+    pub(crate) fn get_request_id_no_await(&self) -> SlotGuardNoAwait<'_> {
         self.responses.insert_no_await()
     }
 
