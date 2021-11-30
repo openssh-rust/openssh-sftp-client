@@ -7,7 +7,7 @@ use read_end::ReadEnd;
 use responses::Responses;
 use write_end::WriteEnd;
 
-pub(crate) use responses::{SlotGuard, SlotGuardNoWait};
+pub(crate) use responses::{SlotGuard, SlotGuardNoAwait};
 
 use super::Response;
 
@@ -29,7 +29,7 @@ impl Connection {
         self.responses.insert()
     }
 
-    fn get_request_id_no_await(&self) -> SlotGuardNoWait<'_> {
+    fn get_request_id_no_await(&self) -> SlotGuardNoAwait<'_> {
         self.responses.insert_no_await()
     }
 

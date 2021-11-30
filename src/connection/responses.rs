@@ -62,8 +62,8 @@ impl Responses {
 
     /// It is recommended to use this function in `Drop::drop` implementation
     /// since it does not require any `.await`.
-    pub fn insert_no_await(&self) -> SlotGuardNoWait {
-        SlotGuardNoWait(self, self.insert_impl(false))
+    pub fn insert_no_await(&self) -> SlotGuardNoAwait {
+        SlotGuardNoAwait(self, self.insert_impl(false))
     }
 
     /// Prototype
@@ -130,15 +130,15 @@ impl Drop for SlotGuard<'_> {
 }
 
 #[derive(Debug)]
-pub(crate) struct SlotGuardNoWait<'a>(&'a Responses, u32);
+pub(crate) struct SlotGuardNoAwait<'a>(&'a Responses, u32);
 
-impl SlotGuardNoWait<'_> {
+impl SlotGuardNoAwait<'_> {
     pub(crate) fn get_slot_id(&self) -> u32 {
         self.1
     }
 }
 
-impl Drop for SlotGuardNoWait<'_> {
+impl Drop for SlotGuardNoAwait<'_> {
     fn drop(&mut self) {
         self.0.remove(self.1);
     }
