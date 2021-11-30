@@ -115,6 +115,13 @@ pub(crate) enum Request<'a> {
         path: Cow<'a, Path>,
         attrs: FileAttrs,
     },
+
+    /// Responds with SSH_FXP_STATUS
+    Fsetstat {
+        request_id: u32,
+        handle: &'a [u8],
+        attrs: FileAttrs,
+    },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -188,6 +195,12 @@ impl Serialize for Request<'_> {
                 path,
                 attrs,
             } => (constants::SSH_FXP_SETSTAT, *request_id, path, attrs).serialize(serializer),
+
+            Fsetstat {
+                request_id,
+                handle,
+                attrs,
+            } => (constants::SSH_FXP_FSETSTAT, *request_id, *handle, attrs).serialize(serializer),
         }
     }
 }
