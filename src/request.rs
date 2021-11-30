@@ -97,6 +97,14 @@ pub(crate) enum Request<'a> {
         request_id: u32,
         path: Cow<'a, Path>,
     },
+
+    /// Responds with SSH_FXP_ATTRS or SSH_FXP_STATUS.
+    ///
+    /// Does not follow symlink.
+    Lstat {
+        request_id: u32,
+        path: Cow<'a, Path>,
+    },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -155,6 +163,10 @@ impl Serialize for Request<'_> {
 
             Stat { request_id, path } => {
                 (constants::SSH_FXP_STAT, *request_id, path).serialize(serializer)
+            }
+
+            Lstat { request_id, path } => {
+                (constants::SSH_FXP_LSTAT, *request_id, path).serialize(serializer)
             }
         }
     }
