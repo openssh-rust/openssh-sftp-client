@@ -53,7 +53,6 @@ pub(crate) struct Response {
 }
 
 #[derive(Debug)]
-#[repr(u32)]
 pub(crate) enum StatusCode {
     Success,
     Eof,
