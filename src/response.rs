@@ -52,6 +52,8 @@ pub(crate) enum ResponseInner {
     Handle(Box<[u8]>),
 
     Name(Box<[NameEntry]>),
+
+    Attrs(FileAttrs),
 }
 
 #[derive(Debug)]
@@ -115,6 +117,8 @@ impl<'de> Deserialize<'de> for Response {
 
                         Name(entries.into_boxed_slice())
                     }
+
+                    SSH_FXP_ATTRS => Attrs(self.get_next(&mut seq)?),
 
                     _ => {
                         return Err(Error::invalid_value(
