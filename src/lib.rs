@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-mod client;
+mod connection;
 mod constants;
 mod error;
 mod file;
@@ -10,7 +10,7 @@ mod response;
 use request::Request;
 use response::Response;
 
-pub use client::Client;
+pub use connection::Connection;
 pub use error::Error;
 pub use file::FileAttrs;
 pub use request::{CreateFlags, FileMode, OpenFile};

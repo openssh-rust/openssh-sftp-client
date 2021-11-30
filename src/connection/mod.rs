@@ -17,14 +17,14 @@ use responses::Responses;
 use write_end::WriteEnd;
 
 #[derive(Debug)]
-pub struct Client {
+pub struct Connection {
     write_end: WriteEnd,
     read_task: JoinHandle<io::Result<()>>,
 
     responses: Arc<Responses>,
     request_id: AtomicU32,
 }
-impl Client {
+impl Connection {
     async fn negotiate(reader: &mut PipeRead, writer: &mut PipeWrite) {}
 
     fn get_request_id(&self) -> u32 {
