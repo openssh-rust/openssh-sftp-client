@@ -55,15 +55,15 @@ pub(crate) struct Response {
 #[derive(Debug)]
 #[repr(u32)]
 pub(crate) enum StatusCode {
-    Success = constants::SSH_FX_OK,
-    Eof = constants::SSH_FX_EOF,
-    NoSuchFile = constants::SSH_FX_NO_SUCH_FILE,
-    PermDenied = constants::SSH_FX_PERMISSION_DENIED,
-    Failure = constants::SSH_FX_FAILURE,
-    BadMessage = constants::SSH_FX_BAD_MESSAGE,
-    NoConnection = constants::SSH_FX_NO_CONNECTION,
-    ConnectionLost = constants::SSH_FX_CONNECTION_LOST,
-    OpUnsupported = constants::SSH_FX_OP_UNSUPPORTED,
+    Success,
+    Eof,
+    NoSuchFile,
+    PermDenied,
+    Failure,
+    BadMessage,
+    NoConnection,
+    ConnectionLost,
+    OpUnsupported,
 }
 impl<'de> Deserialize<'de> for StatusCode {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
