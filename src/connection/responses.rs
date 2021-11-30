@@ -9,7 +9,7 @@ use std::io;
 use parking_lot::RwLock;
 use thunderdome::Arena;
 
-pub(crate) type Value = Awaitable<(Response, Vec<u8>)>;
+pub(crate) type Value = Option<Awaitable<(Response, Vec<u8>)>>;
 
 // TODO: Simplify this
 
@@ -17,8 +17,12 @@ pub(crate) type Value = Awaitable<(Response, Vec<u8>)>;
 pub(crate) struct Responses(RwLock<Arena<Value>>);
 
 impl Responses {
-    fn insert_impl(&self) -> u32 {
-        let val = Awaitable::new();
+    fn insert_impl(&self, waitable: bool) -> u32 {
+        let val = if waitable {
+            Some(Awaitable::new())
+        } else {
+            None
+        };
 
         self.0.write().insert(val).slot()
     }
@@ -41,7 +45,7 @@ impl Responses {
                 let guard = rwlock.read();
                 let (_index, value) = guard.get_by_slot(self.1).expect("Invalid slot");
 
-                if value.install_waker(waker) {
+                if value.as_ref().unwrap().install_waker(waker) {
                     Poll::Ready(())
                 } else {
                     Poll::Pending
@@ -53,7 +57,11 @@ impl Responses {
     }
 
     pub fn insert(&self) -> SlotGuard {
-        SlotGuard(self, Some(self.insert_impl()))
+        SlotGuard(self, Some(self.insert_impl(true)))
+    }
+
+    pub fn insert_no_await(&self) -> SlotGuardNoWait {
+        SlotGuardNoWait(self, self.insert_impl(false))
     }
 
     /// Prototype
@@ -63,14 +71,31 @@ impl Responses {
         response: Response,
         buffer: Vec<u8>,
     ) -> io::Result<()> {
-        match self.0.read().get_by_slot(slot) {
+        let need_removal = match self.0.read().get_by_slot(slot) {
             None => return Ok(()),
             Some((_index, value)) => {
-                value.done((response, buffer));
+                if let Some(awaitable) = value {
+                    awaitable.done((response, buffer));
+                    false
+                } else {
+                    true
+                }
             }
         };
 
+        if need_removal {
+            self.remove(slot);
+        }
+
         Ok(())
+    }
+
+    fn remove(&self, slot: u32) -> Value {
+        self.0
+            .write()
+            .remove_by_slot(slot)
+            .expect("Slot is removed before SlotGuard is dropped or waited")
+            .1
     }
 }
 
@@ -83,18 +108,14 @@ impl SlotGuard<'_> {
     }
 
     fn remove(&mut self, slot: u32) -> Value {
-        self.0
-             .0
-            .write()
-            .remove_by_slot(slot)
-            .expect("Slot is removed before SlotGuard is dropped or waited")
-            .1
+        self.0.remove(slot)
     }
 
     pub(crate) async fn wait(mut self) -> (Response, Vec<u8>) {
         let slot = self.1.take().unwrap();
         self.0.wait_impl(slot).await;
         self.remove(slot)
+            .unwrap()
             .get_value()
             .expect("Response is already processed and get_value should return a value")
     }
@@ -105,5 +126,20 @@ impl Drop for SlotGuard<'_> {
         if let Some(slot) = self.1.take() {
             self.remove(slot);
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SlotGuardNoWait<'a>(&'a Responses, u32);
+
+impl SlotGuardNoWait<'_> {
+    pub(crate) fn get_slot_id(&self) -> u32 {
+        self.1
+    }
+}
+
+impl Drop for SlotGuardNoWait<'_> {
+    fn drop(&mut self) {
+        self.0.remove(self.1);
     }
 }
