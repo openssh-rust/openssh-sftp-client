@@ -146,16 +146,6 @@ pub(crate) enum StatusCode {
     /// incompatibility is detected.
     BadMessage,
 
-    /// A pseudo-error which indicates that the client has no
-    /// connection to the server (it can only be generated locally by the
-    /// client, and MUST NOT be returned by servers).
-    NoConnection,
-
-    /// A pseudo-error which indicates that the connection to the
-    /// server has been lost (it can only be generated locally by the
-    /// client, and MUST NOT be returned by servers).
-    ConnectionLost,
-
     /// Indicates that an attempt was made to perform an operation which
     /// is not supported for the server.
     OpUnsupported,
