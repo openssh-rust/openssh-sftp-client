@@ -120,13 +120,44 @@ impl<'de> Deserialize<'de> for Response {
 #[derive(Debug)]
 pub(crate) enum StatusCode {
     Success,
+
+    /// Indicates end-of-file condition.
+    ///
+    /// For SSH_FX_READ it means that no more data is available in the file,
+    /// and for SSH_FX_READDIR it indicates that no more files are contained
+    /// in the directory.
     Eof,
+
+    /// is returned when a reference is made to a file which should exist
+    /// but doesn't.
     NoSuchFile,
+
+    /// Returned when the authenticated user does not have sufficient
+    /// permissions to perform the operation.
     PermDenied,
+
+    /// A generic catch-all error message.
+    ///
+    /// It should be returned if an error occurs for which there is no more
+    /// specific error code defined.
     Failure,
+
+    /// May be returned if a badly formatted packet or protocol
+    /// incompatibility is detected.
     BadMessage,
+
+    /// A pseudo-error which indicates that the client has no
+    /// connection to the server (it can only be generated locally by the
+    /// client, and MUST NOT be returned by servers).
     NoConnection,
+
+    /// A pseudo-error which indicates that the connection to the
+    /// server has been lost (it can only be generated locally by the
+    /// client, and MUST NOT be returned by servers).
     ConnectionLost,
+
+    /// Indicates that an attempt was made to perform an operation which
+    /// is not supported for the server.
     OpUnsupported,
 }
 impl<'de> Deserialize<'de> for StatusCode {
