@@ -1,4 +1,4 @@
-use super::{constants, FileAttrs};
+use super::{constants, Extensions, FileAttrs};
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -9,7 +9,10 @@ use serde::{Serialize, Serializer};
 #[derive(Debug)]
 pub(crate) enum Request<'a> {
     /// Response with `Response::Version`.
-    Hello { version: u32 },
+    Hello {
+        version: u32,
+        extensions: Extensions,
+    },
 
     /// The response to this message will be either SSH_FXP_HANDLE
     /// (if the operation is successful) or SSH_FXP_STATUS
@@ -149,7 +152,11 @@ impl Serialize for Request<'_> {
         use Request::*;
 
         match self {
-            Hello { version } => (constants::SSH_FXP_INIT, *version).serialize(serializer),
+            Hello {
+                version,
+                extensions,
+            } => (constants::SSH_FXP_INIT, *version, extensions.iter()).serialize(serializer),
+
             Open { request_id, params } => {
                 (constants::SSH_FXP_OPEN, *request_id, params).serialize(serializer)
             }
