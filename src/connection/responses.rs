@@ -60,6 +60,8 @@ impl Responses {
         SlotGuard(Some(self), self.insert_impl(true))
     }
 
+    /// It is recommended to use this function in `Drop::drop` implementation
+    /// since it does not require any `.await`.
     pub fn insert_no_await(&self) -> SlotGuardNoWait {
         SlotGuardNoWait(self, self.insert_impl(false))
     }
