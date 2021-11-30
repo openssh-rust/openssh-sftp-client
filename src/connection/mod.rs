@@ -7,7 +7,7 @@ use read_end::ReadEnd;
 use responses::Responses;
 use write_end::WriteEnd;
 
-pub(crate) use responses::SlotGuard;
+pub(crate) use responses::{SlotGuard, SlotGuardNoWait};
 
 use super::Response;
 
@@ -27,6 +27,10 @@ pub struct Connection {
 impl Connection {
     fn get_request_id(&self) -> SlotGuard<'_> {
         self.responses.insert()
+    }
+
+    fn get_request_id_no_await(&self) -> SlotGuardNoWait<'_> {
+        self.responses.insert_no_await()
     }
 
     pub(crate) async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
