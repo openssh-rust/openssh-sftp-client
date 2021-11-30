@@ -47,6 +47,8 @@ pub(crate) enum ResponseInner {
         /// [RFC-1766]
         language_tag: String,
     },
+
+    Handle(Box<[u8]>),
 }
 
 #[derive(Debug)]
@@ -96,6 +98,8 @@ impl<'de> Deserialize<'de> for Response {
                         err_msg: self.get_next(&mut seq)?,
                         language_tag: self.get_next(&mut seq)?,
                     },
+
+                    SSH_FXP_HANDLE => Handle(self.get_next(&mut seq)?),
 
                     _ => {
                         return Err(Error::invalid_value(
