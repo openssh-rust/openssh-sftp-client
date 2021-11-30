@@ -41,25 +41,6 @@ pub(crate) enum Request<'a> {
         len: u32,
     },
 
-    /// The write will extend the file if writing beyond the end of the file.
-    ///
-    /// It is legal to write way beyond the end of the file, the semantics
-    /// are to write zeroes from the end of the file to the specified offset
-    /// and then the data.
-    ///
-    /// On most operating systems, such writes do not allocate disk space but
-    /// instead leave "holes" in the file.
-    ///
-    /// The server responds to a write request with a SSH_FXP_STATUS message.
-    ///
-    /// The Write also includes any amount of custom data and its size is
-    /// included in the size of the entire packet sent.
-    Write {
-        request_id: u32,
-        handle: &'a [u8],
-        offset: u64,
-    },
-
     /// Responds with a SSH_FXP_STATUS message.
     Remove {
         request_id: u32,
@@ -171,11 +152,6 @@ impl Serialize for Request<'_> {
             } => {
                 (constants::SSH_FXP_READ, *request_id, *handle, *offset, *len).serialize(serializer)
             }
-            Write {
-                request_id,
-                handle,
-                offset,
-            } => (constants::SSH_FXP_WRITE, *request_id, *handle, *offset).serialize(serializer),
 
             Remove {
                 request_id,
@@ -253,6 +229,19 @@ impl Serialize for Request<'_> {
     }
 }
 impl Request<'_> {
+    /// The write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// The server responds to a write request with a SSH_FXP_STATUS message.
+    ///
+    /// The Write also includes any amount of custom data and its size is
+    /// included in the size of the entire packet sent.
     pub(crate) fn serialize_write_request<'a>(
         serializer: &'a mut ssh_format::Serializer,
         request_id: u32,
@@ -261,12 +250,7 @@ impl Request<'_> {
         data_len: u32,
     ) -> ssh_format::Result<&'a [u8]> {
         serializer.reset();
-        Request::Write {
-            request_id,
-            handle,
-            offset,
-        }
-        .serialize(&mut *serializer)?;
+        (constants::SSH_FXP_WRITE, request_id, handle, offset).serialize(&mut *serializer)?;
 
         serializer
             .get_output_with_data(data_len)
