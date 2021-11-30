@@ -88,6 +88,9 @@ pub(crate) enum Request<'a> {
         request_id: u32,
         path: Cow<'a, Path>,
     },
+
+    /// Responds with a SSH_FXP_NAME or a SSH_FXP_STATUS message
+    Readdir { request_id: u32, handle: &'a [u8] },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -138,6 +141,10 @@ impl Serialize for Request<'_> {
 
             Opendir { request_id, path } => {
                 (constants::SSH_FXP_OPENDIR, *request_id, path).serialize(serializer)
+            }
+
+            Readdir { request_id, handle } => {
+                (constants::SSH_FXP_READDIR, *request_id, *handle).serialize(serializer)
             }
         }
     }
