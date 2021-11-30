@@ -34,4 +34,9 @@ impl ServerVersion {
 }
 
 #[derive(Debug)]
-pub(crate) enum Response {}
+pub(crate) enum ResponseInner {}
+
+#[derive(Debug)]
+pub(crate) struct Response {
+    response_id: u32,
+}
