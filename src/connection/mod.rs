@@ -31,7 +31,7 @@ impl Connection {
     pub(crate) async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
         let responses = Arc::new(Responses::default());
 
-        let mut read_end = ReadEnd::new(reader, responses.clone());
+        let mut read_end = ReadEnd::new(reader);
 
         Self {
             read_task: tokio::spawn(async move {

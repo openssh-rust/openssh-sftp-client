@@ -12,12 +12,10 @@ use tokio_pipe::PipeRead;
 pub(crate) struct ReadEnd {
     reader: PipeRead,
     buffer: Vec<u8>,
-    responses: Arc<Responses>,
 }
 impl ReadEnd {
     pub(crate) fn new(reader: PipeRead, responses: Arc<Responses>) -> Self {
         Self {
-            responses,
             reader,
             buffer: Vec::new(),
         }
