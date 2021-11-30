@@ -1,8 +1,9 @@
-use super::{constants, Extensions};
+use super::{constants, Extensions, FileAttrs};
 
 use core::fmt;
 
-use serde::de::{Deserialize, Deserializer, Error, SeqAccess, Unexpected, Visitor};
+use serde::de::{Deserializer, Error, SeqAccess, Unexpected, Visitor};
+use serde::Deserialize;
 use ssh_format::from_bytes;
 
 use vec_strings::Strings;
@@ -182,4 +183,12 @@ impl<'de> Deserialize<'de> for StatusCode {
             )),
         }
     }
+}
+
+/// Entry in ResponseInner::Name
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct NameEntry {
+    filename: String,
+    longname: String,
+    attrs: FileAttrs,
 }
