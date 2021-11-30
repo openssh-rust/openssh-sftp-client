@@ -10,6 +10,12 @@ macro_rules! def_u32_constants {
     };
 }
 
+macro_rules! def_str_constants {
+    ( $name:ident, $val:literal ) => {
+        pub(crate) const $name: &'static str = $val;
+    };
+}
+
 // version
 pub(crate) const SSH2_FILEXFER_VERSION: u8 = 3;
 
@@ -80,3 +86,13 @@ def_u32_constants!(SFTP_EXT_FSYNC, 0x00000010);
 def_u32_constants!(SFTP_EXT_LSETSTAT, 0x00000020);
 def_u32_constants!(SFTP_EXT_LIMITS, 0x00000040);
 def_u32_constants!(SFTP_EXT_PATH_EXPAND, 0x00000080);
+
+// extension names
+def_str_constants!(EXT_NAME_POSIX_RENAME, "posix-rename@openssh.com");
+def_str_constants!(EXT_NAME_STATVFS, "statvfs@openssh.com");
+def_str_constants!(EXT_NAME_FSTATVFS, "fstatvfs@openssh.com");
+def_str_constants!(EXT_NAME_HARDLINK, "hardlink@openssh.com");
+def_str_constants!(EXT_NAME_FSYNC, "fsync@openssh.com");
+def_str_constants!(EXT_NAME_LSETSTAT, "lsetstat@openssh.com");
+def_str_constants!(EXT_NAME_LIMITS, "limits@openssh.com");
+def_str_constants!(EXT_NAME_EXPAND_PATH, "expand-path@openssh.com");
