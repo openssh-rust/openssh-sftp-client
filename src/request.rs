@@ -242,6 +242,8 @@ impl Request<'_> {
     ///
     /// The Write also includes any amount of custom data and its size is
     /// included in the size of the entire packet sent.
+    ///
+    /// Return the serialized header (including the 4-byte size).
     pub(crate) fn serialize_write_request<'a>(
         serializer: &'a mut ssh_format::Serializer,
         request_id: u32,
