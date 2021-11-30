@@ -29,7 +29,7 @@ impl Connection {
         self.request_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    pub async fn connect(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
+    pub(crate) async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
         let responses = Arc::new(Responses::default());
 
         let mut read_end = ReadEnd::new(reader, responses.clone());
