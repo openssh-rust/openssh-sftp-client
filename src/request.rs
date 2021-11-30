@@ -252,6 +252,27 @@ impl Serialize for Request<'_> {
         }
     }
 }
+impl Request<'_> {
+    pub(crate) fn serialize_write_request<'a>(
+        serializer: &'a mut ssh_format::Serializer,
+        request_id: u32,
+        handle: &[u8],
+        offset: u64,
+        data_len: u32,
+    ) -> ssh_format::Result<&'a [u8]> {
+        serializer.reset();
+        Request::Write {
+            request_id,
+            handle,
+            offset,
+        }
+        .serialize(&mut *serializer)?;
+
+        serializer
+            .get_output_with_data(data_len)
+            .map(|v| v.as_slice())
+    }
+}
 
 bitflags! {
     pub struct FileMode: u32 {
