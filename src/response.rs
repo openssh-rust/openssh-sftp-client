@@ -51,6 +51,10 @@ pub(crate) enum ResponseInner {
 
     Handle(Box<[u8]>),
 
+    /// The remaining bytes returned by ssh_format::from_bytes is the data
+    /// of the packet.
+    Data,
+
     Name(Box<[NameEntry]>),
 
     Attrs(FileAttrs),
@@ -105,6 +109,8 @@ impl<'de> Deserialize<'de> for Response {
                     },
 
                     SSH_FXP_HANDLE => Handle(self.get_next(&mut seq)?),
+
+                    SSH_FXP_DATA => Data,
 
                     SSH_FXP_NAME => {
                         let len: u32 = self.get_next(&mut seq)?;
