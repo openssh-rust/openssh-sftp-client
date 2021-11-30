@@ -50,6 +50,8 @@ pub(crate) enum ResponseInner {
     },
 
     Handle(Box<[u8]>),
+
+    Name(Box<[NameEntry]>),
 }
 
 #[derive(Debug)]
@@ -101,6 +103,18 @@ impl<'de> Deserialize<'de> for Response {
                     },
 
                     SSH_FXP_HANDLE => Handle(self.get_next(&mut seq)?),
+
+                    SSH_FXP_NAME => {
+                        let len: u32 = self.get_next(&mut seq)?;
+                        let len = len as usize;
+                        let mut entries = Vec::<NameEntry>::with_capacity(len);
+
+                        for _ in 0..len {
+                            entries.push(self.get_next(&mut seq)?);
+                        }
+
+                        Name(entries.into_boxed_slice())
+                    }
 
                     _ => {
                         return Err(Error::invalid_value(
