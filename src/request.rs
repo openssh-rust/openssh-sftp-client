@@ -23,7 +23,10 @@ pub(crate) enum Request<'a> {
     },
 
     /// Response will be SSH_FXP_STATUS.
-    Close { request_id: u32, handle: &'a [u8] },
+    Close {
+        request_id: u32,
+        handle: Cow<'a, [u8]>,
+    },
 
     /// In response to this request, the server will read as many bytes as it
     /// can from the file (up to `len'), and return them in a SSH_FXP_DATA
@@ -36,7 +39,7 @@ pub(crate) enum Request<'a> {
     /// For e.g. device files this may return fewer bytes than requested.
     Read {
         request_id: u32,
-        handle: &'a [u8],
+        handle: Cow<'a, [u8]>,
         offset: u64,
         len: u32,
     },
@@ -74,7 +77,10 @@ pub(crate) enum Request<'a> {
     },
 
     /// Responds with a SSH_FXP_NAME or a SSH_FXP_STATUS message
-    Readdir { request_id: u32, handle: &'a [u8] },
+    Readdir {
+        request_id: u32,
+        handle: Cow<'a, [u8]>,
+    },
 
     /// Responds with SSH_FXP_ATTRS or SSH_FXP_STATUS.
     Stat {
@@ -91,7 +97,10 @@ pub(crate) enum Request<'a> {
     },
 
     /// Responds with SSH_FXP_ATTRS or SSH_FXP_STATUS.
-    Fstat { request_id: u32, handle: &'a [u8] },
+    Fstat {
+        request_id: u32,
+        handle: Cow<'a, [u8]>,
+    },
 
     /// Responds with SSH_FXP_STATUS
     Setstat {
@@ -103,7 +112,7 @@ pub(crate) enum Request<'a> {
     /// Responds with SSH_FXP_STATUS
     Fsetstat {
         request_id: u32,
-        handle: &'a [u8],
+        handle: Cow<'a, [u8]>,
         attrs: FileAttrs,
     },
 
@@ -142,7 +151,7 @@ impl Serialize for Request<'_> {
                 (constants::SSH_FXP_OPEN, *request_id, params).serialize(serializer)
             }
             Close { request_id, handle } => {
-                (constants::SSH_FXP_CLOSE, *request_id, *handle).serialize(serializer)
+                (constants::SSH_FXP_CLOSE, *request_id, handle).serialize(serializer)
             }
             Read {
                 request_id,
@@ -150,7 +159,7 @@ impl Serialize for Request<'_> {
                 offset,
                 len,
             } => {
-                (constants::SSH_FXP_READ, *request_id, *handle, *offset, *len).serialize(serializer)
+                (constants::SSH_FXP_READ, *request_id, handle, *offset, *len).serialize(serializer)
             }
 
             Remove {
@@ -179,7 +188,7 @@ impl Serialize for Request<'_> {
             }
 
             Readdir { request_id, handle } => {
-                (constants::SSH_FXP_READDIR, *request_id, *handle).serialize(serializer)
+                (constants::SSH_FXP_READDIR, *request_id, handle).serialize(serializer)
             }
 
             Stat { request_id, path } => {
@@ -191,7 +200,7 @@ impl Serialize for Request<'_> {
             }
 
             Fstat { request_id, handle } => {
-                (constants::SSH_FXP_FSTAT, *request_id, *handle).serialize(serializer)
+                (constants::SSH_FXP_FSTAT, *request_id, handle).serialize(serializer)
             }
 
             Setstat {
@@ -204,7 +213,7 @@ impl Serialize for Request<'_> {
                 request_id,
                 handle,
                 attrs,
-            } => (constants::SSH_FXP_FSETSTAT, *request_id, *handle, attrs).serialize(serializer),
+            } => (constants::SSH_FXP_FSETSTAT, *request_id, handle, attrs).serialize(serializer),
 
             Readlink { request_id, path } => {
                 (constants::SSH_FXP_READLINK, *request_id, path).serialize(serializer)
