@@ -37,7 +37,7 @@ impl ServerVersion {
 #[derive(Debug)]
 pub(crate) enum ResponseInner {
     Status {
-        status_code: u32,
+        status_code: StatusCode,
 
         /// ISO-10646 UTF-8 [RFC-2279]
         err_msg: String,
