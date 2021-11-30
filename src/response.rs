@@ -165,21 +165,25 @@ impl<'de> Deserialize<'de> for StatusCode {
         use constants::*;
         use StatusCode::*;
 
-        let discriminent = <u32 as Deserialize>::deserialize(deserializer)?;
+        let discriminant = <u32 as Deserialize>::deserialize(deserializer)?;
 
-        match discriminent {
+        match discriminant {
             SSH_FX_OK => Ok(Success),
             SSH_FX_EOF => Ok(Eof),
             SSH_FX_NO_SUCH_FILE => Ok(NoSuchFile),
             SSH_FX_PERMISSION_DENIED => Ok(PermDenied),
             SSH_FX_FAILURE => Ok(Failure),
             SSH_FX_BAD_MESSAGE => Ok(BadMessage),
-            SSH_FX_NO_CONNECTION => Ok(NoConnection),
-            SSH_FX_CONNECTION_LOST => Ok(ConnectionLost),
             SSH_FX_OP_UNSUPPORTED => Ok(OpUnsupported),
 
+            SSH_FX_NO_CONNECTION | SSH_FX_CONNECTION_LOST => Err(Error::invalid_value(
+                Unexpected::Unsigned(discriminant as u64),
+                &"Server MUST NOT return SSH_FX_NO_CONNECTION or SSH_FX_CONNECTION_LOST \
+                for they are pseudo-error that can only be generated locally.",
+            )),
+
             _ => Err(Error::invalid_value(
-                Unexpected::Unsigned(discriminent as u64),
+                Unexpected::Unsigned(discriminant as u64),
                 &"Invalid status code",
             )),
         }
