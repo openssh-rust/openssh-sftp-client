@@ -129,6 +129,13 @@ pub(crate) enum Request<'a> {
         request_id: u32,
         path: Cow<'a, Path>,
     },
+
+    /// Responds with SSH_FXP_STATUS.
+    Symlink {
+        request_id: u32,
+        linkpath: Cow<'a, Path>,
+        targetpath: Cow<'a, Path>,
+    },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -212,6 +219,18 @@ impl Serialize for Request<'_> {
             Readlink { request_id, path } => {
                 (constants::SSH_FXP_READLINK, *request_id, path).serialize(serializer)
             }
+
+            Symlink {
+                request_id,
+                linkpath,
+                targetpath,
+            } => (
+                constants::SSH_FXP_SYMLINK,
+                *request_id,
+                linkpath,
+                targetpath,
+            )
+                .serialize(serializer),
         }
     }
 }
