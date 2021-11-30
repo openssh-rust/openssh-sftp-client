@@ -136,6 +136,13 @@ pub(crate) enum Request<'a> {
         linkpath: Cow<'a, Path>,
         targetpath: Cow<'a, Path>,
     },
+
+    /// Responds with SSH_FXP_NAME with a name and dummy attribute value
+    /// or SSH_FXP_STATUS on error.
+    Realpath {
+        request_id: u32,
+        path: Cow<'a, Path>,
+    },
 }
 impl Serialize for Request<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -231,6 +238,10 @@ impl Serialize for Request<'_> {
                 targetpath,
             )
                 .serialize(serializer),
+
+            Realpath { request_id, path } => {
+                (constants::SSH_FXP_REALPATH, *request_id, path).serialize(serializer)
+            }
         }
     }
 }
