@@ -57,7 +57,7 @@ impl Responses {
     }
 
     pub fn insert(&self) -> SlotGuard {
-        SlotGuard(self, Some(self.insert_impl(true)))
+        SlotGuard(Some(self), self.insert_impl(true))
     }
 
     pub fn insert_no_await(&self) -> SlotGuardNoWait {
@@ -100,21 +100,19 @@ impl Responses {
 }
 
 #[derive(Debug)]
-pub(crate) struct SlotGuard<'a>(&'a Responses, Option<u32>);
+pub(crate) struct SlotGuard<'a>(Option<&'a Responses>, u32);
 
 impl SlotGuard<'_> {
     pub(crate) fn get_slot_id(&self) -> u32 {
-        self.1.unwrap()
-    }
-
-    fn remove(&mut self, slot: u32) -> Value {
-        self.0.remove(slot)
+        self.1
     }
 
     pub(crate) async fn wait(mut self) -> (Response, Vec<u8>) {
-        let slot = self.1.take().unwrap();
-        self.0.wait_impl(slot).await;
-        self.remove(slot)
+        let responses = self.0.take().unwrap();
+        let slot = self.1;
+        responses.wait_impl(slot).await;
+        responses
+            .remove(slot)
             .unwrap()
             .get_value()
             .expect("Response is already processed and get_value should return a value")
@@ -123,8 +121,8 @@ impl SlotGuard<'_> {
 
 impl Drop for SlotGuard<'_> {
     fn drop(&mut self) {
-        if let Some(slot) = self.1.take() {
-            self.remove(slot);
+        if let Some(responses) = self.0.take() {
+            responses.remove(self.1);
         }
     }
 }
