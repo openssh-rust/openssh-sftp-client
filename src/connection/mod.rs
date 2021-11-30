@@ -22,11 +22,10 @@ pub struct Connection {
     read_task: JoinHandle<io::Result<()>>,
 
     responses: Arc<Responses>,
-    request_id: AtomicU32,
 }
 impl Connection {
     fn get_request_id(&self) -> u32 {
-        self.request_id.fetch_add(1, Ordering::Relaxed)
+        todo!()
     }
 
     pub(crate) async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
@@ -42,7 +41,6 @@ impl Connection {
             }),
             write_end: WriteEnd::new(writer),
             responses,
-            request_id: AtomicU32::new(0),
         }
     }
 }
