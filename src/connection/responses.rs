@@ -9,7 +9,7 @@ use std::io;
 use parking_lot::RwLock;
 use thunderdome::Arena;
 
-pub(crate) type Value = Option<Awaitable<(Response, Vec<u8>)>>;
+pub(crate) type Value = Option<Awaitable<(Response, Box<[u8]>)>>;
 
 // TODO: Simplify this
 
@@ -71,7 +71,7 @@ impl Responses {
         &self,
         slot: u32,
         response: Response,
-        buffer: Vec<u8>,
+        buffer: Box<[u8]>,
     ) -> io::Result<()> {
         let need_removal = match self.0.read().get_by_slot(slot) {
             None => return Ok(()),
@@ -109,7 +109,7 @@ impl SlotGuard<'_> {
         self.1
     }
 
-    pub(crate) async fn wait(mut self) -> (Response, Vec<u8>) {
+    pub(crate) async fn wait(mut self) -> (Response, Box<[u8]>) {
         let responses = self.0.take().unwrap();
         let slot = self.1;
         responses.wait_impl(slot).await;
