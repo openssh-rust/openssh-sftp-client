@@ -25,15 +25,11 @@ pub struct Connection {
     request_id: AtomicU32,
 }
 impl Connection {
-    async fn negotiate(reader: &mut PipeRead, writer: &mut PipeWrite) {}
-
     fn get_request_id(&self) -> u32 {
         self.request_id.fetch_add(1, Ordering::Relaxed)
     }
 
     pub async fn connect(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
-        Self::negotiate(&mut reader, &mut writer).await;
-
         let responses = Arc::new(Responses::default());
 
         let mut read_end = ReadEnd::new(reader, responses.clone());
