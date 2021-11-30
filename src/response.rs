@@ -54,7 +54,7 @@ pub(crate) struct Response {
 #[derive(Debug)]
 #[repr(u32)]
 pub(crate) enum StatusCode {
-    Ok = constants::SSH_FX_OK,
+    Success = constants::SSH_FX_OK,
     Eof = constants::SSH_FX_EOF,
     NoSuchFile = constants::SSH_FX_NO_SUCH_FILE,
     PermDenied = constants::SSH_FX_PERMISSION_DENIED,
