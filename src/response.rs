@@ -50,6 +50,7 @@ pub(crate) enum ResponseInner {
 #[derive(Debug)]
 pub(crate) struct Response {
     response_id: u32,
+    response_inner: ResponseInner,
 }
 
 #[derive(Debug)]
