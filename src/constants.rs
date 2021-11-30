@@ -45,16 +45,16 @@ def_packet_type!(SSH_FXP_ATTRS, 105);
 def_packet_type!(SSH_FXP_EXTENDED, 200);
 def_packet_type!(SSH_FXP_EXTENDED_REPLY, 201);
 
-// status messages
-def_packet_type!(SSH_FX_OK, 0);
-def_packet_type!(SSH_FX_EOF, 1);
-def_packet_type!(SSH_FX_NO_SUCH_FILE, 2);
-def_packet_type!(SSH_FX_PERMISSION_DENIED, 3);
-def_packet_type!(SSH_FX_FAILURE, 4);
-def_packet_type!(SSH_FX_BAD_MESSAGE, 5);
-def_packet_type!(SSH_FX_NO_CONNECTION, 6);
-def_packet_type!(SSH_FX_CONNECTION_LOST, 7);
-def_packet_type!(SSH_FX_OP_UNSUPPORTED, 8);
+// status code
+def_u32_constants!(SSH_FX_OK, 0);
+def_u32_constants!(SSH_FX_EOF, 1);
+def_u32_constants!(SSH_FX_NO_SUCH_FILE, 2);
+def_u32_constants!(SSH_FX_PERMISSION_DENIED, 3);
+def_u32_constants!(SSH_FX_FAILURE, 4);
+def_u32_constants!(SSH_FX_BAD_MESSAGE, 5);
+def_u32_constants!(SSH_FX_NO_CONNECTION, 6);
+def_u32_constants!(SSH_FX_CONNECTION_LOST, 7);
+def_u32_constants!(SSH_FX_OP_UNSUPPORTED, 8);
 
 // attributes
 def_u32_constants!(SSH_FILEXFER_ATTR_SIZE, 0x00000001);
