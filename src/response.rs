@@ -34,9 +34,33 @@ impl ServerVersion {
 }
 
 #[derive(Debug)]
-pub(crate) enum ResponseInner {}
+pub(crate) enum ResponseInner {
+    Status {
+        status_code: u32,
+
+        /// ISO-10646 UTF-8 [RFC-2279]
+        err_msg: String,
+
+        /// [RFC-1766]
+        language_tag: String,
+    },
+}
 
 #[derive(Debug)]
 pub(crate) struct Response {
     response_id: u32,
+}
+
+#[derive(Debug)]
+#[repr(u32)]
+pub(crate) enum StatusCode {
+    Ok = constants::SSH_FX_OK,
+    Eof = constants::SSH_FX_EOF,
+    NoSuchFile = constants::SSH_FX_NO_SUCH_FILE,
+    PermDenied = constants::SSH_FX_PERMISSION_DENIED,
+    Failure = constants::SSH_FX_FAILURE,
+    BadMessage = constants::SSH_FX_BAD_MESSAGE,
+    NoConnection = constants::SSH_FX_NO_CONNECTION,
+    ConnectionLost = constants::SSH_FX_CONNECTION_LOST,
+    OpUnsupported = constants::SSH_FX_OP_UNSUPPORTED,
 }
