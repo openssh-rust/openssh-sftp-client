@@ -14,7 +14,7 @@ pub(crate) struct ReadEnd {
     buffer: Vec<u8>,
 }
 impl ReadEnd {
-    pub(crate) fn new(reader: PipeRead, responses: Arc<Responses>) -> Self {
+    pub(crate) fn new(reader: PipeRead) -> Self {
         Self {
             reader,
             buffer: Vec::new(),
