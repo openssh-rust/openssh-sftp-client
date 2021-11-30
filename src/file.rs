@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use vec_strings::Strings;
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct FileAttrs {
     flags: u32,
 
