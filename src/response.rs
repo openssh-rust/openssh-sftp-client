@@ -43,10 +43,10 @@ pub(crate) enum ResponseInner {
         status_code: StatusCode,
 
         /// ISO-10646 UTF-8 [RFC-2279]
-        err_msg: String,
+        err_msg: Box<str>,
 
         /// [RFC-1766]
-        language_tag: String,
+        language_tag: Box<str>,
     },
 
     Handle(Box<[u8]>),
