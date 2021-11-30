@@ -70,3 +70,13 @@ def_u32_constants!(SSH_FXF_APPEND, 0x00000004);
 def_u32_constants!(SSH_FXF_CREAT, 0x00000008);
 def_u32_constants!(SSH_FXF_TRUNC, 0x00000010);
 def_u32_constants!(SSH_FXF_EXCL, 0x00000020);
+
+// extensions
+def_u32_constants!(SFTP_EXT_POSIX_RENAME, 0x00000001);
+def_u32_constants!(SFTP_EXT_STATVFS, 0x00000002);
+def_u32_constants!(SFTP_EXT_FSTATVFS, 0x00000004);
+def_u32_constants!(SFTP_EXT_HARDLINK, 0x00000008);
+def_u32_constants!(SFTP_EXT_FSYNC, 0x00000010);
+def_u32_constants!(SFTP_EXT_LSETSTAT, 0x00000020);
+def_u32_constants!(SFTP_EXT_LIMITS, 0x00000040);
+def_u32_constants!(SFTP_EXT_PATH_EXPAND, 0x00000080);
