@@ -1,5 +1,6 @@
 use super::{constants, Extensions};
 
+use serde::de::{Deserialize, Deserializer, Error, Unexpected};
 use ssh_format::from_bytes;
 
 use vec_strings::Strings;
@@ -63,4 +64,29 @@ pub(crate) enum StatusCode {
     NoConnection = constants::SSH_FX_NO_CONNECTION,
     ConnectionLost = constants::SSH_FX_CONNECTION_LOST,
     OpUnsupported = constants::SSH_FX_OP_UNSUPPORTED,
+}
+impl<'de> Deserialize<'de> for StatusCode {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use constants::*;
+        use StatusCode::*;
+
+        let discriminent = <u32 as Deserialize>::deserialize(deserializer)?;
+
+        match discriminent {
+            SSH_FX_OK => Ok(Success),
+            SSH_FX_EOF => Ok(Eof),
+            SSH_FX_NO_SUCH_FILE => Ok(NoSuchFile),
+            SSH_FX_PERMISSION_DENIED => Ok(PermDenied),
+            SSH_FX_FAILURE => Ok(Failure),
+            SSH_FX_BAD_MESSAGE => Ok(BadMessage),
+            SSH_FX_NO_CONNECTION => Ok(NoConnection),
+            SSH_FX_CONNECTION_LOST => Ok(ConnectionLost),
+            SSH_FX_OP_UNSUPPORTED => Ok(OpUnsupported),
+
+            _ => Err(Error::invalid_value(
+                Unexpected::Unsigned(discriminent as u64),
+                &"Invalid status code",
+            )),
+        }
+    }
 }
