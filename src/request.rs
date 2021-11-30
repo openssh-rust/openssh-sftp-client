@@ -20,10 +20,7 @@ pub(crate) enum Request<'a> {
     },
 
     /// Response will be SSH_FXP_STATUS.
-    Close {
-        request_id: u32,
-        handle: Cow<'a, str>,
-    },
+    Close { request_id: u32, handle: &'a [u8] },
 
     /// In response to this request, the server will read as many bytes as it
     /// can from the file (up to `len'), and return them in a SSH_FXP_DATA
@@ -36,7 +33,7 @@ pub(crate) enum Request<'a> {
     /// For e.g. device files this may return fewer bytes than requested.
     Read {
         request_id: u32,
-        handle: Cow<'a, str>,
+        handle: &'a [u8],
         offset: u64,
         len: u32,
     },
@@ -56,7 +53,7 @@ pub(crate) enum Request<'a> {
     /// included in the size of the entire packet sent.
     Write {
         request_id: u32,
-        handle: Cow<'a, str>,
+        handle: &'a [u8],
         offset: u64,
     },
 
@@ -96,7 +93,7 @@ impl Serialize for Request<'_> {
                 (constants::SSH_FXP_OPEN, *request_id, params).serialize(serializer)
             }
             Close { request_id, handle } => {
-                (constants::SSH_FXP_CLOSE, *request_id, handle).serialize(serializer)
+                (constants::SSH_FXP_CLOSE, *request_id, *handle).serialize(serializer)
             }
             Read {
                 request_id,
@@ -104,13 +101,13 @@ impl Serialize for Request<'_> {
                 offset,
                 len,
             } => {
-                (constants::SSH_FXP_READ, *request_id, handle, *offset, *len).serialize(serializer)
+                (constants::SSH_FXP_READ, *request_id, *handle, *offset, *len).serialize(serializer)
             }
             Write {
                 request_id,
                 handle,
                 offset,
-            } => (constants::SSH_FXP_WRITE, *request_id, handle, *offset).serialize(serializer),
+            } => (constants::SSH_FXP_WRITE, *request_id, *handle, *offset).serialize(serializer),
 
             Remove {
                 request_id,
