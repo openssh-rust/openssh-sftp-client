@@ -9,9 +9,9 @@ use thunderdome::Arena;
 pub(crate) type Value = Awaitable<(Response, Box<[u8]>)>;
 
 #[derive(Debug, Default)]
-pub(crate) struct Responses(Arena<Value>);
+pub(crate) struct AwaitableResponses(Arena<Value>);
 
-impl Responses {
+impl AwaitableResponses {
     pub fn insert(&mut self) -> AwaitableResponse {
         let awaitable_response = Awaitable::new();
 

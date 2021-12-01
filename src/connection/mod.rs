@@ -1,7 +1,7 @@
 mod awaitable;
-mod responses;
+mod awaitable_responses;
 
-use responses::*;
+use awaitable_responses::*;
 
 use openssh_sftp_protocol::response::Response;
 
@@ -11,14 +11,14 @@ use tokio_pipe::{PipeRead, PipeWrite};
 pub struct Connection {
     writer: PipeWrite,
     reader: PipeRead,
-    responses: Responses,
+    responses: AwaitableResponses,
 }
 impl Connection {
     pub(crate) async fn new(reader: PipeRead, writer: PipeWrite) -> Self {
         Self {
             reader,
             writer,
-            responses: Responses::default(),
+            responses: AwaitableResponses::default(),
         }
     }
 }
