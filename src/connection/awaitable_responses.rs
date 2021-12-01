@@ -12,7 +12,7 @@ pub(crate) type Value = Awaitable<(Response, Box<[u8]>)>;
 pub(crate) struct AwaitableResponses(Arena<Value>);
 
 impl AwaitableResponses {
-    pub fn insert(&mut self) -> AwaitableResponse {
+    pub(crate) fn insert(&mut self) -> AwaitableResponse {
         let awaitable_response = Awaitable::new();
 
         AwaitableResponse(
