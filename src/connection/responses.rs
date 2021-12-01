@@ -4,8 +4,6 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use std::io;
-
 use thunderdome::Arena;
 
 pub(crate) type Value = Awaitable<(Response, Box<[u8]>)>;
@@ -23,17 +21,10 @@ impl Responses {
         )
     }
 
-    pub(crate) async fn do_callback(
-        &mut self,
-        slot: u32,
-        response: Response,
-        buffer: Box<[u8]>,
-    ) -> io::Result<()> {
+    pub(crate) async fn do_callback(&mut self, slot: u32, response: Response, buffer: Box<[u8]>) {
         self.remove(slot)
             .expect("Invalid slot")
             .done((response, buffer));
-
-        Ok(())
     }
 
     /// Precondition: There must not be an ongoing request for `slot`.
