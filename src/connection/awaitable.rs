@@ -1,21 +1,28 @@
 use core::mem;
 use core::task::Waker;
 
+use std::sync::Arc;
+
 use parking_lot::Mutex;
 
 #[derive(Debug)]
 enum InnerState<T> {
     None,
-    Done(T),
     Waiting(Waker),
+
+    /// The awaitable is done
+    Done(T),
+
+    /// The result of awaitable is taken
+    Completed,
 }
 
-#[derive(Debug)]
-pub(crate) struct Awaitable<T>(Mutex<InnerState<T>>);
+#[derive(Debug, Clone)]
+pub(crate) struct Awaitable<T>(Arc<Mutex<InnerState<T>>>);
 
 impl<T> Awaitable<T> {
     pub(crate) fn new() -> Self {
-        Self(Mutex::new(InnerState::None))
+        Self(Arc::new(Mutex::new(InnerState::None)))
     }
 
     /// Return true if the task is already done.
@@ -28,6 +35,7 @@ impl<T> Awaitable<T> {
             Waiting(_waker) => panic!("Waker is installed twice"),
             None => false,
             Done(_) => true,
+            Completed => panic!("The result of awaitable is already taken"),
         };
         if !done {
             *guard = Waiting(waker);
@@ -42,16 +50,18 @@ impl<T> Awaitable<T> {
         let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
 
         match prev_state {
-            Done(_) => panic!("Awaitable is marked as done twice"),
+            Done(_) | Completed => panic!("Awaitable is marked as done twice"),
             None => (),
             Waiting(waker) => waker.wake(),
         }
     }
 
     pub(crate) fn get_value(self) -> Option<T> {
-        use InnerState::Done;
+        use InnerState::{Completed, Done};
 
-        match self.0.into_inner() {
+        let prev_state = mem::replace(&mut *self.0.lock(), Completed);
+
+        match prev_state {
             Done(value) => Some(value),
             _ => None,
         }
