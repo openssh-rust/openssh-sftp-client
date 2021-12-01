@@ -9,7 +9,7 @@ license = "MIT"
 description = "Data format used to communicate with openssh mux server."
 repository = "https://github.com/NobodyXu/openssh-sftp-client"
 
-keywords = ["ssh", "openssh", "multiplex", "async", "network", "sftp"]
+keywords = ["ssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
