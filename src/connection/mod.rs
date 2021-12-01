@@ -9,7 +9,7 @@ use write_end::WriteEnd;
 
 pub(crate) use responses::{SlotGuard, SlotGuardNoAwait};
 
-use super::Response;
+use openssh_sftp_protocol::response::Response;
 
 use std::io;
 use std::sync::Arc;
@@ -35,7 +35,7 @@ impl Connection {
         self.responses.insert_no_await()
     }
 
-    pub(crate) async fn new(mut reader: PipeRead, mut writer: PipeWrite) -> Self {
+    pub(crate) async fn new(reader: PipeRead, writer: PipeWrite) -> Self {
         let responses = Arc::new(Responses::default());
 
         let mut read_end = ReadEnd::new(reader);

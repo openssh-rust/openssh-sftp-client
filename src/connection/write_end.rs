@@ -1,13 +1,11 @@
 use core::future::Future;
 use core::pin::Pin;
-use core::slice;
 use core::task::{Context, Poll};
 
 use std::io::{self, IoSlice};
 
 use tokio::sync::RwLock;
 
-use tokio::io::AsyncWriteExt;
 use tokio_async_write_utility::AsyncWriteUtility;
 use tokio_pipe::{AtomicWriteIoSlices, PipeWrite};
 
