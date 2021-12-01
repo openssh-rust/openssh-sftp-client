@@ -45,9 +45,11 @@ impl Connection {
     }
 
     async fn negotiate(&mut self) -> Result<(), Error> {
+        let version = SSH2_FILEXFER_VERSION;
+
         // Sent hello message
         let bytes = self.transformer.serialize(Hello {
-            version: SSH2_FILEXFER_VERSION as u32,
+            version,
             extensions: Default::default(),
         })?;
         self.writer
@@ -59,7 +61,7 @@ impl Connection {
         self.read_exact(len as usize).await?;
         let server_version = ServerVersion::deserialize(self.transformer.get_buffer())?;
 
-        if server_version.version != (SSH2_FILEXFER_VERSION as u32) {
+        if server_version.version != version {
             Err(Error::UnsupportedSftpProtocol)
         } else {
             Ok(())
