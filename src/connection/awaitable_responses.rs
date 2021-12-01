@@ -1,12 +1,13 @@
-use super::{awaitable::Awaitable, Response};
+use super::awaitable::Awaitable;
 
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
+use openssh_sftp_protocol::response::ResponseInner;
 use thunderdome::Arena;
 
-pub(crate) type Value = Awaitable<(Response, Box<[u8]>)>;
+pub(crate) type Value = Awaitable<(ResponseInner, Box<[u8]>)>;
 
 #[derive(Debug, Default)]
 pub(crate) struct AwaitableResponses(Arena<Value>);
@@ -21,7 +22,12 @@ impl AwaitableResponses {
         )
     }
 
-    pub(crate) async fn do_callback(&mut self, slot: u32, response: Response, buffer: Box<[u8]>) {
+    pub(crate) async fn do_callback(
+        &mut self,
+        slot: u32,
+        response: ResponseInner,
+        buffer: Box<[u8]>,
+    ) {
         self.remove(slot)
             .expect("Invalid slot")
             .done((response, buffer));
@@ -43,7 +49,7 @@ impl AwaitableResponse {
         self.0
     }
 
-    pub(crate) async fn wait(self) -> (Response, Box<[u8]>) {
+    pub(crate) async fn wait(self) -> (ResponseInner, Box<[u8]>) {
         struct WaitFuture<'a>(Option<&'a Value>);
 
         impl Future for WaitFuture<'_> {
