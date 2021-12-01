@@ -6,140 +6,79 @@ use core::task::{Context, Poll};
 
 use std::io;
 
-use parking_lot::RwLock;
 use thunderdome::Arena;
 
-pub(crate) type Value = Option<Awaitable<(Response, Box<[u8]>)>>;
+pub(crate) type Value = Awaitable<(Response, Box<[u8]>)>;
 
 // TODO: Simplify this
 
 #[derive(Debug, Default)]
-pub(crate) struct Responses(RwLock<Arena<Value>>);
+pub(crate) struct Responses(Arena<Value>);
 
 impl Responses {
-    fn insert_impl(&self, waitable: bool) -> u32 {
-        let val = if waitable {
-            Some(Awaitable::new())
-        } else {
-            None
-        };
+    fn insert_impl(&mut self) -> (u32, Value) {
+        let val = Awaitable::new();
 
-        self.0.write().insert(val).slot()
+        (self.0.insert(val.clone()).slot(), val)
     }
 
-    async fn wait_impl(&self, slot: u32) {
-        struct WaitFuture<'a>(Option<&'a RwLock<Arena<Value>>>, u32);
+    pub fn insert(&mut self) -> SlotGuard {
+        let (slot, response) = self.insert_impl();
+        SlotGuard(slot, response)
+    }
+
+    pub(crate) async fn do_callback(
+        &mut self,
+        slot: u32,
+        response: Response,
+        buffer: Box<[u8]>,
+    ) -> io::Result<()> {
+        self.remove(slot)
+            .expect("Invalid slot")
+            .done((response, buffer));
+
+        Ok(())
+    }
+
+    /// Precondition: There must not be an ongoing request for `slot`.
+    pub(crate) fn remove(&mut self, slot: u32) -> Option<Value> {
+        self.0.remove_by_slot(slot).map(|(_index, value)| value)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SlotGuard(u32, Value);
+
+impl SlotGuard {
+    pub(crate) fn get_slot_id(&self) -> u32 {
+        self.0
+    }
+
+    pub(crate) async fn wait(self) -> (Response, Box<[u8]>) {
+        struct WaitFuture<'a>(Option<&'a Value>);
 
         impl Future for WaitFuture<'_> {
             type Output = ();
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let rwlock = if let Some(rwlock) = self.0.take() {
-                    rwlock
+                if let Some(value) = self.0.take() {
+                    let waker = cx.waker().clone();
+
+                    if value.install_waker(waker) {
+                        Poll::Ready(())
+                    } else {
+                        Poll::Pending
+                    }
                 } else {
-                    return Poll::Ready(());
-                };
-
-                let waker = cx.waker().clone();
-
-                let guard = rwlock.read();
-                let (_index, value) = guard.get_by_slot(self.1).expect("Invalid slot");
-
-                if value.as_ref().unwrap().install_waker(waker) {
                     Poll::Ready(())
-                } else {
-                    Poll::Pending
                 }
             }
         }
 
-        WaitFuture(Some(&self.0), slot).await;
-    }
+        WaitFuture(Some(&self.1)).await;
 
-    pub fn insert(&self) -> SlotGuard {
-        SlotGuard(Some(self), self.insert_impl(true))
-    }
-
-    /// It is recommended to use this function in `Drop::drop` implementation
-    /// since it does not require any `.await`.
-    pub fn insert_no_await(&self) -> SlotGuardNoAwait {
-        SlotGuardNoAwait(self, self.insert_impl(false))
-    }
-
-    /// Prototype
-    pub(crate) async fn do_callback(
-        &self,
-        slot: u32,
-        response: Response,
-        buffer: Box<[u8]>,
-    ) -> io::Result<()> {
-        let need_removal = match self.0.read().get_by_slot(slot) {
-            None => return Ok(()),
-            Some((_index, value)) => {
-                if let Some(awaitable) = value {
-                    awaitable.done((response, buffer));
-                    false
-                } else {
-                    true
-                }
-            }
-        };
-
-        if need_removal {
-            self.remove(slot);
-        }
-
-        Ok(())
-    }
-
-    fn remove(&self, slot: u32) -> Value {
-        self.0
-            .write()
-            .remove_by_slot(slot)
-            .expect("Slot is removed before SlotGuard is dropped or waited")
-            .1
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct SlotGuard<'a>(Option<&'a Responses>, u32);
-
-impl SlotGuard<'_> {
-    pub(crate) fn get_slot_id(&self) -> u32 {
         self.1
-    }
-
-    pub(crate) async fn wait(mut self) -> (Response, Box<[u8]>) {
-        let responses = self.0.take().unwrap();
-        let slot = self.1;
-        responses.wait_impl(slot).await;
-        responses
-            .remove(slot)
-            .unwrap()
             .get_value()
-            .expect("Response is already processed and get_value should return a value")
-    }
-}
-
-impl Drop for SlotGuard<'_> {
-    fn drop(&mut self) {
-        if let Some(responses) = self.0.take() {
-            responses.remove(self.1);
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct SlotGuardNoAwait<'a>(&'a Responses, u32);
-
-impl SlotGuardNoAwait<'_> {
-    pub(crate) fn get_slot_id(&self) -> u32 {
-        self.1
-    }
-}
-
-impl Drop for SlotGuardNoAwait<'_> {
-    fn drop(&mut self) {
-        self.0.remove(self.1);
+            .expect("The request should be done by now")
     }
 }
