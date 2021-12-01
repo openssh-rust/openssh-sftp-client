@@ -1,16 +1,18 @@
-use openssh_sftp_protocol::ssh_format;
 use std::io;
 use thiserror::Error;
 
+use openssh_sftp_protocol::response::ResponseInner;
+use openssh_sftp_protocol::ssh_format;
+
 #[derive(Debug, Error)]
 pub enum Error {
-    /// Server speaks multiplex protocol other than protocol 4.
-    #[error("Server speaks multiplex protocol other than protocol 4.")]
-    UnsupportedMuxProtocol,
+    /// Server speaks sftp protocol other than protocol 4.
+    #[error("Server speaks sftp protocol other than protocol 4.")]
+    UnsupportedSftpProtocol,
 
-    /// Server response with unexpected package type {0}: Response {1:#?}.
-    #[error("Server response with unexpected package type {0}")]
-    InvalidServerResponse(&'static str),
+    /// Server response with unexpected package type.
+    #[error("Server response with unexpected package type {0}: Response {1:#?}")]
+    InvalidServerResponse(&'static str, ResponseInner),
 
     /// Server response with a different id than the requested one.
     #[error("Server response with a different id than the requested one.")]
