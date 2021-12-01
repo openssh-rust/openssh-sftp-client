@@ -1,11 +1,7 @@
 mod awaitable;
-mod read_end;
 mod responses;
-mod write_end;
 
-use read_end::ReadEnd;
 use responses::Responses;
-use write_end::WriteEnd;
 
 pub(crate) use responses::{SlotGuard, SlotGuardNoAwait};
 
@@ -19,8 +15,8 @@ use tokio_pipe::{PipeRead, PipeWrite};
 
 #[derive(Debug)]
 pub struct Connection {
-    write_end: WriteEnd,
-    read_task: JoinHandle<io::Result<()>>,
+    writer: PipeWrite,
+    reader: PipeRead,
 
     responses: Arc<Responses>,
 }
@@ -38,15 +34,9 @@ impl Connection {
     pub(crate) async fn new(reader: PipeRead, writer: PipeWrite) -> Self {
         let responses = Arc::new(Responses::default());
 
-        let mut read_end = ReadEnd::new(reader);
-
         Self {
-            read_task: tokio::spawn(async move {
-                loop {
-                    read_end.read_one_response().await?;
-                }
-            }),
-            write_end: WriteEnd::new(writer),
+            reader,
+            writer,
             responses,
         }
     }
