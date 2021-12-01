@@ -9,13 +9,12 @@ use parking_lot::Mutex;
 #[derive(Debug)]
 enum InnerState<T> {
     None,
+
+    /// The wakeup callback is registered.
     Waiting(Waker),
 
     /// The awaitable is done
     Done(T),
-
-    /// The result of awaitable is taken
-    Completed,
 }
 
 #[derive(Debug, Clone)]
@@ -33,10 +32,9 @@ impl<T: Debug> Awaitable<T> {
         let mut guard = self.0.lock();
 
         let done = match &*guard {
-            Waiting(_waker) => panic!("Waker is installed twice"),
+            Waiting(_waker) => panic!("Waker is installed twice before the awaitable is done"),
             None => false,
             Done(_) => true,
-            Completed => panic!("The result of awaitable is already taken"),
         };
         if !done {
             *guard = Waiting(waker);
@@ -51,18 +49,20 @@ impl<T: Debug> Awaitable<T> {
         let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
 
         match prev_state {
-            Done(_) | Completed => panic!("Awaitable is marked as done twice"),
+            Done(_) => panic!("Awaitable is marked as done twice"),
             None => (),
             Waiting(waker) => waker.wake(),
         }
     }
 
+    /// Precondition: This must be the last Awaitable.
     pub(crate) fn get_value(self) -> Option<T> {
-        use InnerState::{Completed, Done};
+        use InnerState::Done;
 
-        let prev_state = mem::replace(&mut *self.0.lock(), Completed);
-
-        match Arc::try_unwrap(self.0).unwrap().into_inner() {
+        match Arc::try_unwrap(self.0)
+            .expect("get_value is called when there is other awaitable alive")
+            .into_inner()
+        {
             Done(value) => Some(value),
             _ => None,
         }
