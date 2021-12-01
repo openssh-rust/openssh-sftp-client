@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 use core::mem;
 use core::task::Waker;
 
@@ -18,9 +19,9 @@ enum InnerState<T> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Awaitable<T>(Arc<Mutex<InnerState<T>>>);
+pub(crate) struct Awaitable<T: Debug>(Arc<Mutex<InnerState<T>>>);
 
-impl<T> Awaitable<T> {
+impl<T: Debug> Awaitable<T> {
     pub(crate) fn new() -> Self {
         Self(Arc::new(Mutex::new(InnerState::None)))
     }
@@ -61,7 +62,7 @@ impl<T> Awaitable<T> {
 
         let prev_state = mem::replace(&mut *self.0.lock(), Completed);
 
-        match prev_state {
+        match Arc::try_unwrap(self.0).unwrap().into_inner() {
             Done(value) => Some(value),
             _ => None,
         }
