@@ -23,4 +23,4 @@ openssh-sftp-protocol = "0.5.0"
 
 tokio = { version = "1.11.0", features = ["io-util"] }
 tokio-pipe = "0.2.6"
-tokio-async-write-utility = "0.1"
+tokio-io-utility = "0.1.1"

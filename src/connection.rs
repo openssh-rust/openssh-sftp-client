@@ -11,7 +11,7 @@ use ssh_format::Transformer;
 use std::io::IoSlice;
 
 use tokio::io::AsyncReadExt;
-use tokio_async_write_utility::AsyncWriteUtility;
+use tokio_io_utility::AsyncWriteUtility;
 use tokio_pipe::{PipeRead, PipeWrite};
 
 #[derive(Debug)]
