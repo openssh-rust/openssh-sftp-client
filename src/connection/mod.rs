@@ -3,10 +3,10 @@ mod awaitable_responses;
 
 use super::Error;
 
-use awaitable_responses::*;
+use awaitable_responses::AwaitableResponses;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-use openssh_sftp_protocol::request::Hello;
+use openssh_sftp_protocol::request::{Hello, Request};
 use openssh_sftp_protocol::response::ServerVersion;
 use openssh_sftp_protocol::serde::{Deserialize, Serialize};
 use openssh_sftp_protocol::ssh_format::Transformer;
@@ -16,6 +16,8 @@ use std::io::IoSlice;
 use tokio::io::AsyncReadExt;
 use tokio_async_write_utility::AsyncWriteUtility;
 use tokio_pipe::{PipeRead, PipeWrite};
+
+pub use awaitable_responses::{AwaitableResponse, Response};
 
 pub use openssh_sftp_protocol::file_attrs::FileAttrs;
 pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile, RequestInner};
@@ -98,5 +100,30 @@ impl Connection {
         val.negotiate().await?;
 
         Ok(val)
+    }
+
+    /// Send requests (except for writes)
+    pub async fn send_request(
+        &mut self,
+        request: RequestInner<'_>,
+    ) -> Result<AwaitableResponse, Error> {
+        let (request_id, awaitable_response) = self.responses.insert();
+        match self
+            .write(
+                Request {
+                    request_id,
+                    inner: request,
+                },
+                None,
+            )
+            .await
+        {
+            Ok(_) => Ok(awaitable_response),
+            Err(err) => {
+                self.responses.remove(request_id).unwrap();
+
+                Err(err)
+            }
+        }
     }
 }
