@@ -165,46 +165,43 @@ impl Connection {
     }
 
     /// * `len` - includes packet_type.
-    async fn read_in_data_packet(&mut self, len: u32) -> Result<(u32, Response), Error> {
-        let request_id = self.read_and_deserialize(4).await?;
-
+    async fn read_in_data_packet(&mut self, len: u32) -> Result<Response, Error> {
         // 1 byte for the packet_type and 4 byte for the request_id
         let mut vec = vec![0; (len - 5) as usize];
         self.reader.read_exact(&mut vec).await?;
 
-        Ok((request_id, Response::Buffer(vec.into_boxed_slice())))
+        Ok(Response::Buffer(vec.into_boxed_slice()))
     }
 
     /// * `len` - includes the packet type
-    async fn read_in_packet(&mut self, len: u32) -> Result<(u32, Response), Error> {
-        // Remove the length
+    async fn read_in_packet(&mut self, len: u32) -> Result<Response, Error> {
+        // Remove the len
         self.transformer.get_buffer().drain(0..4);
 
         // Read in the rest of the packets, but do not overwrite the packet_type
+        // and the response_id
         self.transformer.get_buffer().resize(len as usize, 0);
         self.reader
-            .read_exact(&mut self.transformer.get_buffer()[1..])
+            // Skip packet_type (1 byte) and response_id (4 byte)
+            .read_exact(&mut self.transformer.get_buffer()[5..])
             .await?;
 
         // Ignore any trailing bytes to be forward compatible
         let response: response::Response = self.transformer.deserialize()?.0;
 
-        Ok((
-            response.response_id,
-            Response::Header(response.response_inner),
-        ))
+        Ok(Response::Header(response.response_inner))
     }
 
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
-        let (len, packet_type): (u32, u8) = self.read_and_deserialize(5).await?;
+        let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
 
-        let (request_id, response) = if response::Response::is_data(packet_type) {
+        let response = if response::Response::is_data(packet_type) {
             self.read_in_data_packet(len).await?
         } else {
             self.read_in_packet(len).await?
         };
 
-        self.responses.do_callback(request_id, response);
+        self.responses.do_callback(response_id, response);
 
         Ok(())
     }
