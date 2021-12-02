@@ -1,11 +1,13 @@
 use std::io;
 use thiserror::Error;
 
-use openssh_sftp_protocol::response::{ResponseInner, StatusCode};
+use openssh_sftp_protocol::response::StatusCode;
 use openssh_sftp_protocol::ssh_format;
 
 pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
 pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
+
+pub use openssh_sftp_protocol::response::ResponseInner;
 
 #[derive(Debug, Error)]
 pub enum Error {
