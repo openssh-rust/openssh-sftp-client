@@ -52,14 +52,17 @@ impl Connection {
         Ok(())
     }
 
+    fn deserialize<'a, T: Deserialize<'a>>(&'a self) -> Result<T, Error> {
+        // Ignore any trailing bytes to be forward compatible
+        Ok(self.transformer.deserialize()?.0)
+    }
+
     async fn read_and_deserialize<'a, T>(&'a mut self, size: usize) -> Result<T, Error>
     where
         T: Deserialize<'a>,
     {
         self.read_exact(size).await?;
-
-        // Ignore any trailing bytes to be forward compatible
-        Ok(self.transformer.deserialize()?.0)
+        self.deserialize()
     }
 
     async fn negotiate(&mut self) -> Result<(), Error> {
@@ -186,8 +189,7 @@ impl Connection {
             .read_exact(&mut self.transformer.get_buffer()[5..])
             .await?;
 
-        // Ignore any trailing bytes to be forward compatible
-        let response: response::Response = self.transformer.deserialize()?.0;
+        let response: response::Response = self.deserialize()?;
 
         Ok(Response::Header(response.response_inner))
     }
