@@ -17,7 +17,7 @@ pub enum Response {
     Buffer(Box<[u8]>),
 }
 
-pub(crate) type Value = Awaitable<(ResponseInner, Box<[u8]>)>;
+pub(crate) type Value = Awaitable<Response>;
 
 #[derive(Debug, Default)]
 pub(crate) struct AwaitableResponses(Arena<Value>);
@@ -32,15 +32,8 @@ impl AwaitableResponses {
         )
     }
 
-    pub(crate) async fn do_callback(
-        &mut self,
-        slot: u32,
-        response: ResponseInner,
-        buffer: Box<[u8]>,
-    ) {
-        self.remove(slot)
-            .expect("Invalid slot")
-            .done((response, buffer));
+    pub(crate) async fn do_callback(&mut self, slot: u32, response: Response, buffer: Box<[u8]>) {
+        self.remove(slot).expect("Invalid slot").done(response);
     }
 
     /// Precondition: There must not be an ongoing request for `slot`.
@@ -59,7 +52,7 @@ impl AwaitableResponse {
         self.0
     }
 
-    pub(crate) async fn wait(self) -> (ResponseInner, Box<[u8]>) {
+    pub(crate) async fn wait(self) -> Response {
         struct WaitFuture<'a>(Option<&'a Value>);
 
         impl Future for WaitFuture<'_> {

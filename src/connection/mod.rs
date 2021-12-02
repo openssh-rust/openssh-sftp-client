@@ -17,8 +17,10 @@ use tokio::io::AsyncReadExt;
 use tokio_async_write_utility::AsyncWriteUtility;
 use tokio_pipe::{PipeRead, PipeWrite};
 
+pub use openssh_sftp_protocol::file_attrs::FileAttrs;
 pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile, RequestInner};
 pub use openssh_sftp_protocol::response::{NameEntry, ResponseInner};
+pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
 #[derive(Debug)]
 pub struct Connection {
