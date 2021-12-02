@@ -7,7 +7,7 @@ use awaitable_responses::AwaitableResponses;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use openssh_sftp_protocol::request::{Hello, Request};
-use openssh_sftp_protocol::response::ServerVersion;
+use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::{Deserialize, Serialize};
 use ssh_format::Transformer;
 
@@ -162,5 +162,50 @@ impl Connection {
                 Err(err)
             }
         }
+    }
+
+    /// * `len` - includes packet_type.
+    async fn read_in_data_packet(&mut self, len: u32) -> Result<(u32, Response), Error> {
+        let request_id = self.read_and_deserialize(4).await?;
+
+        // 1 byte for the packet_type and 4 byte for the request_id
+        let mut vec = vec![0; (len - 5) as usize];
+        self.reader.read_exact(&mut vec).await?;
+
+        Ok((request_id, Response::Buffer(vec.into_boxed_slice())))
+    }
+
+    /// * `len` - includes the packet type
+    async fn read_in_packet(&mut self, len: u32) -> Result<(u32, Response), Error> {
+        // Remove the length
+        self.transformer.get_buffer().drain(0..4);
+
+        // Read in the rest of the packets, but do not overwrite the packet_type
+        self.transformer.get_buffer().resize(len as usize, 0);
+        self.reader
+            .read_exact(&mut self.transformer.get_buffer()[1..])
+            .await?;
+
+        // Ignore any trailing bytes to be forward compatible
+        let response: response::Response = self.transformer.deserialize()?.0;
+
+        Ok((
+            response.response_id,
+            Response::Header(response.response_inner),
+        ))
+    }
+
+    pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
+        let (len, packet_type): (u32, u8) = self.read_and_deserialize(5).await?;
+
+        let (request_id, response) = if response::Response::is_data(packet_type) {
+            self.read_in_data_packet(len).await?
+        } else {
+            self.read_in_packet(len).await?
+        };
+
+        self.responses.do_callback(request_id, response);
+
+        Ok(())
     }
 }
