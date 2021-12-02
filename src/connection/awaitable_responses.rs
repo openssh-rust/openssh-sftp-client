@@ -49,7 +49,7 @@ impl AwaitableResponses {
 pub struct AwaitableResponse(Value);
 
 impl AwaitableResponse {
-    pub(crate) async fn wait(self) -> Response {
+    pub async fn wait(self) -> Response {
         struct WaitFuture<'a>(Option<&'a Value>);
 
         impl Future for WaitFuture<'_> {
