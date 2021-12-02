@@ -23,12 +23,13 @@ pub(crate) type Value = Awaitable<Response>;
 pub(crate) struct AwaitableResponses(Arena<Value>);
 
 impl AwaitableResponses {
-    pub(crate) fn insert(&mut self) -> AwaitableResponse {
+    /// Return (slot_id, awaitable_response)
+    pub(crate) fn insert(&mut self) -> (u32, AwaitableResponse) {
         let awaitable_response = Awaitable::new();
 
-        AwaitableResponse(
+        (
             self.0.insert(awaitable_response.clone()).slot(),
-            awaitable_response,
+            AwaitableResponse(awaitable_response),
         )
     }
 
@@ -45,13 +46,9 @@ impl AwaitableResponses {
 }
 
 #[derive(Debug)]
-pub struct AwaitableResponse(u32, Value);
+pub struct AwaitableResponse(Value);
 
 impl AwaitableResponse {
-    pub(crate) fn get_slot_id(&self) -> u32 {
-        self.0
-    }
-
     pub(crate) async fn wait(self) -> Response {
         struct WaitFuture<'a>(Option<&'a Value>);
 
@@ -73,9 +70,9 @@ impl AwaitableResponse {
             }
         }
 
-        WaitFuture(Some(&self.1)).await;
+        WaitFuture(Some(&self.0)).await;
 
-        self.1
+        self.0
             .get_value()
             .expect("The request should be done by now")
     }
