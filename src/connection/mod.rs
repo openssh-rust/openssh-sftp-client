@@ -21,6 +21,9 @@ pub use awaitable_responses::{AwaitableResponse, Response};
 
 pub use openssh_sftp_protocol::file_attrs::FileAttrs;
 pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile, RequestInner};
+pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
+pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
+pub use openssh_sftp_protocol::response::StatusCode;
 pub use openssh_sftp_protocol::response::{NameEntry, ResponseInner};
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
