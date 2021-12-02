@@ -10,7 +10,6 @@ use ssh_format::Transformer;
 
 use std::io::IoSlice;
 
-use tokio::io::AsyncReadExt;
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
 use tokio_pipe::{PipeRead, PipeWrite};
 
@@ -36,9 +35,6 @@ impl Connection {
     async fn read_exact(&mut self, size: usize) -> Result<(), Error> {
         self.transformer.get_buffer().clear();
         read_exact_to_vec(&mut self.reader, self.transformer.get_buffer(), size).await?;
-        self.reader
-            .read_exact(&mut self.transformer.get_buffer())
-            .await?;
 
         Ok(())
     }
