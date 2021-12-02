@@ -8,7 +8,7 @@ use awaitable_responses::*;
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use openssh_sftp_protocol::request::Hello;
 use openssh_sftp_protocol::response::ServerVersion;
-use openssh_sftp_protocol::serde::Deserialize;
+use openssh_sftp_protocol::serde::{Deserialize, Serialize};
 use openssh_sftp_protocol::ssh_format::Transformer;
 
 use std::io::IoSlice;
@@ -28,6 +28,19 @@ pub struct Connection {
     responses: AwaitableResponses,
 }
 impl Connection {
+    async fn write<T>(&mut self, value: T, data: Option<&[u8]>) -> Result<(), Error>
+    where
+        T: Serialize,
+    {
+        let mut slices = [
+            IoSlice::new(self.transformer.serialize(value)?),
+            IoSlice::new(data.unwrap_or(&[])),
+        ];
+        self.writer.write_vectored_all(&mut slices).await?;
+
+        Ok(())
+    }
+
     async fn read_exact(&mut self, size: usize) -> Result<(), Error> {
         self.transformer.get_buffer().resize(size, 0);
         self.reader
@@ -51,13 +64,14 @@ impl Connection {
         let version = SSH2_FILEXFER_VERSION;
 
         // Sent hello message
-        let bytes = self.transformer.serialize(Hello {
-            version,
-            extensions: Default::default(),
-        })?;
-        self.writer
-            .write_vectored_all(&mut [IoSlice::new(bytes)])
-            .await?;
+        self.write(
+            Hello {
+                version,
+                extensions: Default::default(),
+            },
+            None,
+        )
+        .await?;
 
         // Receive server version
         let len: u32 = self.read_and_deserialize(4).await?;
