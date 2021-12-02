@@ -34,6 +34,10 @@ pub enum Error {
     /// Sftp error.
     #[error("Sftp error: {0:#?}, {1:#?}.")]
     SftpError(SftpErrorKind, SftpErrMsg),
+
+    /// Sftp protocol can only send and receive at most u32::MAX data in one request.
+    #[error("Sftp protocol can only send and receive at most u32::MAX data in one request.")]
+    BufferTooLong,
 }
 
 impl Error {
