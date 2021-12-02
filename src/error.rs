@@ -1,8 +1,11 @@
 use std::io;
 use thiserror::Error;
 
-use openssh_sftp_protocol::response::ResponseInner;
+use openssh_sftp_protocol::response::{ResponseInner, StatusCode};
 use openssh_sftp_protocol::ssh_format;
+
+pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
+pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -25,4 +28,26 @@ pub enum Error {
     /// Failed to serialize/deserialize the message: {0}.
     #[error("Failed to serialize/deserialize the message: {0}.")]
     FormatError(#[from] ssh_format::Error),
+
+    /// Sftp error.
+    #[error("Sftp error: {0:#?}, {1:#?}.")]
+    SftpError(SftpErrorKind, SftpErrMsg),
+}
+
+impl Error {
+    pub(crate) fn check_response(response: ResponseInner) -> Result<ResponseInner, Error> {
+        match response {
+            ResponseInner::Status {
+                status_code,
+                err_msg,
+            } => match status_code {
+                StatusCode::Success => Ok(ResponseInner::Status {
+                    status_code: StatusCode::Success,
+                    err_msg,
+                }),
+                StatusCode::Failure(err_kind) => Err(Error::SftpError(err_kind, err_msg)),
+            },
+            response => Ok(response),
+        }
+    }
 }
