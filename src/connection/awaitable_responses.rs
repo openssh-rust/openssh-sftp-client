@@ -9,12 +9,12 @@ use thunderdome::Arena;
 
 #[derive(Debug, Clone)]
 pub enum Response {
-    header(ResponseInner),
+    Header(ResponseInner),
 
     /// The buffer that stores the response of Read,
     /// since its corresponding response type `ResponseInner::Data`
     /// does not contain any member, it doesn't have to be stored.
-    buffer(Box<[u8]>),
+    Buffer(Box<[u8]>),
 }
 
 pub(crate) type Value = Awaitable<(ResponseInner, Box<[u8]>)>;
