@@ -33,7 +33,7 @@ impl AwaitableResponses {
         )
     }
 
-    pub(crate) async fn do_callback(&mut self, slot: u32, response: Response, buffer: Box<[u8]>) {
+    pub(crate) async fn do_callback(&mut self, slot: u32, response: Response) {
         self.remove(slot).expect("Invalid slot").done(response);
     }
 
