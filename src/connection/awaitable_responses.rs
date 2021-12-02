@@ -45,7 +45,7 @@ impl AwaitableResponses {
 }
 
 #[derive(Debug)]
-pub(crate) struct AwaitableResponse(u32, Value);
+pub struct AwaitableResponse(u32, Value);
 
 impl AwaitableResponse {
     pub(crate) fn get_slot_id(&self) -> u32 {
