@@ -11,7 +11,7 @@ use ssh_format::Transformer;
 use std::io::IoSlice;
 
 use tokio::io::AsyncReadExt;
-use tokio_io_utility::AsyncWriteUtility;
+use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
 use tokio_pipe::{PipeRead, PipeWrite};
 
 #[derive(Debug)]
@@ -34,7 +34,8 @@ impl Connection {
     }
 
     async fn read_exact(&mut self, size: usize) -> Result<(), Error> {
-        self.transformer.get_buffer().resize(size, 0);
+        self.transformer.get_buffer().clear();
+        read_exact_to_vec(&mut self.reader, self.transformer.get_buffer(), size).await?;
         self.reader
             .read_exact(&mut self.transformer.get_buffer())
             .await?;
@@ -157,27 +158,26 @@ impl Connection {
         }
     }
 
-    /// * `len` - includes packet_type.
+    /// * `len` - excludes packet_type and request_id.
     async fn read_in_data_packet(&mut self, len: u32) -> Result<Response, Error> {
-        // 1 byte for the packet_type and 4 byte for the request_id
-        let mut vec = vec![0; (len - 5) as usize];
-        self.reader.read_exact(&mut vec).await?;
+        let mut vec = Vec::new();
+        read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
 
         Ok(Response::Buffer(vec.into_boxed_slice()))
     }
 
-    /// * `len` - includes the packet type
+    /// * `len` - excludes packet_type and request_id.
     async fn read_in_packet(&mut self, len: u32) -> Result<Response, Error> {
         // Remove the len
         self.transformer.get_buffer().drain(0..4);
 
-        // Read in the rest of the packets, but do not overwrite the packet_type
-        // and the response_id
-        self.transformer.get_buffer().resize(len as usize, 0);
-        self.reader
-            // Skip packet_type (1 byte) and response_id (4 byte)
-            .read_exact(&mut self.transformer.get_buffer()[5..])
-            .await?;
+        // read_exact_to_vec does not overwrite any existing data.
+        read_exact_to_vec(
+            &mut self.reader,
+            &mut self.transformer.get_buffer(),
+            len as usize,
+        )
+        .await?;
 
         let response: response::Response = self.deserialize()?;
 
@@ -186,6 +186,8 @@ impl Connection {
 
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
         let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
+
+        let len = len - 5;
 
         let response = if response::Response::is_data(packet_type) {
             self.read_in_data_packet(len).await?
