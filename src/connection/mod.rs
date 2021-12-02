@@ -32,15 +32,13 @@ pub struct Connection {
     responses: AwaitableResponses,
 }
 impl Connection {
-    async fn write<T>(&mut self, value: T, data: Option<&[u8]>) -> Result<(), Error>
+    async fn write<T>(&mut self, value: T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let mut slices = [
-            IoSlice::new(self.transformer.serialize(value)?),
-            IoSlice::new(data.unwrap_or(&[])),
-        ];
-        self.writer.write_vectored_all(&mut slices).await?;
+        self.writer
+            .write_vectored_all(&mut [IoSlice::new(self.transformer.serialize(value)?)])
+            .await?;
 
         Ok(())
     }
@@ -68,13 +66,10 @@ impl Connection {
         let version = SSH2_FILEXFER_VERSION;
 
         // Sent hello message
-        self.write(
-            Hello {
-                version,
-                extensions: Default::default(),
-            },
-            None,
-        )
+        self.write(Hello {
+            version,
+            extensions: Default::default(),
+        })
         .await?;
 
         // Receive server version
@@ -111,13 +106,10 @@ impl Connection {
     ) -> Result<AwaitableResponse, Error> {
         let (request_id, awaitable_response) = self.responses.insert();
         match self
-            .write(
-                Request {
-                    request_id,
-                    inner: request,
-                },
-                None,
-            )
+            .write(Request {
+                request_id,
+                inner: request,
+            })
             .await
         {
             Ok(_) => Ok(awaitable_response),
