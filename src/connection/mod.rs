@@ -9,7 +9,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use openssh_sftp_protocol::request::{Hello, Request};
 use openssh_sftp_protocol::response::ServerVersion;
 use openssh_sftp_protocol::serde::{Deserialize, Serialize};
-use openssh_sftp_protocol::ssh_format::Transformer;
+use ssh_format::Transformer;
 
 use std::io::IoSlice;
 
@@ -102,7 +102,9 @@ impl Connection {
         Ok(val)
     }
 
-    /// Send requests (except for writes)
+    /// Send requests.
+    ///
+    /// **Please use `Self::send_write_request` for sending write requests.**
     pub async fn send_request(
         &mut self,
         request: RequestInner<'_>,
@@ -116,6 +118,49 @@ impl Connection {
                 },
                 None,
             )
+            .await
+        {
+            Ok(_) => Ok(awaitable_response),
+            Err(err) => {
+                self.responses.remove(request_id).unwrap();
+
+                Err(err)
+            }
+        }
+    }
+
+    async fn send_write_request_impl(
+        &mut self,
+        request_id: u32,
+        handle: &[u8],
+        offset: u64,
+        data: &[u8],
+    ) -> Result<(), Error> {
+        let header = Request::serialize_write_request(
+            self.transformer.get_ser(),
+            request_id,
+            handle,
+            offset,
+            data.len().try_into().map_err(|_| Error::BufferTooLong)?,
+        )?;
+
+        let mut slices = [IoSlice::new(header), IoSlice::new(data)];
+        self.writer.write_vectored_all(&mut slices).await?;
+
+        Ok(())
+    }
+
+    /// Send write requests
+    pub async fn send_write_request(
+        &mut self,
+        handle: &[u8],
+        offset: u64,
+        data: &[u8],
+    ) -> Result<AwaitableResponse, Error> {
+        let (request_id, awaitable_response) = self.responses.insert();
+
+        match self
+            .send_write_request_impl(request_id, handle, offset, data)
             .await
         {
             Ok(_) => Ok(awaitable_response),
