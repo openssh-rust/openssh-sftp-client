@@ -3,8 +3,6 @@ mod awaitable_responses;
 
 use super::Error;
 
-use std::io::IoSlice;
-
 use awaitable_responses::*;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
@@ -12,6 +10,8 @@ use openssh_sftp_protocol::request::Hello;
 use openssh_sftp_protocol::response::ServerVersion;
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::Transformer;
+
+use std::io::IoSlice;
 
 use tokio::io::AsyncReadExt;
 use tokio_async_write_utility::AsyncWriteUtility;
