@@ -38,6 +38,13 @@ impl<Buffer: ToBuffer> Response<Buffer> {
             _ => panic!("{}", err_msg),
         }
     }
+
+    pub fn expect_alloated_box<T: Display>(self, err_msg: T) -> Box<[u8]> {
+        match self {
+            Response::AllocatedBox(allocated_box) => allocated_box,
+            _ => panic!("{}", err_msg),
+        }
+    }
 }
 
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
