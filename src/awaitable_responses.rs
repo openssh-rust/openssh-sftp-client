@@ -1,5 +1,7 @@
 use super::awaitable::Awaitable;
+use super::ToBuffer;
 
+use core::fmt::Debug;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -8,24 +10,32 @@ use openssh_sftp_protocol::response::ResponseInner;
 use thunderdome::Arena;
 
 #[derive(Debug, Clone)]
-pub enum Response {
+pub enum Response<Buffer: ToBuffer> {
     Header(ResponseInner),
 
     /// The buffer that stores the response of Read,
     /// since its corresponding response type `ResponseInner::Data`
     /// does not contain any member, it doesn't have to be stored.
-    Buffer(Box<[u8]>),
+    Buffer(Buffer),
+
+    /// Same as `Buffer`, this is a fallback
+    /// if `Buffer` isn't provided or it isn't large enough.
+    AllocatedBox(Box<[u8]>),
 }
 
-pub(crate) type Value = Awaitable<Response>;
+pub(crate) type Value<Buffer: ToBuffer> = Awaitable<Buffer, Response<Buffer>>;
 
-#[derive(Debug, Default)]
-pub(crate) struct AwaitableResponses(Arena<Value>);
+#[derive(Debug)]
+pub(crate) struct AwaitableResponses<Buffer: ToBuffer>(Arena<Value<Buffer>>);
 
-impl AwaitableResponses {
+impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
+    pub(crate) fn new() -> Self {
+        Self(Arena::new())
+    }
+
     /// Return (slot_id, awaitable_response)
-    pub(crate) fn insert(&mut self) -> (u32, AwaitableResponse) {
-        let awaitable_response = Awaitable::new();
+    pub(crate) fn insert(&mut self, buffer: Option<Buffer>) -> (u32, AwaitableResponse<Buffer>) {
+        let awaitable_response = Awaitable::new(buffer);
 
         (
             self.0.insert(awaitable_response.clone()).slot(),
@@ -33,12 +43,20 @@ impl AwaitableResponses {
         )
     }
 
-    pub(crate) fn do_callback(&mut self, slot: u32, response: Response) {
+    pub(crate) fn get_input(&self, slot: u32) -> Option<Buffer> {
+        self.0
+            .get_by_slot(slot)
+            .expect("Invalid slot")
+            .1
+            .take_input()
+    }
+
+    pub(crate) fn do_callback(&mut self, slot: u32, response: Response<Buffer>) {
         self.remove(slot).expect("Invalid slot").done(response);
     }
 
     /// Precondition: There must not be an ongoing request for `slot`.
-    pub(crate) fn remove(&mut self, slot: u32) -> Option<Value> {
+    pub(crate) fn remove(&mut self, slot: u32) -> Option<Value<Buffer>> {
         self.0
             .remove_by_slot(slot)
             .map(|(_index, awaitable_response)| awaitable_response)
@@ -46,13 +64,13 @@ impl AwaitableResponses {
 }
 
 #[derive(Debug)]
-pub struct AwaitableResponse(Value);
+pub struct AwaitableResponse<Buffer: ToBuffer>(Value<Buffer>);
 
-impl AwaitableResponse {
-    pub async fn wait(self) -> Response {
-        struct WaitFuture<'a>(Option<&'a Value>);
+impl<Buffer: ToBuffer + Debug> AwaitableResponse<Buffer> {
+    pub async fn wait(self) -> Response<Buffer> {
+        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Value<Buffer>>);
 
-        impl Future for WaitFuture<'_> {
+        impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
             type Output = ();
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

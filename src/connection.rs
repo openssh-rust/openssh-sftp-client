@@ -8,19 +8,21 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::{Deserialize, Serialize};
 use ssh_format::Transformer;
 
+use core::fmt::Debug;
+
 use std::io::IoSlice;
 
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
 use tokio_pipe::{PipeRead, PipeWrite};
 
 #[derive(Debug)]
-pub struct Connection {
+pub struct Connection<Buffer: ToBuffer> {
     writer: PipeWrite,
     reader: PipeRead,
     transformer: Transformer,
-    responses: AwaitableResponses,
+    responses: AwaitableResponses<Buffer>,
 }
-impl Connection {
+impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
     async fn write<T>(&mut self, value: T) -> Result<(), Error>
     where
         T: Serialize,
@@ -79,7 +81,7 @@ impl Connection {
             reader,
             writer,
             transformer: Transformer::default(),
-            responses: AwaitableResponses::default(),
+            responses: AwaitableResponses::new(),
         };
 
         val.negotiate().await?;
@@ -93,8 +95,8 @@ impl Connection {
     pub async fn send_request(
         &mut self,
         request: RequestInner<'_>,
-    ) -> Result<AwaitableResponse, Error> {
-        let (request_id, awaitable_response) = self.responses.insert();
+    ) -> Result<AwaitableResponse<Buffer>, Error> {
+        let (request_id, awaitable_response) = self.responses.insert(None);
         match self
             .write(Request {
                 request_id,
