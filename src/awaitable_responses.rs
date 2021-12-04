@@ -2,7 +2,7 @@ use super::awaitable::Awaitable;
 use super::Error;
 use super::ToBuffer;
 
-use core::fmt::Debug;
+use core::fmt::{Debug, Display};
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -22,6 +22,15 @@ pub enum Response<Buffer: ToBuffer> {
     /// Same as `Buffer`, this is a fallback
     /// if `Buffer` isn't provided or it isn't large enough.
     AllocatedBox(Box<[u8]>),
+}
+
+impl<Buffer: ToBuffer> Response<Buffer> {
+    pub fn expect_header<T: Display>(self, err_msg: T) -> ResponseInner {
+        match self {
+            Response::Header(response) => response,
+            _ => panic!("{}", err_msg),
+        }
+    }
 }
 
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
