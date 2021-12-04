@@ -11,14 +11,6 @@ pub enum Error {
     #[error("Server speaks sftp protocol other than protocol 4.")]
     UnsupportedSftpProtocol,
 
-    /// Server response with unexpected package type.
-    #[error("Server response with unexpected package type {0}: Response {1:#?}")]
-    InvalidServerResponse(&'static str, ResponseInner),
-
-    /// Server response with a different id than the requested one.
-    #[error("Server response with a different id than the requested one.")]
-    UnmatchedRequestId,
-
     /// IO Error (Excluding `EWOULDBLOCK`): {0}.
     #[error("IO Error (Excluding `EWOULDBLOCK`): {0}.")]
     IOError(#[from] io::Error),
