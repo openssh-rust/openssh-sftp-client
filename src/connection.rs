@@ -12,6 +12,7 @@ use core::fmt::Debug;
 
 use std::io::IoSlice;
 
+use tokio::io::AsyncReadExt;
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
 use tokio_pipe::{PipeRead, PipeWrite};
 
@@ -95,8 +96,9 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
     pub async fn send_request(
         &mut self,
         request: RequestInner<'_>,
+        buffer: Option<Buffer>,
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let (request_id, awaitable_response) = self.responses.insert(None);
+        let (request_id, awaitable_response) = self.responses.insert(buffer);
         match self
             .write(Request {
                 request_id,
@@ -140,8 +142,8 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         handle: &[u8],
         offset: u64,
         data: &[u8],
-    ) -> Result<AwaitableResponse, Error> {
-        let (request_id, awaitable_response) = self.responses.insert();
+    ) -> Result<AwaitableResponse<Buffer>, Error> {
+        let (request_id, awaitable_response) = self.responses.insert(None);
 
         match self
             .send_write_request_impl(request_id, handle, offset, data)
@@ -156,16 +158,41 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         }
     }
 
-    /// * `len` - excludes packet_type and request_id.
-    async fn read_in_data_packet(&mut self, len: u32) -> Result<Response, Error> {
+    async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
         let mut vec = Vec::new();
         read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
 
-        Ok(Response::Buffer(vec.into_boxed_slice()))
+        Ok(Response::AllocatedBox(vec.into_boxed_slice()))
     }
 
     /// * `len` - excludes packet_type and request_id.
-    async fn read_in_packet(&mut self, len: u32) -> Result<Response, Error> {
+    async fn read_in_data_packet(
+        &mut self,
+        len: u32,
+        buffer: Option<Buffer>,
+    ) -> Result<Response<Buffer>, Error> {
+        if let Some(mut buffer) = buffer {
+            match buffer.get_buffer() {
+                crate::Buffer::Vector(vec) => {
+                    read_exact_to_vec(&mut self.reader, vec, len as usize).await?;
+                    Ok(Response::Buffer(buffer))
+                }
+                crate::Buffer::Slice(slice) => {
+                    if slice.len() >= len as usize {
+                        self.reader.read_exact(slice).await?;
+                        Ok(Response::Buffer(buffer))
+                    } else {
+                        self.read_in_data_packet_fallback(len).await
+                    }
+                }
+            }
+        } else {
+            self.read_in_data_packet_fallback(len).await
+        }
+    }
+
+    /// * `len` - excludes packet_type and request_id.
+    async fn read_in_packet(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
         // Remove the len
         self.transformer.get_buffer().drain(0..4);
 
@@ -188,7 +215,8 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         let len = len - 5;
 
         let response = if response::Response::is_data(packet_type) {
-            self.read_in_data_packet(len).await?
+            self.read_in_data_packet(len, self.responses.get_input(response_id))
+                .await?
         } else {
             self.read_in_packet(len).await?
         };
