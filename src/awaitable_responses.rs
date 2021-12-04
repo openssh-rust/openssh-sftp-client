@@ -31,6 +31,13 @@ impl<Buffer: ToBuffer> Response<Buffer> {
             _ => panic!("{}", err_msg),
         }
     }
+
+    pub fn expect_buffer<T: Display>(self, err_msg: T) -> Buffer {
+        match self {
+            Response::Buffer(buffer) => buffer,
+            _ => panic!("{}", err_msg),
+        }
+    }
 }
 
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
