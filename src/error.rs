@@ -28,4 +28,8 @@ pub enum Error {
     /// The user of `Connection` can choose to log this error and continue operation.
     #[error("The response id is invalid.")]
     InvalidResponseId,
+
+    /// Error {1:#?} happens when handling Error {0:#?}.
+    #[error("Error {1:#?} happens when handling Error {0:#?}.")]
+    RecursiveErrors(Box<Error>, Box<Error>),
 }
