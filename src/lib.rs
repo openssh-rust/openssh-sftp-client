@@ -2,10 +2,13 @@
 
 mod awaitable;
 mod awaitable_responses;
+mod buffer;
 mod connection;
 mod error;
 
 pub use awaitable_responses::{AwaitableResponse, Response};
+
+pub use buffer::*;
 
 pub use openssh_sftp_protocol::file_attrs::FileAttrs;
 pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile, RequestInner};
