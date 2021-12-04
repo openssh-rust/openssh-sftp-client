@@ -12,7 +12,7 @@ use core::fmt::Debug;
 
 use std::io::IoSlice;
 
-use tokio::io::AsyncReadExt;
+use tokio::io::{copy, sink, AsyncReadExt};
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
 use tokio_pipe::{PipeRead, PipeWrite};
 
@@ -158,6 +158,11 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         }
     }
 
+    async fn consume_data_packet(&mut self, len: u32) -> Result<(), Error> {
+        copy(&mut (&mut self.reader).take(len as u64), &mut sink()).await?;
+        todo!()
+    }
+
     async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
         let mut vec = Vec::new();
         read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
@@ -215,8 +220,15 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         let len = len - 5;
 
         let response = if response::Response::is_data(packet_type) {
-            self.read_in_data_packet(len, self.responses.get_input(response_id)?)
-                .await?
+            let buffer = match self.responses.get_input(response_id) {
+                Ok(buffer) => buffer,
+                Err(err) => {
+                    // Invalid response_id
+                    self.consume_data_packet(len).await?;
+                    return Err(err);
+                }
+            };
+            self.read_in_data_packet(len, buffer).await?
         } else {
             self.read_in_packet(len).await?
         };

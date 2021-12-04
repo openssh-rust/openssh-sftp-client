@@ -24,6 +24,8 @@ pub enum Error {
     BufferTooLong,
 
     /// The response id is invalid.
+    ///
+    /// The user of `Connection` can choose to log this error and continue operation.
     #[error("The response id is invalid.")]
     InvalidResponseId,
 }
