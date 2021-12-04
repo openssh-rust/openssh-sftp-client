@@ -222,9 +222,15 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         let response = if response::Response::is_data(packet_type) {
             let buffer = match self.responses.get_input(response_id) {
                 Ok(buffer) => buffer,
+
+                // Invalid response_id
                 Err(err) => {
-                    // Invalid response_id
-                    self.consume_data_packet(len).await?;
+                    if let Err(consumption_err) = self.consume_data_packet(len).await {
+                        return Err(Error::RecursiveErrors(
+                            Box::new(err),
+                            Box::new(consumption_err),
+                        ));
+                    }
                     return Err(err);
                 }
             };
