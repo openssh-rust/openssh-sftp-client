@@ -45,6 +45,11 @@ impl<Buffer: ToBuffer> Response<Buffer> {
             _ => panic!("{}", err_msg),
         }
     }
+
+    /// Return true if `self` contains `Response::Buffer`.
+    pub fn is_buffer(&self) -> bool {
+        matches!(self, Response::Buffer(_))
+    }
 }
 
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
