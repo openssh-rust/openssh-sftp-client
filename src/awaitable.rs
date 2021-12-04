@@ -34,7 +34,7 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     pub(crate) fn install_waker(&self, waker: Waker) -> bool {
         let mut guard = self.0.lock();
 
-        match &*guard {
+        match &mut *guard {
             Ongoing(_input, stored_waker) => {
                 if stored_waker.is_some() {
                     panic!("Waker is installed twice before the awaitable is done");
@@ -49,7 +49,7 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     pub(crate) fn take_input(&self) -> Option<Input> {
         let mut guard = self.0.lock();
 
-        match &*guard {
+        match &mut *guard {
             Ongoing(input, _stored_waker) => input.take(),
             Done(_) => None,
         }
