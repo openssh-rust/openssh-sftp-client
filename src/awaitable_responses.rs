@@ -23,7 +23,7 @@ pub enum Response<Buffer: ToBuffer> {
     AllocatedBox(Box<[u8]>),
 }
 
-pub(crate) type Value<Buffer: ToBuffer> = Awaitable<Buffer, Response<Buffer>>;
+pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
 
 #[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer>(Arena<Value<Buffer>>);
