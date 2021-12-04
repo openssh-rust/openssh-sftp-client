@@ -22,4 +22,8 @@ pub enum Error {
     /// Sftp protocol can only send and receive at most u32::MAX data in one request.
     #[error("Sftp protocol can only send and receive at most u32::MAX data in one request.")]
     BufferTooLong,
+
+    /// The response id is invalid.
+    #[error("The response id is invalid.")]
+    InvalidResponseId,
 }
