@@ -215,13 +215,13 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         let len = len - 5;
 
         let response = if response::Response::is_data(packet_type) {
-            self.read_in_data_packet(len, self.responses.get_input(response_id))
+            self.read_in_data_packet(len, self.responses.get_input(response_id)?)
                 .await?
         } else {
             self.read_in_packet(len).await?
         };
 
-        self.responses.do_callback(response_id, response);
+        self.responses.do_callback(response_id, response)?;
 
         Ok(())
     }

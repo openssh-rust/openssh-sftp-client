@@ -1,4 +1,5 @@
 use super::awaitable::Awaitable;
+use super::Error;
 use super::ToBuffer;
 
 use core::fmt::Debug;
@@ -43,16 +44,26 @@ impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
         )
     }
 
-    pub(crate) fn get_input(&self, slot: u32) -> Option<Buffer> {
-        self.0
-            .get_by_slot(slot)
-            .expect("Invalid slot")
-            .1
-            .take_input()
+    fn option_to_error<T>(opt: Option<T>) -> Result<T, Error> {
+        match opt {
+            Some(val) => Ok(val),
+            None => Err(Error::InvalidResponseId),
+        }
     }
 
-    pub(crate) fn do_callback(&mut self, slot: u32, response: Response<Buffer>) {
-        self.remove(slot).expect("Invalid slot").done(response);
+    pub(crate) fn get_input(&self, slot: u32) -> Result<Option<Buffer>, Error> {
+        Ok(Self::option_to_error(self.0.get_by_slot(slot))?
+            .1
+            .take_input())
+    }
+
+    pub(crate) fn do_callback(
+        &mut self,
+        slot: u32,
+        response: Response<Buffer>,
+    ) -> Result<(), Error> {
+        Self::option_to_error(self.remove(slot))?.done(response);
+        Ok(())
     }
 
     /// Precondition: There must not be an ongoing request for `slot`.
