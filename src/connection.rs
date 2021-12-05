@@ -160,7 +160,7 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
 
     async fn consume_data_packet(&mut self, len: u32) -> Result<(), Error> {
         copy(&mut (&mut self.reader).take(len as u64), &mut sink()).await?;
-        todo!()
+        Ok(())
     }
 
     async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
