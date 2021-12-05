@@ -7,8 +7,8 @@ pub use openssh_sftp_protocol::response::ResponseInner;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    /// Server speaks sftp protocol other than protocol 4.
-    #[error("Server speaks sftp protocol other than protocol 4.")]
+    /// Server speaks sftp protocol other than protocol 3.
+    #[error("Server speaks sftp protocol other than protocol 3.")]
     UnsupportedSftpProtocol,
 
     /// IO Error (Excluding `EWOULDBLOCK`): {0}.
