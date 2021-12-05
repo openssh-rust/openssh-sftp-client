@@ -6,7 +6,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use openssh_sftp_protocol::request::{Hello, Request};
 use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::{Deserialize, Serialize};
-use ssh_format::Transformer;
+use openssh_sftp_protocol::ssh_format::Transformer;
 
 use core::fmt::Debug;
 
