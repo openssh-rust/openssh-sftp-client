@@ -9,21 +9,23 @@ use openssh_sftp_protocol::serde::{Deserialize, Serialize};
 use openssh_sftp_protocol::ssh_format::Transformer;
 
 use core::fmt::Debug;
+use core::marker::Unpin;
 
 use std::io::IoSlice;
 
-use tokio::io::{copy, sink, AsyncReadExt};
+use tokio::io::{copy, sink, AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
-use tokio_pipe::{PipeRead, PipeWrite};
 
 #[derive(Debug)]
-pub struct Connection<Buffer: ToBuffer> {
-    writer: PipeWrite,
-    reader: PipeRead,
+pub struct Connection<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: ToBuffer> {
+    writer: Writer,
+    reader: Reader,
     transformer: Transformer,
     responses: AwaitableResponses<Buffer>,
 }
-impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
+impl<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: Debug + ToBuffer>
+    Connection<Writer, Reader, Buffer>
+{
     async fn write<T>(&mut self, value: T) -> Result<(), Error>
     where
         T: Serialize,
@@ -77,7 +79,7 @@ impl<Buffer: Debug + ToBuffer> Connection<Buffer> {
         }
     }
 
-    pub async fn new(reader: PipeRead, writer: PipeWrite) -> Result<Self, Error> {
+    pub async fn new(reader: Reader, writer: Writer) -> Result<Self, Error> {
         let mut val = Self {
             reader,
             writer,
