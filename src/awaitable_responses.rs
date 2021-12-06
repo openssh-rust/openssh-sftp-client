@@ -1,4 +1,4 @@
-use super::awaitable::Awaitable;
+use super::awaitable::{Awaitable, AwaitableFactory};
 use super::Error;
 use super::ToBuffer;
 
@@ -55,16 +55,19 @@ impl<Buffer: ToBuffer> Response<Buffer> {
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
 
 #[derive(Debug)]
-pub(crate) struct AwaitableResponses<Buffer: ToBuffer>(Arena<Value<Buffer>>);
+pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
+    Arena<Value<Buffer>>,
+    AwaitableFactory<Buffer, Response<Buffer>>,
+);
 
 impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
     pub(crate) fn new() -> Self {
-        Self(Arena::new())
+        Self(Arena::new(), Awaitable::get_factory())
     }
 
     /// Return (slot_id, awaitable_response)
     pub(crate) fn insert(&mut self, buffer: Option<Buffer>) -> (u32, AwaitableResponse<Buffer>) {
-        let awaitable_response = Awaitable::new(buffer);
+        let awaitable_response = self.1.create(buffer);
 
         (
             self.0.insert(awaitable_response.clone()).slot(),

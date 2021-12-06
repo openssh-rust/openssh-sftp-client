@@ -17,13 +17,17 @@ use tokio::io::{copy, sink, AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
 
 #[derive(Debug)]
-pub struct Connection<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: ToBuffer> {
+pub struct Connection<
+    Writer: AsyncWrite + Unpin,
+    Reader: AsyncRead + Unpin,
+    Buffer: ToBuffer + 'static,
+> {
     writer: Writer,
     reader: Reader,
     transformer: Transformer,
     responses: AwaitableResponses<Buffer>,
 }
-impl<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: Debug + ToBuffer>
+impl<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: Debug + ToBuffer + 'static>
     Connection<Writer, Reader, Buffer>
 {
     async fn write<T>(&mut self, value: T) -> Result<(), Error>
@@ -137,6 +141,8 @@ impl<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: Debug + ToBu
 
         Ok(())
     }
+
+    // TODO: Use IoSlice for data
 
     /// Send write requests
     pub async fn send_write_request(

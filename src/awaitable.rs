@@ -2,7 +2,9 @@ use core::fmt::Debug;
 use core::mem;
 use core::task::Waker;
 
-use std::sync::Arc;
+use generic_global_variables::{Entry, GenericGlobal};
+use once_cell::sync::OnceCell;
+use openssh_sftp_protocol::shared_arena::{ArenaArc, SharedArena};
 
 use parking_lot::Mutex;
 
@@ -15,10 +17,26 @@ enum InnerState<Input, Output> {
 
     Consumed,
 }
+impl<Input, Output> InnerState<Input, Output> {
+    fn new(input: Option<Input>) -> Mutex<Self> {
+        Mutex::new(Ongoing(input, None))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct AwaitableFactory<Input: 'static, Output: 'static>(
+    Entry<SharedArena<Mutex<InnerState<Input, Output>>>>,
+);
+impl<Input, Output> AwaitableFactory<Input, Output> {
+    pub(crate) fn create(&self, input: Option<Input>) -> Awaitable<Input, Output> {
+        Awaitable(self.0.alloc_arc(InnerState::new(input)))
+    }
+}
+
 use InnerState::*;
 
 #[derive(Debug)]
-pub(crate) struct Awaitable<Input, Output>(Arc<Mutex<InnerState<Input, Output>>>);
+pub(crate) struct Awaitable<Input, Output>(ArenaArc<Mutex<InnerState<Input, Output>>>);
 
 impl<Input, Output> Clone for Awaitable<Input, Output> {
     fn clone(&self) -> Self {
@@ -27,9 +45,12 @@ impl<Input, Output> Clone for Awaitable<Input, Output> {
 }
 
 impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
-    pub(crate) fn new(input: Option<Input>) -> Self {
-        let state = Ongoing(input, None);
-        Self(Arc::new(Mutex::new(state)))
+    pub(crate) fn get_factory() -> AwaitableFactory<Input, Output> {
+        static GLOBALS: OnceCell<GenericGlobal> = OnceCell::new();
+
+        let globals = GLOBALS.get_or_init(GenericGlobal::new);
+
+        AwaitableFactory(globals.get_or_init(SharedArena::new))
     }
 
     /// Return true if the task is already done.
