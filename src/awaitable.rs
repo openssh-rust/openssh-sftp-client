@@ -64,27 +64,19 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     }
 
     pub(crate) fn done(self, value: Output) {
-        let stored_waker = {
-            // hold the lock so that the waker will be called
-            // only after self is dropped.
-            let mut guard = self.0.lock();
+        let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
 
-            let prev_state = mem::replace(&mut *guard, Done(value));
-
-            match prev_state {
-                Done(_) => panic!("Awaitable is marked as done twice"),
-                Ongoing(_input, stored_waker) => stored_waker,
-                Consumed => {
-                    panic!("Task is marked as done twice after its result consumed")
+        match prev_state {
+            Done(_) => panic!("Awaitable is marked as done twice"),
+            Ongoing(_input, stored_waker) => {
+                if let Some(waker) = stored_waker {
+                    waker.wake();
                 }
             }
+            Consumed => {
+                panic!("Awaitable is marked as done again after its result consumed")
+            }
         };
-
-        drop(self);
-
-        if let Some(waker) = stored_waker {
-            waker.wake();
-        }
     }
 
     /// Precondition: This must be called after `done` is called.
