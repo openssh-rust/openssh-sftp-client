@@ -15,6 +15,7 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 [dependencies]
 thiserror = "1.0.29"
 once_cell = "1.8.0"
+generic-global-variables = "0.1.0"
 
 parking_lot = "0.11.2"
 thunderdome = "0.5.0"
