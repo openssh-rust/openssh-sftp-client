@@ -1,4 +1,5 @@
 use core::fmt::Debug;
+use core::hint::spin_loop;
 use core::mem;
 use core::task::Waker;
 
@@ -76,12 +77,29 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
         }
     }
 
-    /// Precondition: This must be the last Awaitable.
+    /// Precondition: This must be called only if `install_waker` returns `true`
+    /// or the waker registered in `install_waker` is called.
     pub(crate) fn get_value(self) -> Option<Output> {
-        match Arc::try_unwrap(self.0)
-            .expect("get_value is called when there is other awaitable alive")
-            .into_inner()
-        {
+        let mut this = self.0;
+        let state = loop {
+            match Arc::try_unwrap(this) {
+                Ok(mutex) => break mutex.into_inner(),
+
+                // This branch would only happen if `install_waker` returns
+                // `true`, which is quite rare considering that usually
+                // the waker will be registered first before the response
+                // arrived.
+                //
+                // `done` has been called, but it hasn't drop `self` yet.
+                // Use busy loop to wait for it to happen.
+                Err(arc) => {
+                    spin_loop();
+                    this = arc;
+                }
+            }
+        };
+
+        match state {
             Done(value) => Some(value),
             _ => None,
         }
