@@ -27,8 +27,11 @@ pub struct Connection<
     transformer: Transformer,
     responses: AwaitableResponses<Buffer>,
 }
-impl<Writer: AsyncWrite + Unpin, Reader: AsyncRead + Unpin, Buffer: Debug + ToBuffer + 'static>
-    Connection<Writer, Reader, Buffer>
+impl<Writer, Reader, Buffer> Connection<Writer, Reader, Buffer>
+where
+    Writer: AsyncWrite + Unpin,
+    Reader: AsyncRead + Unpin,
+    Buffer: Debug + ToBuffer + 'static,
 {
     async fn write<T>(&mut self, value: T) -> Result<(), Error>
     where
