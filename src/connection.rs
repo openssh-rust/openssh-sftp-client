@@ -316,9 +316,10 @@ mod tests {
 
     async fn launch_sftp() -> (process::Child, process::ChildStdin, process::ChildStdout) {
         let mut child = process::Command::new(get_sftp_path())
+            .args(&["-e", "-l", "DEBUG"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::inherit())
             .kill_on_drop(true)
             .spawn()
             .unwrap();
