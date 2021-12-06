@@ -130,7 +130,7 @@ impl<Buffer: ToBuffer + Debug> AwaitableResponse<Buffer> {
         WaitFuture(Some(&self.0)).await;
 
         self.0
-            .get_output()
+            .take_output()
             .expect("The request should be done by now")
     }
 }
