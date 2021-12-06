@@ -59,9 +59,9 @@ pub(crate) struct AwaitableResponseFactory<Buffer: ToBuffer + 'static>(
     AwaitableFactory<Buffer, Response<Buffer>>,
 );
 
-impl<Buffer: ToBuffer + Debug + 'static> AwaitableResponseFactory<Buffer> {
+impl<Buffer: ToBuffer + 'static> AwaitableResponseFactory<Buffer> {
     pub(crate) fn new() -> Self {
-        Self(Awaitable::get_factory())
+        Self(AwaitableFactory::new())
     }
 
     pub(crate) fn create(&self) -> AwaitableResponses<Buffer> {

@@ -28,6 +28,14 @@ pub(crate) struct AwaitableFactory<Input: 'static, Output: 'static>(
     Entry<SharedArena<Mutex<InnerState<Input, Output>>>>,
 );
 impl<Input, Output> AwaitableFactory<Input, Output> {
+    pub(crate) fn new() -> Self {
+        static GLOBALS: OnceCell<GenericGlobal> = OnceCell::new();
+
+        let globals = GLOBALS.get_or_init(GenericGlobal::new);
+
+        Self(globals.get_or_init(SharedArena::new))
+    }
+
     pub(crate) fn create(&self, input: Option<Input>) -> Awaitable<Input, Output> {
         Awaitable(self.0.alloc_arc(InnerState::new(input)))
     }
@@ -51,14 +59,6 @@ impl<Input, Output> Clone for Awaitable<Input, Output> {
 }
 
 impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
-    pub(crate) fn get_factory() -> AwaitableFactory<Input, Output> {
-        static GLOBALS: OnceCell<GenericGlobal> = OnceCell::new();
-
-        let globals = GLOBALS.get_or_init(GenericGlobal::new);
-
-        AwaitableFactory(globals.get_or_init(SharedArena::new))
-    }
-
     /// Return true if the task is already done.
     pub(crate) fn install_waker(&self, waker: Waker) -> bool {
         let mut guard = self.0.lock();
