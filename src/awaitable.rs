@@ -33,6 +33,12 @@ impl<Input, Output> AwaitableFactory<Input, Output> {
     }
 }
 
+impl<Input, Output> Clone for AwaitableFactory<Input, Output> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 use InnerState::*;
 
 #[derive(Debug)]
