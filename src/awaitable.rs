@@ -1,5 +1,4 @@
 use core::fmt::Debug;
-use core::hint::spin_loop;
 use core::mem;
 use core::task::Waker;
 
@@ -13,6 +12,8 @@ enum InnerState<Input, Output> {
 
     /// The awaitable is done
     Done(Output),
+
+    Consumed,
 }
 use InnerState::*;
 
@@ -44,6 +45,9 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
                 false
             }
             Done(_) => true,
+            Consumed => {
+                panic!("Waker is installed after the awaitable is done and its result consumed")
+            }
         }
     }
 
@@ -53,6 +57,9 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
         match &mut *guard {
             Ongoing(input, _stored_waker) => input.take(),
             Done(_) => None,
+            Consumed => {
+                panic!("Task attempts to retrieve input after the awaitable is done and its result consumed")
+            }
         }
     }
 
@@ -67,6 +74,9 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
             match prev_state {
                 Done(_) => panic!("Awaitable is marked as done twice"),
                 Ongoing(_input, stored_waker) => stored_waker,
+                Consumed => {
+                    panic!("Task is marked as done twice after its result consumed")
+                }
             }
         };
 
@@ -77,29 +87,11 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
         }
     }
 
-    /// Precondition: This must be called only if `install_waker` returns `true`
-    /// or the waker registered in `install_waker` is called.
+    /// Precondition: This must be called after `done` is called.
     pub(crate) fn get_value(self) -> Option<Output> {
-        let mut this = self.0;
-        let state = loop {
-            match Arc::try_unwrap(this) {
-                Ok(mutex) => break mutex.into_inner(),
+        let prev_state = mem::replace(&mut *self.0.lock(), Consumed);
 
-                // This branch would only happen if `install_waker` returns
-                // `true`, which is quite rare considering that usually
-                // the waker will be registered first before the response
-                // arrived.
-                //
-                // `done` has been called, but it hasn't drop `self` yet.
-                // Use busy loop to wait for it to happen.
-                Err(arc) => {
-                    spin_loop();
-                    this = arc;
-                }
-            }
-        };
-
-        match state {
+        match prev_state {
             Done(value) => Some(value),
             _ => None,
         }
