@@ -79,7 +79,7 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
         };
     }
 
-    /// Precondition: This must be called after `done` is called.
+    /// Return `Some(output)` if the awaitable is done.
     pub(crate) fn take_output(self) -> Option<Output> {
         let prev_state = mem::replace(&mut *self.0.lock(), Consumed);
 
