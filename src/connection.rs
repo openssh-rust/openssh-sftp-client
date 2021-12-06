@@ -59,8 +59,8 @@ impl<Buffer: ToBuffer + 'static> Clone for ConnectionFactory<Buffer> {
 }
 
 /// TODO:
-///  - Use IoSlice for data in `send_write_request`
-///  - Support for zero copy API
+///  - Support IoSlice for data in `send_write_request`
+///  - Support for zero copy API using tokio_pipe
 #[derive(Debug)]
 pub struct Connection<
     Writer: AsyncWrite + Unpin,
