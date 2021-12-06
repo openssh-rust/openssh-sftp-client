@@ -11,15 +11,9 @@ openssh sftp client, implements [sftp v3] accodring to
 On the first test, run the following commands:
 
 ```
-cd /path/to/this/repo
-
-# Clone all submodules
-git submodule update --init --depth 1 --recursive
-
-cd static-openssh-sftp-server
-./compile-static.sh
+/path/to/this/repo/compile-static-sftp-server.sh
 ```
 
-These commands only need to run once.
+It only need to run once.
 
 Afterwards, you can run `cargo test` directly.
