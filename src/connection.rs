@@ -285,3 +285,64 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    use std::path;
+    use std::process::Stdio;
+
+    use once_cell::sync::OnceCell;
+
+    use tokio::process;
+
+    fn get_conn_factory() -> &'static ConnectionFactory<Vec<u8>> {
+        static CONN_FACTORY: OnceCell<ConnectionFactory<Vec<u8>>> = OnceCell::new();
+        CONN_FACTORY.get_or_init(ConnectionFactory::new)
+    }
+
+    fn get_sftp_path() -> &'static path::Path {
+        static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
+
+        SFTP_PATH.get_or_init(|| {
+            let mut sftp_path = path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            sftp_path.push("static-openssh-sftp-server");
+            sftp_path.push("sftp-server");
+
+            sftp_path
+        })
+    }
+
+    async fn launch_sftp() -> (process::Child, process::ChildStdin, process::ChildStdout) {
+        let mut child = process::Command::new(get_sftp_path())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+
+        let stdin = child.stdin.take().unwrap();
+        let stdout = child.stdout.take().unwrap();
+
+        (child, stdin, stdout)
+    }
+
+    async fn connect() -> (
+        Connection<process::ChildStdin, process::ChildStdout, Vec<u8>>,
+        process::Child,
+    ) {
+        let (child, stdin, stdout) = launch_sftp().await;
+        (
+            get_conn_factory().create(stdout, stdin).await.unwrap(),
+            child,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_connect() {
+        let mut child = connect().await.1;
+        assert!(child.wait().await.unwrap().success());
+    }
+}
