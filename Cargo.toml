@@ -26,5 +26,4 @@ tokio = { version = "1.11.0", features = ["io-util"] }
 tokio-io-utility = "0.1.1"
 
 [dev-dependencies]
-tokio-pipe = "0.2.6"
 tokio = { version = "1.11.0", features = ["rt", "macros"] }
