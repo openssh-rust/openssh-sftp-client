@@ -10,7 +10,7 @@ pub use awaitable_responses::{AwaitableResponse, Response};
 
 pub use buffer::*;
 
-pub use openssh_sftp_protocol::file_attrs::FileAttrs;
+pub use openssh_sftp_protocol::file_attrs::{FileAttrs, FileAttrsBox};
 pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile, RequestInner};
 pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
 pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
