@@ -1,6 +1,6 @@
 use super::*;
 
-use awaitable_responses::AwaitableResponses;
+use awaitable_responses::{AwaitableResponseFactory, AwaitableResponses};
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use openssh_sftp_protocol::request::{Hello, Request};
@@ -15,6 +15,48 @@ use std::io::IoSlice;
 
 use tokio::io::{copy, sink, AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_io_utility::{read_exact_to_vec, AsyncWriteUtility};
+
+#[derive(Debug)]
+pub struct ConnectionFactory<Buffer: ToBuffer + 'static>(AwaitableResponseFactory<Buffer>);
+
+impl<Buffer: ToBuffer + Debug + 'static> Default for ConnectionFactory<Buffer> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<Buffer: ToBuffer + Debug + 'static> ConnectionFactory<Buffer> {
+    pub fn new() -> Self {
+        Self(AwaitableResponseFactory::new())
+    }
+
+    pub async fn create<Writer, Reader>(
+        &self,
+        reader: Reader,
+        writer: Writer,
+    ) -> Result<Connection<Writer, Reader, Buffer>, Error>
+    where
+        Writer: AsyncWrite + Unpin,
+        Reader: AsyncRead + Unpin,
+    {
+        let mut val = Connection {
+            reader,
+            writer,
+            transformer: Transformer::default(),
+            responses: self.0.create(),
+        };
+
+        val.negotiate().await?;
+
+        Ok(val)
+    }
+}
+
+impl<Buffer: ToBuffer + 'static> Clone for ConnectionFactory<Buffer> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
 #[derive(Debug)]
 pub struct Connection<
@@ -84,19 +126,6 @@ where
         } else {
             Ok(())
         }
-    }
-
-    pub async fn new(reader: Reader, writer: Writer) -> Result<Self, Error> {
-        let mut val = Self {
-            reader,
-            writer,
-            transformer: Transformer::default(),
-            responses: AwaitableResponses::new(),
-        };
-
-        val.negotiate().await?;
-
-        Ok(val)
     }
 
     /// Send requests.

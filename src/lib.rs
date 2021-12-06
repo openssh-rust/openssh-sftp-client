@@ -18,5 +18,5 @@ pub use openssh_sftp_protocol::response::StatusCode;
 pub use openssh_sftp_protocol::response::{NameEntry, ResponseInner};
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
-pub use connection::Connection;
+pub use connection::{Connection, ConnectionFactory};
 pub use error::Error;

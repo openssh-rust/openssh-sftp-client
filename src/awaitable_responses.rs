@@ -55,16 +55,33 @@ impl<Buffer: ToBuffer> Response<Buffer> {
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
 
 #[derive(Debug)]
+pub(crate) struct AwaitableResponseFactory<Buffer: ToBuffer + 'static>(
+    AwaitableFactory<Buffer, Response<Buffer>>,
+);
+
+impl<Buffer: ToBuffer + Debug + 'static> AwaitableResponseFactory<Buffer> {
+    pub(crate) fn new() -> Self {
+        Self(Awaitable::get_factory())
+    }
+
+    pub(crate) fn create(&self) -> AwaitableResponses<Buffer> {
+        AwaitableResponses(Arena::new(), self.0.clone())
+    }
+}
+
+impl<Buffer: ToBuffer + 'static> Clone for AwaitableResponseFactory<Buffer> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
     Arena<Value<Buffer>>,
     AwaitableFactory<Buffer, Response<Buffer>>,
 );
 
 impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
-    pub(crate) fn new() -> Self {
-        Self(Arena::new(), Awaitable::get_factory())
-    }
-
     /// Return (slot_id, awaitable_response)
     pub(crate) fn insert(&mut self, buffer: Option<Buffer>) -> (u32, AwaitableResponse<Buffer>) {
         let awaitable_response = self.1.create(buffer);
