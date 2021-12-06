@@ -19,7 +19,7 @@ enum InnerState<Input, Output> {
 }
 impl<Input, Output> InnerState<Input, Output> {
     fn new(input: Option<Input>) -> Mutex<Self> {
-        Mutex::new(Ongoing(input, None))
+        Mutex::new(InnerState::Ongoing(input, None))
     }
 }
 
@@ -47,8 +47,6 @@ impl<Input, Output> Clone for AwaitableFactory<Input, Output> {
     }
 }
 
-use InnerState::*;
-
 #[derive(Debug)]
 pub(crate) struct Awaitable<Input, Output>(ArenaArc<Mutex<InnerState<Input, Output>>>);
 
@@ -61,6 +59,8 @@ impl<Input, Output> Clone for Awaitable<Input, Output> {
 impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     /// Return true if the task is already done.
     pub(crate) fn install_waker(&self, waker: Waker) -> bool {
+        use InnerState::*;
+
         let mut guard = self.0.lock();
 
         match &mut *guard {
@@ -79,6 +79,8 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     }
 
     pub(crate) fn take_input(&self) -> Option<Input> {
+        use InnerState::*;
+
         let mut guard = self.0.lock();
 
         match &mut *guard {
@@ -91,6 +93,8 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     }
 
     pub(crate) fn done(self, value: Output) {
+        use InnerState::*;
+
         let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
 
         match prev_state {
@@ -108,6 +112,8 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
 
     /// Return `Some(output)` if the awaitable is done.
     pub(crate) fn take_output(self) -> Option<Output> {
+        use InnerState::*;
+
         let prev_state = mem::replace(&mut *self.0.lock(), Consumed);
 
         match prev_state {
