@@ -119,9 +119,7 @@ impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Read
 
         let len = len - 5;
 
-        let res = self.responses.remove(response_id);
-
-        let callback = match res {
+        let callback = match self.responses.remove(response_id) {
             Ok(callback) => callback,
 
             // Invalid response_id
