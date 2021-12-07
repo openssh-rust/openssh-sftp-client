@@ -120,28 +120,32 @@ impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Read
 
         let len = len - 5;
 
-        let response = if response::Response::is_data(packet_type) {
-            let res = self.responses.read().get_input(response_id);
-            let buffer = match res {
-                Ok(buffer) => buffer,
+        let res = self.responses.write().remove(response_id);
 
-                // Invalid response_id
-                Err(err) => {
-                    if let Err(consumption_err) = self.consume_data_packet(len).await {
-                        return Err(Error::RecursiveErrors(
-                            Box::new(err),
-                            Box::new(consumption_err),
-                        ));
-                    }
-                    return Err(err);
+        let callback = match res {
+            Ok(callback) => callback,
+
+            // Invalid response_id
+            Err(err) => {
+                // Consume the invalid data to return self to a valid state
+                // where read_in_one_packet can be called again.
+                if let Err(consumption_err) = self.consume_data_packet(len).await {
+                    return Err(Error::RecursiveErrors(
+                        Box::new(err),
+                        Box::new(consumption_err),
+                    ));
                 }
-            };
-            self.read_in_data_packet(len, buffer).await?
+                return Err(err);
+            }
+        };
+
+        let response = if response::Response::is_data(packet_type) {
+            self.read_in_data_packet(len, callback.get_input()).await?
         } else {
             self.read_in_packet(len).await?
         };
 
-        self.responses.write().do_callback(response_id, response)?;
+        callback.do_callback(response);
 
         Ok(())
     }

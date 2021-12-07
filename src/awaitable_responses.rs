@@ -92,33 +92,11 @@ impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
         )
     }
 
-    fn option_to_error<T>(opt: Option<T>) -> Result<T, Error> {
-        match opt {
-            Some(val) => Ok(val),
-            None => Err(Error::InvalidResponseId),
-        }
-    }
-
-    pub(crate) fn get_input(&self, slot: u32) -> Result<Option<Buffer>, Error> {
-        Ok(Self::option_to_error(self.0.get_by_slot(slot))?
-            .1
-            .take_input())
-    }
-
-    pub(crate) fn do_callback(
-        &mut self,
-        slot: u32,
-        response: Response<Buffer>,
-    ) -> Result<(), Error> {
-        Self::option_to_error(self.remove(slot))?.done(response);
-        Ok(())
-    }
-
-    /// Precondition: There must not be an ongoing request for `slot`.
-    pub(crate) fn remove(&mut self, slot: u32) -> Option<Value<Buffer>> {
+    pub(crate) fn remove(&mut self, slot: u32) -> Result<AwaitableResponse<Buffer>, Error> {
         self.0
             .remove_by_slot(slot)
-            .map(|(_index, awaitable_response)| awaitable_response)
+            .map(|(_index, awaitable_response)| AwaitableResponse(awaitable_response))
+            .ok_or_else(|| Error::InvalidResponseId)
     }
 }
 
@@ -126,6 +104,14 @@ impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
 pub struct AwaitableResponse<Buffer: ToBuffer>(Value<Buffer>);
 
 impl<Buffer: ToBuffer + Debug> AwaitableResponse<Buffer> {
+    pub(crate) fn get_input(&self) -> Option<Buffer> {
+        self.0.take_input()
+    }
+
+    pub(crate) fn do_callback(self, response: Response<Buffer>) {
+        self.0.done(response);
+    }
+
     pub async fn wait(self) -> Response<Buffer> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Value<Buffer>>);
 
