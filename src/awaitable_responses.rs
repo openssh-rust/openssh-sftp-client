@@ -96,7 +96,7 @@ impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
         self.0
             .remove_by_slot(slot)
             .map(|(_index, awaitable_response)| AwaitableResponse(awaitable_response))
-            .ok_or_else(|| Error::InvalidResponseId)
+            .ok_or(Error::InvalidResponseId)
     }
 }
 
