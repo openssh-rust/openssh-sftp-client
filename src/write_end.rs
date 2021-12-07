@@ -5,7 +5,6 @@ use super::ToBuffer;
 use core::fmt::Debug;
 use core::marker::Unpin;
 
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 use openssh_sftp_protocol::extensions::Extensions;
@@ -24,11 +23,11 @@ use tokio_io_utility::AsyncWriteUtility;
 pub struct WriteEnd<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
     writer: Writer,
     serializer: Serializer,
-    responses: Arc<RwLock<AwaitableResponses<Buffer>>>,
+    responses: Arc<AwaitableResponses<Buffer>>,
 }
 
 impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Writer, Buffer> {
-    pub(crate) fn new(writer: Writer, responses: Arc<RwLock<AwaitableResponses<Buffer>>>) -> Self {
+    pub(crate) fn new(writer: Writer, responses: Arc<AwaitableResponses<Buffer>>) -> Self {
         Self {
             writer,
             serializer: Serializer::new(),
@@ -69,7 +68,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Wr
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let (request_id, awaitable_response) = self.responses.write().insert(buffer);
+        let (request_id, awaitable_response) = self.responses.insert(buffer);
         match self
             .write(Request {
                 request_id,
@@ -79,7 +78,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Wr
         {
             Ok(_) => Ok(awaitable_response),
             Err(err) => {
-                self.responses.write().remove(request_id).unwrap();
+                self.responses.remove(request_id).unwrap();
 
                 Err(err)
             }
@@ -114,7 +113,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Wr
         offset: u64,
         data: &[u8],
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let (request_id, awaitable_response) = self.responses.write().insert(None);
+        let (request_id, awaitable_response) = self.responses.insert(None);
 
         match self
             .send_write_request_impl(request_id, handle, offset, data)
@@ -122,7 +121,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Wr
         {
             Ok(_) => Ok(awaitable_response),
             Err(err) => {
-                self.responses.write().remove(request_id).unwrap();
+                self.responses.remove(request_id).unwrap();
 
                 Err(err)
             }

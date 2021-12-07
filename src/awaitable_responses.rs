@@ -8,6 +8,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use openssh_sftp_protocol::response::ResponseInner;
+use parking_lot::Mutex;
 use thunderdome::Arena;
 
 #[derive(Debug, Clone)]
@@ -65,7 +66,7 @@ impl<Buffer: ToBuffer + 'static> AwaitableResponseFactory<Buffer> {
     }
 
     pub(crate) fn create(&self) -> AwaitableResponses<Buffer> {
-        AwaitableResponses(Arena::new(), self.0.clone())
+        AwaitableResponses(Mutex::new(Arena::new()), self.0.clone())
     }
 }
 
@@ -77,25 +78,24 @@ impl<Buffer: ToBuffer + 'static> Clone for AwaitableResponseFactory<Buffer> {
 
 #[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
-    Arena<Value<Buffer>>,
+    Mutex<Arena<Value<Buffer>>>,
     AwaitableFactory<Buffer, Response<Buffer>>,
 );
 
 impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
     /// Return (slot_id, awaitable_response)
-    pub(crate) fn insert(&mut self, buffer: Option<Buffer>) -> (u32, AwaitableResponse<Buffer>) {
+    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> (u32, AwaitableResponse<Buffer>) {
         let awaitable_response = self.1.create(buffer);
 
-        (
-            self.0.insert(awaitable_response.clone()).slot(),
-            AwaitableResponse(awaitable_response),
-        )
+        let awaitable_response_clone = awaitable_response.clone();
+        let res = self.0.lock().insert(awaitable_response_clone);
+
+        (res.slot(), AwaitableResponse(awaitable_response))
     }
 
-    pub(crate) fn remove(&mut self, slot: u32) -> Result<AwaitableResponse<Buffer>, Error> {
-        self.0
-            .remove_by_slot(slot)
-            .map(|(_index, awaitable_response)| AwaitableResponse(awaitable_response))
+    pub(crate) fn remove(&self, slot: u32) -> Result<AwaitableResponse<Buffer>, Error> {
+        let res = self.0.lock().remove_by_slot(slot);
+        res.map(|(_index, awaitable_response)| AwaitableResponse(awaitable_response))
             .ok_or(Error::InvalidResponseId)
     }
 }

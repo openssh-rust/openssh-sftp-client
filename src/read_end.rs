@@ -5,7 +5,6 @@ use super::ToBuffer;
 use core::fmt::Debug;
 use core::marker::Unpin;
 
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 use openssh_sftp_protocol::response::{self, ServerVersion};
@@ -19,11 +18,11 @@ use tokio_io_utility::read_exact_to_vec;
 pub struct ReadEnd<Reader: AsyncRead + Unpin, Buffer: ToBuffer + 'static> {
     reader: Reader,
     buffer: Vec<u8>,
-    responses: Arc<RwLock<AwaitableResponses<Buffer>>>,
+    responses: Arc<AwaitableResponses<Buffer>>,
 }
 
 impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Reader, Buffer> {
-    pub(crate) fn new(reader: Reader, responses: Arc<RwLock<AwaitableResponses<Buffer>>>) -> Self {
+    pub(crate) fn new(reader: Reader, responses: Arc<AwaitableResponses<Buffer>>) -> Self {
         Self {
             reader,
             buffer: Vec::new(),
@@ -120,7 +119,7 @@ impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Read
 
         let len = len - 5;
 
-        let res = self.responses.write().remove(response_id);
+        let res = self.responses.remove(response_id);
 
         let callback = match res {
             Ok(callback) => callback,

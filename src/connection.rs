@@ -7,7 +7,6 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use core::fmt::Debug;
 use core::marker::Unpin;
 
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -38,7 +37,7 @@ impl<Buffer: ToBuffer + Debug + 'static> ConnectionFactory<Buffer> {
         Writer: AsyncWrite + Unpin,
         Reader: AsyncRead + Unpin,
     {
-        let responses = Arc::new(RwLock::new(self.0.create()));
+        let responses = Arc::new(self.0.create());
 
         let mut read_end = ReadEnd::new(reader, responses.clone());
         let mut write_end = WriteEnd::new(writer, responses);
