@@ -96,7 +96,7 @@ impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
     pub(crate) fn remove(&self, slot: u32) -> Result<AwaitableResponse<Buffer>, Error> {
         let res = self.0.lock().remove_by_slot(slot);
         res.map(|(_index, awaitable_response)| AwaitableResponse(awaitable_response))
-            .ok_or(Error::InvalidResponseId)
+            .ok_or(Error::InvalidResponseId { response_id: slot })
     }
 }
 
