@@ -37,7 +37,9 @@ impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Read
         let server_version = ServerVersion::deserialize(&self.buffer)?;
 
         if server_version.version != version {
-            Err(Error::UnsupportedSftpProtocol)
+            Err(Error::UnsupportedSftpProtocol {
+                version: server_version.version,
+            })
         } else {
             Ok(())
         }
