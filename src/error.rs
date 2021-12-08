@@ -29,7 +29,7 @@ pub enum Error {
     #[error("The response id is invalid.")]
     InvalidResponseId,
 
-    /// Error {1:#?} happens when handling Error {0:#?}.
-    #[error("Error {1:#?} happens when handling Error {0:#?}.")]
-    RecursiveErrors(Box<Error>, Box<Error>),
+    /// (OriginalError, RecursiveError): {0:#?}.
+    #[error("(OriginalError, RecursiveError): {0:#?}.")]
+    RecursiveErrors(Box<(Error, Error)>),
 }

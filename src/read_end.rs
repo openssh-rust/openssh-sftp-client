@@ -127,10 +127,7 @@ impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Read
                 // Consume the invalid data to return self to a valid state
                 // where read_in_one_packet can be called again.
                 if let Err(consumption_err) = self.consume_data_packet(len).await {
-                    return Err(Error::RecursiveErrors(
-                        Box::new(err),
-                        Box::new(consumption_err),
-                    ));
+                    return Err(Error::RecursiveErrors(Box::new((err, consumption_err))));
                 }
                 return Err(err);
             }
