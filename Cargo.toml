@@ -20,7 +20,7 @@ generic-global-variables = "0.1.1"
 parking_lot = "0.11.2"
 thunderdome = "0.5.0"
 
-openssh-sftp-protocol = "0.9.0"
+openssh-sftp-protocol = "0.9.1"
 
 tokio = { version = "1.11.0", features = ["io-util"] }
 tokio-io-utility = "0.2.0"
