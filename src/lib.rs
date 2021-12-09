@@ -20,7 +20,7 @@ pub use openssh_sftp_protocol::response::StatusCode;
 pub use openssh_sftp_protocol::response::{NameEntry, ResponseInner};
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
-pub use connection::ConnectionFactory;
+pub use connection::connect;
 pub use error::Error;
 pub use read_end::ReadEnd;
 pub use write_end::WriteEnd;

@@ -2,10 +2,6 @@ use core::fmt::Debug;
 use core::mem;
 use core::task::Waker;
 
-use generic_global_variables::{Entry, GenericGlobal};
-use once_cell::sync::OnceCell;
-use openssh_sftp_protocol::shared_arena::{ArenaArc, SharedArena};
-
 use parking_lot::Mutex;
 
 #[derive(Debug)]
@@ -18,45 +14,19 @@ enum InnerState<Input, Output> {
     Consumed,
 }
 impl<Input, Output> InnerState<Input, Output> {
-    fn new(input: Option<Input>) -> Mutex<Self> {
-        Mutex::new(InnerState::Ongoing(input, None))
+    fn new(input: Option<Input>) -> Self {
+        InnerState::Ongoing(input, None)
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct AwaitableFactory<Input: 'static, Output: 'static>(
-    Entry<SharedArena<Mutex<InnerState<Input, Output>>>>,
-);
-impl<Input, Output> AwaitableFactory<Input, Output> {
-    pub(crate) fn new() -> Self {
-        static GLOBALS: OnceCell<GenericGlobal> = OnceCell::new();
-
-        let globals = GLOBALS.get_or_init(GenericGlobal::new);
-
-        Self(globals.get_or_init(SharedArena::new))
-    }
-
-    pub(crate) fn create(&self, input: Option<Input>) -> Awaitable<Input, Output> {
-        Awaitable(self.0.alloc_arc(InnerState::new(input)))
-    }
-}
-
-impl<Input, Output> Clone for AwaitableFactory<Input, Output> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Awaitable<Input, Output>(ArenaArc<Mutex<InnerState<Input, Output>>>);
-
-impl<Input, Output> Clone for Awaitable<Input, Output> {
-    fn clone(&self) -> Self {
-        Awaitable(self.0.clone())
-    }
-}
+pub(crate) struct Awaitable<Input, Output>(Mutex<InnerState<Input, Output>>);
 
 impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
+    pub(crate) fn new(input: Option<Input>) -> Self {
+        Self(Mutex::new(InnerState::new(input)))
+    }
+
     /// Return true if the task is already done.
     pub(crate) fn install_waker(&self, waker: Waker) -> bool {
         use InnerState::*;
@@ -92,7 +62,7 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
         }
     }
 
-    pub(crate) fn done(self, value: Output) {
+    pub(crate) fn done(&self, value: Output) {
         use InnerState::*;
 
         let prev_state = mem::replace(&mut *self.0.lock(), Done(value));
@@ -111,7 +81,7 @@ impl<Input: Debug, Output: Debug> Awaitable<Input, Output> {
     }
 
     /// Return `Some(output)` if the awaitable is done.
-    pub(crate) fn take_output(self) -> Option<Output> {
+    pub(crate) fn take_output(&self) -> Option<Output> {
         use InnerState::*;
 
         let prev_state = mem::replace(&mut *self.0.lock(), Consumed);

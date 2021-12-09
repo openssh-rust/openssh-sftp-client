@@ -1,4 +1,4 @@
-use super::awaitable::{Awaitable, AwaitableFactory};
+use super::awaitable::Awaitable;
 use super::Error;
 use super::ToBuffer;
 
@@ -8,8 +8,9 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use openssh_sftp_protocol::response::ResponseInner;
-use parking_lot::Mutex;
-use thunderdome::Arena;
+
+use concurrent_arena::Arena;
+use concurrent_arena::ArenaArc;
 
 #[derive(Debug, Clone)]
 pub enum Response<Buffer: ToBuffer> {
@@ -55,60 +56,49 @@ impl<Buffer: ToBuffer> Response<Buffer> {
 
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
 
-#[derive(Debug)]
-pub(crate) struct AwaitableResponseFactory<Buffer: ToBuffer + 'static>(
-    AwaitableFactory<Buffer, Response<Buffer>>,
-);
+/// BITARRAY_LEN must be LEN / usize::BITS and LEN must be divisble by usize::BITS.
+const BITARRAY_LEN: usize = 1;
+const LEN: usize = 64;
 
-impl<Buffer: ToBuffer + 'static> AwaitableResponseFactory<Buffer> {
-    pub(crate) fn new() -> Self {
-        Self(AwaitableFactory::new())
-    }
-
-    pub(crate) fn create(&self) -> AwaitableResponses<Buffer> {
-        AwaitableResponses(Mutex::new(Arena::new()), self.0.clone())
-    }
-}
-
-impl<Buffer: ToBuffer + 'static> Clone for AwaitableResponseFactory<Buffer> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
+/// Check `concurrent_arena::Arena` for `BITARRAY_LEN` and `LEN`.
 #[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
-    Mutex<Arena<Value<Buffer>>>,
-    AwaitableFactory<Buffer, Response<Buffer>>,
+    Arena<Value<Buffer>, BITARRAY_LEN, LEN>,
 );
 
-impl<Buffer: Debug + ToBuffer> AwaitableResponses<Buffer> {
+impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
+    pub(crate) fn new() -> Self {
+        Self(Arena::with_capacity(3))
+    }
+
     /// Return (slot_id, awaitable_response)
-    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> (u32, AwaitableResponse<Buffer>) {
-        let awaitable_response = self.1.create(buffer);
-
-        let awaitable_response_clone = awaitable_response.clone();
-        let res = self.0.lock().insert(awaitable_response_clone);
-
-        (res.slot(), AwaitableResponse(awaitable_response))
+    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> AwaitableResponse<Buffer> {
+        AwaitableResponse(self.0.insert(Value::new(buffer)))
     }
 
     pub(crate) fn remove(&self, slot: u32) -> Result<AwaitableResponse<Buffer>, Error> {
-        let res = self.0.lock().remove_by_slot(slot);
-        res.map(|(_index, awaitable_response)| AwaitableResponse(awaitable_response))
+        self.0
+            .remove(slot)
+            .map(AwaitableResponse)
             .ok_or(Error::InvalidResponseId { response_id: slot })
     }
 }
 
 #[derive(Debug)]
-pub struct AwaitableResponse<Buffer: ToBuffer>(Value<Buffer>);
+pub struct AwaitableResponse<Buffer: ToBuffer + Send + Sync>(
+    ArenaArc<Value<Buffer>, BITARRAY_LEN, LEN>,
+);
 
-impl<Buffer: ToBuffer + Debug> AwaitableResponse<Buffer> {
+impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableResponse<Buffer> {
+    pub(crate) fn slot(&self) -> u32 {
+        self.0.slot()
+    }
+
     pub(crate) fn get_input(&self) -> Option<Buffer> {
         self.0.take_input()
     }
 
-    pub(crate) fn do_callback(self, response: Response<Buffer>) {
+    pub(crate) fn do_callback(&self, response: Response<Buffer>) {
         self.0.done(response);
     }
 

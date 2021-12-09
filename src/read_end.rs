@@ -21,7 +21,9 @@ pub struct ReadEnd<Reader: AsyncRead + Unpin, Buffer: ToBuffer + 'static> {
     responses: Arc<AwaitableResponses<Buffer>>,
 }
 
-impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static> ReadEnd<Reader, Buffer> {
+impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Send + Sync>
+    ReadEnd<Reader, Buffer>
+{
     pub(crate) fn new(reader: Reader, responses: Arc<AwaitableResponses<Buffer>>) -> Self {
         Self {
             reader,

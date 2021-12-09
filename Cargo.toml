@@ -14,11 +14,9 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
 thiserror = "1.0.29"
-once_cell = "1.8.0"
-generic-global-variables = "0.1.1"
 
 parking_lot = "0.11.2"
-thunderdome = "0.5.0"
+concurrent_arena = "0.1.0"
 
 openssh-sftp-protocol = "0.10.0"
 
@@ -27,3 +25,4 @@ tokio-io-utility = "0.2.0"
 
 [dev-dependencies]
 tokio = { version = "1.11.0", features = ["rt", "macros", "process"] }
+once_cell = "1.8.0"

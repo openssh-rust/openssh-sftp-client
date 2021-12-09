@@ -1,6 +1,5 @@
+use super::awaitable_responses::AwaitableResponses;
 use super::*;
-
-use awaitable_responses::AwaitableResponseFactory;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
@@ -14,48 +13,26 @@ use tokio::io::{AsyncRead, AsyncWrite};
 /// TODO:
 ///  - Support for zero copy API
 
-#[derive(Debug)]
-pub struct ConnectionFactory<Buffer: ToBuffer + 'static>(AwaitableResponseFactory<Buffer>);
+pub async fn connect<
+    Buffer: ToBuffer + Debug + Send + Sync + 'static,
+    Writer: AsyncWrite + Unpin,
+    Reader: AsyncRead + Unpin,
+>(
+    reader: Reader,
+    writer: Writer,
+) -> Result<(WriteEnd<Writer, Buffer>, ReadEnd<Reader, Buffer>), Error> {
+    let responses = Arc::new(AwaitableResponses::new());
 
-impl<Buffer: ToBuffer + Debug + 'static> Default for ConnectionFactory<Buffer> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+    let mut read_end = ReadEnd::new(reader, responses.clone());
+    let mut write_end = WriteEnd::new(writer, responses);
 
-impl<Buffer: ToBuffer + Debug + 'static> ConnectionFactory<Buffer> {
-    pub fn new() -> Self {
-        Self(AwaitableResponseFactory::new())
-    }
+    // negotiate
+    let version = SSH2_FILEXFER_VERSION;
 
-    pub async fn create<Writer, Reader>(
-        &self,
-        reader: Reader,
-        writer: Writer,
-    ) -> Result<(WriteEnd<Writer, Buffer>, ReadEnd<Reader, Buffer>), Error>
-    where
-        Writer: AsyncWrite + Unpin,
-        Reader: AsyncRead + Unpin,
-    {
-        let responses = Arc::new(self.0.create());
+    write_end.send_hello(version, Default::default()).await?;
+    read_end.receive_server_version(version).await?;
 
-        let mut read_end = ReadEnd::new(reader, responses.clone());
-        let mut write_end = WriteEnd::new(writer, responses);
-
-        // negotiate
-        let version = SSH2_FILEXFER_VERSION;
-
-        write_end.send_hello(version, Default::default()).await?;
-        read_end.receive_server_version(version).await?;
-
-        Ok((write_end, read_end))
-    }
-}
-
-impl<Buffer: ToBuffer + 'static> Clone for ConnectionFactory<Buffer> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
+    Ok((write_end, read_end))
 }
 
 #[cfg(test)]
@@ -68,11 +45,6 @@ mod tests {
     use once_cell::sync::OnceCell;
 
     use tokio::process;
-
-    fn get_conn_factory() -> &'static ConnectionFactory<Vec<u8>> {
-        static CONN_FACTORY: OnceCell<ConnectionFactory<Vec<u8>>> = OnceCell::new();
-        CONN_FACTORY.get_or_init(ConnectionFactory::new)
-    }
 
     fn get_sftp_path() -> &'static path::Path {
         static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
@@ -108,7 +80,7 @@ mod tests {
         process::Child,
     ) {
         let (child, stdin, stdout) = launch_sftp().await;
-        let (write_end, read_end) = get_conn_factory().create(stdout, stdin).await.unwrap();
+        let (write_end, read_end) = crate::connect(stdout, stdin).await.unwrap();
         (write_end, read_end, child)
     }
 

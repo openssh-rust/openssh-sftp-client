@@ -26,7 +26,9 @@ pub struct WriteEnd<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
     responses: Arc<AwaitableResponses<Buffer>>,
 }
 
-impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Writer, Buffer> {
+impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
+    WriteEnd<Writer, Buffer>
+{
     pub(crate) fn new(writer: Writer, responses: Arc<AwaitableResponses<Buffer>>) -> Self {
         Self {
             writer,
@@ -68,7 +70,9 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Wr
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let (request_id, awaitable_response) = self.responses.insert(buffer);
+        let awaitable_response = self.responses.insert(buffer);
+        let request_id = awaitable_response.slot();
+
         match self
             .write(Request {
                 request_id,
@@ -113,7 +117,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + 'static> WriteEnd<Wr
         offset: u64,
         data: &[u8],
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let (request_id, awaitable_response) = self.responses.insert(None);
+        let awaitable_response = self.responses.insert(None);
+        let request_id = awaitable_response.slot();
 
         match self
             .send_write_request_impl(request_id, handle, offset, data)
