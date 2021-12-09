@@ -1,4 +1,3 @@
-use super::awaitable::Awaitable;
 use super::Error;
 use super::ToBuffer;
 
@@ -7,10 +6,12 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use openssh_sftp_protocol::response::ResponseInner;
+use awaitable::Awaitable;
 
 use concurrent_arena::Arena;
 use concurrent_arena::ArenaArc;
+
+use openssh_sftp_protocol::response::ResponseInner;
 
 #[derive(Debug, Clone)]
 pub enum Response<Buffer: ToBuffer> {

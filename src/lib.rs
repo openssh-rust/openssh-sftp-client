@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-mod awaitable;
 mod awaitable_responses;
 mod buffer;
 mod connection;

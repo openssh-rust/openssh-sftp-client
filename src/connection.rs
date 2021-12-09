@@ -1,14 +1,14 @@
 use super::awaitable_responses::AwaitableResponses;
 use super::*;
 
-use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-
 use core::fmt::Debug;
 use core::marker::Unpin;
 
 use std::sync::Arc;
 
 use tokio::io::{AsyncRead, AsyncWrite};
+
+use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
 /// TODO:
 ///  - Support for zero copy API

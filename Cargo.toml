@@ -14,8 +14,7 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
 thiserror = "1.0.29"
-
-parking_lot = "0.11.2"
+awaitable = "0.1.0"
 concurrent_arena = "0.1.0"
 
 openssh-sftp-protocol = "0.10.0"
