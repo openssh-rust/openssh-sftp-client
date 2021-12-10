@@ -92,7 +92,7 @@ pub struct AwaitableResponse<Buffer: ToBuffer + Send + Sync>(
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableResponse<Buffer> {
     pub(crate) fn slot(&self) -> u32 {
-        self.0.slot()
+        ArenaArc::slot(&self.0)
     }
 
     pub(crate) fn get_input(&self) -> Option<Buffer> {
