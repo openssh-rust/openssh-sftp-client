@@ -15,7 +15,7 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 [dependencies]
 thiserror = "1.0.29"
 awaitable = "0.1.0"
-concurrent_arena = "0.1.0"
+concurrent_arena = { git = "https://github.com/NobodyXu/concurrent_arena" }
 
 openssh-sftp-protocol = "0.10.0"
 
