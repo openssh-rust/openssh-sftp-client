@@ -26,6 +26,14 @@ pub struct WriteEnd<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
     shared_data: Arc<SharedData<Writer, Buffer>>,
 }
 
+impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static> Clone
+    for WriteEnd<Writer, Buffer>
+{
+    fn clone(&self) -> Self {
+        Self::new(self.shared_data.clone())
+    }
+}
+
 impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
     WriteEnd<Writer, Buffer>
 {
