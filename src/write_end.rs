@@ -1,6 +1,6 @@
-use super::awaitable_responses::AwaitableResponse;
 use super::connection::SharedData;
 use super::Error;
+use super::Response;
 use super::ToBuffer;
 
 use core::fmt::Debug;
@@ -79,7 +79,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         &mut self,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
-    ) -> Result<AwaitableResponse<Buffer>, Error> {
+    ) -> Result<Response<Buffer>, Error> {
         let awaitable_response = self.shared_data.responses.insert(buffer);
         let request_id = awaitable_response.slot();
 
@@ -90,7 +90,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
             })
             .await
         {
-            Ok(_) => Ok(awaitable_response),
+            Ok(_) => Ok(awaitable_response.wait().await),
             Err(err) => {
                 self.shared_data.responses.remove(request_id).unwrap();
 
@@ -128,7 +128,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         handle: &[u8],
         offset: u64,
         data: &[u8],
-    ) -> Result<AwaitableResponse<Buffer>, Error> {
+    ) -> Result<Response<Buffer>, Error> {
         let awaitable_response = self.shared_data.responses.insert(None);
         let request_id = awaitable_response.slot();
 
@@ -136,7 +136,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
             .send_write_request_impl(request_id, handle, offset, data)
             .await
         {
-            Ok(_) => Ok(awaitable_response),
+            Ok(_) => Ok(awaitable_response.wait().await),
             Err(err) => {
                 self.shared_data.responses.remove(request_id).unwrap();
 
