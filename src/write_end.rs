@@ -1,4 +1,5 @@
-use super::awaitable_responses::{AwaitableResponse, AwaitableResponses};
+use super::awaitable_responses::AwaitableResponse;
+use super::connection::SharedData;
 use super::Error;
 use super::ToBuffer;
 
@@ -21,19 +22,17 @@ use tokio_io_utility::AsyncWriteUtility;
 
 #[derive(Debug)]
 pub struct WriteEnd<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
-    writer: Writer,
     serializer: Serializer,
-    responses: Arc<AwaitableResponses<Buffer>>,
+    shared_data: Arc<SharedData<Writer, Buffer>>,
 }
 
 impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
     WriteEnd<Writer, Buffer>
 {
-    pub(crate) fn new(writer: Writer, responses: Arc<AwaitableResponses<Buffer>>) -> Self {
+    pub(crate) fn new(shared_data: Arc<SharedData<Writer, Buffer>>) -> Self {
         Self {
-            writer,
             serializer: Serializer::new(),
-            responses,
+            shared_data,
         }
     }
 
@@ -55,7 +54,10 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     {
         self.serializer.reset();
         value.serialize(&mut self.serializer)?;
-        self.writer
+
+        let mut writer = self.shared_data.writer.lock().await;
+
+        writer
             .write_vectored_all(&mut [IoSlice::new(self.serializer.get_output()?)])
             .await?;
 
@@ -70,7 +72,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let awaitable_response = self.responses.insert(buffer);
+        let awaitable_response = self.shared_data.responses.insert(buffer);
         let request_id = awaitable_response.slot();
 
         match self
@@ -82,7 +84,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         {
             Ok(_) => Ok(awaitable_response),
             Err(err) => {
-                self.responses.remove(request_id).unwrap();
+                self.shared_data.responses.remove(request_id).unwrap();
 
                 Err(err)
             }
@@ -104,8 +106,10 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
             data.len().try_into().map_err(|_| Error::BufferTooLong)?,
         )?;
 
+        let mut writer = self.shared_data.writer.lock().await;
+
         let mut slices = [IoSlice::new(header), IoSlice::new(data)];
-        self.writer.write_vectored_all(&mut slices).await?;
+        writer.write_vectored_all(&mut slices).await?;
 
         Ok(())
     }
@@ -117,7 +121,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         offset: u64,
         data: &[u8],
     ) -> Result<AwaitableResponse<Buffer>, Error> {
-        let awaitable_response = self.responses.insert(None);
+        let awaitable_response = self.shared_data.responses.insert(None);
         let request_id = awaitable_response.slot();
 
         match self
@@ -126,7 +130,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         {
             Ok(_) => Ok(awaitable_response),
             Err(err) => {
-                self.responses.remove(request_id).unwrap();
+                self.shared_data.responses.remove(request_id).unwrap();
 
                 Err(err)
             }

@@ -1,4 +1,5 @@
-use super::awaitable_responses::{AwaitableResponses, Response};
+use super::awaitable_responses::Response;
+use super::connection::SharedData;
 use super::Error;
 use super::ToBuffer;
 
@@ -11,24 +12,31 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy, sink, AsyncRead, AsyncReadExt};
+use tokio::io::{copy, sink, AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_io_utility::read_exact_to_vec;
 
 #[derive(Debug)]
-pub struct ReadEnd<Reader: AsyncRead + Unpin, Buffer: ToBuffer + 'static> {
+pub struct ReadEnd<
+    Writer: AsyncWrite + Unpin,
+    Reader: AsyncRead + Unpin,
+    Buffer: ToBuffer + 'static,
+> {
     reader: Reader,
     buffer: Vec<u8>,
-    responses: Arc<AwaitableResponses<Buffer>>,
+    shared_data: Arc<SharedData<Writer, Buffer>>,
 }
 
-impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Send + Sync>
-    ReadEnd<Reader, Buffer>
+impl<
+        Writer: AsyncWrite + Unpin,
+        Reader: AsyncRead + Unpin,
+        Buffer: ToBuffer + Debug + 'static + Send + Sync,
+    > ReadEnd<Writer, Reader, Buffer>
 {
-    pub(crate) fn new(reader: Reader, responses: Arc<AwaitableResponses<Buffer>>) -> Self {
+    pub(crate) fn new(reader: Reader, shared_data: Arc<SharedData<Writer, Buffer>>) -> Self {
         Self {
             reader,
             buffer: Vec::new(),
-            responses,
+            shared_data,
         }
     }
 
@@ -123,7 +131,7 @@ impl<Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Send + Sync
 
         let len = len - 5;
 
-        let callback = match self.responses.remove(response_id) {
+        let callback = match self.shared_data.responses.remove(response_id) {
             Ok(callback) => callback,
 
             // Invalid response_id

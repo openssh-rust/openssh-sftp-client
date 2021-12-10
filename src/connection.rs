@@ -5,6 +5,7 @@ use core::fmt::Debug;
 use core::marker::Unpin;
 
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -13,6 +14,17 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 /// TODO:
 ///  - Support for zero copy API
 
+/// SharedData contains both the writer and the responses because:
+///  - The overhead of `Arc` and a separate allocation;
+///  - If the write end of a connection is closed, then openssh implementation
+///    of sftp-server would close the read end right away, discarding
+///    any unsent but processed or unprocessed responses.
+#[derive(Debug)]
+pub(crate) struct SharedData<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
+    pub(crate) writer: Mutex<Writer>,
+    pub(crate) responses: AwaitableResponses<Buffer>,
+}
+
 pub async fn connect<
     Buffer: ToBuffer + Debug + Send + Sync + 'static,
     Writer: AsyncWrite + Unpin,
@@ -20,11 +32,14 @@ pub async fn connect<
 >(
     reader: Reader,
     writer: Writer,
-) -> Result<(WriteEnd<Writer, Buffer>, ReadEnd<Reader, Buffer>), Error> {
-    let responses = Arc::new(AwaitableResponses::new());
+) -> Result<(WriteEnd<Writer, Buffer>, ReadEnd<Writer, Reader, Buffer>), Error> {
+    let shared_data = Arc::new(SharedData {
+        writer: Mutex::new(writer),
+        responses: AwaitableResponses::new(),
+    });
 
-    let mut read_end = ReadEnd::new(reader, responses.clone());
-    let mut write_end = WriteEnd::new(writer, responses);
+    let mut read_end = ReadEnd::new(reader, shared_data.clone());
+    let mut write_end = WriteEnd::new(shared_data);
 
     // negotiate
     let version = SSH2_FILEXFER_VERSION;
@@ -76,7 +91,7 @@ mod tests {
 
     async fn connect() -> (
         WriteEnd<process::ChildStdin, Vec<u8>>,
-        ReadEnd<process::ChildStdout, Vec<u8>>,
+        ReadEnd<process::ChildStdin, process::ChildStdout, Vec<u8>>,
         process::Child,
     ) {
         let (child, stdin, stdout) = launch_sftp().await;
