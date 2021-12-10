@@ -95,6 +95,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         })
         .await?;
 
+        self.shared_data.notify_new_packet_event();
+
         Ok(OngoingRequest(id))
     }
 
@@ -132,6 +134,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         self.send_write_request_impl(id.slot(), handle, offset, data)
             .await?;
 
+        self.shared_data.notify_new_packet_event();
+
         Ok(OngoingRequest(id))
     }
 }
@@ -140,7 +144,9 @@ pub struct OngoingRequest<Buffer: ToBuffer + Send + Sync + 'static>(Id<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> OngoingRequest<Buffer> {
     pub async fn wait(self) -> (Id<Buffer>, Response<Buffer>) {
-        let response = self.0.wait().await;
-        (self.0, response)
+        let id = self.0;
+
+        let response = id.wait().await;
+        (id, response)
     }
 }

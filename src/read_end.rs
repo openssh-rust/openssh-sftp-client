@@ -155,4 +155,9 @@ impl<
 
         Ok(())
     }
+
+    /// Return number of requests sent and number of responses to read in.
+    pub async fn wait_for_new_request(&self) -> usize {
+        self.shared_data.wait_for_new_request().await
+    }
 }

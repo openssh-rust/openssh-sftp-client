@@ -4,8 +4,11 @@ use super::*;
 use core::fmt::Debug;
 use core::marker::Unpin;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+
 use tokio::sync::Mutex;
+use tokio::sync::Notify;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -23,6 +26,30 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 pub(crate) struct SharedData<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
     pub(crate) writer: Mutex<Writer>,
     pub(crate) responses: AwaitableResponses<Buffer>,
+
+    notify: Notify,
+    requests_sent: AtomicUsize,
+}
+
+impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
+    pub(crate) fn notify_new_packet_event(&self) {
+        self.requests_sent.fetch_add(1, Ordering::Relaxed);
+
+        // We only have one waiting task, that is `ReadEnd`.
+        // Notify the `ReadEnd` after the requests_sent is incremented.
+        self.notify.notify_one();
+    }
+
+    /// Return number of requests and clear requests_sent
+    pub(crate) async fn wait_for_new_request(&self) -> usize {
+        loop {
+            let cnt = self.requests_sent.swap(0, Ordering::Relaxed);
+            if cnt > 0 {
+                break cnt;
+            }
+            self.notify.notified().await;
+        }
+    }
 }
 
 pub async fn connect<
@@ -36,6 +63,8 @@ pub async fn connect<
     let shared_data = Arc::new(SharedData {
         writer: Mutex::new(writer),
         responses: AwaitableResponses::new(),
+        notify: Notify::new(),
+        requests_sent: AtomicUsize::new(0),
     });
 
     let mut read_end = ReadEnd::new(reader, shared_data.clone());
