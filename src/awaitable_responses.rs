@@ -73,24 +73,28 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
     }
 
     /// Return (slot_id, awaitable_response)
-    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> ResponseId<Buffer> {
-        ResponseId(self.0.insert(Value::new(buffer)))
+    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> Id<Buffer> {
+        Id(self.0.insert(Value::new(buffer)))
     }
 
-    pub(crate) fn remove(&self, slot: u32) -> Result<ResponseId<Buffer>, Error> {
+    pub(crate) fn get(&self, slot: u32) -> Result<Id<Buffer>, Error> {
         self.0
-            .remove(slot)
-            .map(ResponseId)
+            .get(slot)
+            .map(Id)
             .ok_or(Error::InvalidResponseId { response_id: slot })
     }
 }
 
 #[derive(Debug)]
-pub struct ResponseId<Buffer: ToBuffer + Send + Sync>(ArenaArc<Value<Buffer>, BITARRAY_LEN, LEN>);
+pub struct Id<Buffer: ToBuffer + Send + Sync>(ArenaArc<Value<Buffer>, BITARRAY_LEN, LEN>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> ResponseId<Buffer> {
+impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     pub(crate) fn slot(&self) -> u32 {
         ArenaArc::slot(&self.0)
+    }
+
+    pub(crate) fn reset(&self, input: Option<Buffer>) {
+        self.0.reset(input);
     }
 
     pub(crate) fn get_input(&self) -> Option<Buffer> {
@@ -130,7 +134,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> ResponseId<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + Send + Sync> Drop for ResponseId<Buffer> {
+impl<Buffer: ToBuffer + Send + Sync> Drop for Id<Buffer> {
     fn drop(&mut self) {
         ArenaArc::remove(&self.0);
     }

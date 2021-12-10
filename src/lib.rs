@@ -7,7 +7,7 @@ mod error;
 mod read_end;
 mod write_end;
 
-pub use awaitable_responses::{AwaitableResponse, Response};
+pub use awaitable_responses::{Id, Response};
 
 pub use buffer::*;
 

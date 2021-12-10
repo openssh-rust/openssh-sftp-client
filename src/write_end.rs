@@ -1,5 +1,6 @@
 use super::connection::SharedData;
 use super::Error;
+use super::Id;
 use super::Response;
 use super::ToBuffer;
 
@@ -72,31 +73,29 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         Ok(())
     }
 
+    /// Create a useable response id.
+    pub fn create_response_id(&self) -> Id<Buffer> {
+        self.shared_data.responses.insert(None)
+    }
+
     /// Send requests.
     ///
     /// **Please use `Self::send_write_request` for sending write requests.**
     pub async fn send_request(
         &mut self,
+        id: &mut Id<Buffer>,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
     ) -> Result<Response<Buffer>, Error> {
-        let awaitable_response = self.shared_data.responses.insert(buffer);
-        let request_id = awaitable_response.slot();
+        id.reset(buffer);
 
-        match self
-            .write(Request {
-                request_id,
-                inner: request,
-            })
-            .await
-        {
-            Ok(_) => Ok(awaitable_response.wait().await),
-            Err(err) => {
-                self.shared_data.responses.remove(request_id).unwrap();
+        self.write(Request {
+            request_id: id.slot(),
+            inner: request,
+        })
+        .await?;
 
-                Err(err)
-            }
-        }
+        Ok(id.wait().await)
     }
 
     async fn send_write_request_impl(
@@ -125,23 +124,14 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     /// Send write requests
     pub async fn send_write_request(
         &mut self,
+        id: &mut Id<Buffer>,
         handle: &[u8],
         offset: u64,
         data: &[u8],
     ) -> Result<Response<Buffer>, Error> {
-        let awaitable_response = self.shared_data.responses.insert(None);
-        let request_id = awaitable_response.slot();
+        self.send_write_request_impl(id.slot(), handle, offset, data)
+            .await?;
 
-        match self
-            .send_write_request_impl(request_id, handle, offset, data)
-            .await
-        {
-            Ok(_) => Ok(awaitable_response.wait().await),
-            Err(err) => {
-                self.shared_data.responses.remove(request_id).unwrap();
-
-                Err(err)
-            }
-        }
+        Ok(id.wait().await)
     }
 }

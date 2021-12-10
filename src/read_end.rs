@@ -131,7 +131,7 @@ impl<
 
         let len = len - 5;
 
-        let callback = match self.shared_data.responses.remove(response_id) {
+        let callback = match self.shared_data.responses.get(response_id) {
             Ok(callback) => callback,
 
             // Invalid response_id
