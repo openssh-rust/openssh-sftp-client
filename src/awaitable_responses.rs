@@ -73,24 +73,22 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
     }
 
     /// Return (slot_id, awaitable_response)
-    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> AwaitableResponse<Buffer> {
-        AwaitableResponse(self.0.insert(Value::new(buffer)))
+    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> ResponseId<Buffer> {
+        ResponseId(self.0.insert(Value::new(buffer)))
     }
 
-    pub(crate) fn remove(&self, slot: u32) -> Result<AwaitableResponse<Buffer>, Error> {
+    pub(crate) fn remove(&self, slot: u32) -> Result<ResponseId<Buffer>, Error> {
         self.0
             .remove(slot)
-            .map(AwaitableResponse)
+            .map(ResponseId)
             .ok_or(Error::InvalidResponseId { response_id: slot })
     }
 }
 
 #[derive(Debug)]
-pub struct AwaitableResponse<Buffer: ToBuffer + Send + Sync>(
-    ArenaArc<Value<Buffer>, BITARRAY_LEN, LEN>,
-);
+pub struct ResponseId<Buffer: ToBuffer + Send + Sync>(ArenaArc<Value<Buffer>, BITARRAY_LEN, LEN>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableResponse<Buffer> {
+impl<Buffer: ToBuffer + Debug + Send + Sync> ResponseId<Buffer> {
     pub(crate) fn slot(&self) -> u32 {
         ArenaArc::slot(&self.0)
     }
@@ -103,7 +101,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableResponse<Buffer> {
         self.0.done(response);
     }
 
-    pub(crate) async fn wait(self) -> Response<Buffer> {
+    pub(crate) async fn wait(&self) -> Response<Buffer> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Value<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
@@ -129,5 +127,11 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableResponse<Buffer> {
         self.0
             .take_output()
             .expect("The request should be done by now")
+    }
+}
+
+impl<Buffer: ToBuffer + Send + Sync> Drop for ResponseId<Buffer> {
+    fn drop(&mut self) {
+        ArenaArc::remove(&self.0);
     }
 }
