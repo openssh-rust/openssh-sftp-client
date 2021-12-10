@@ -83,10 +83,10 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     /// **Please use `Self::send_write_request` for sending write requests.**
     pub async fn send_request(
         &mut self,
-        id: &mut Id<Buffer>,
+        id: Id<Buffer>,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
-    ) -> Result<Response<Buffer>, Error> {
+    ) -> Result<OngoingRequest<Buffer>, Error> {
         id.reset(buffer);
 
         self.write(Request {
@@ -95,7 +95,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         })
         .await?;
 
-        Ok(id.wait().await)
+        Ok(OngoingRequest(id))
     }
 
     async fn send_write_request_impl(
@@ -124,14 +124,23 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     /// Send write requests
     pub async fn send_write_request(
         &mut self,
-        id: &mut Id<Buffer>,
+        id: Id<Buffer>,
         handle: &[u8],
         offset: u64,
         data: &[u8],
-    ) -> Result<Response<Buffer>, Error> {
+    ) -> Result<OngoingRequest<Buffer>, Error> {
         self.send_write_request_impl(id.slot(), handle, offset, data)
             .await?;
 
-        Ok(id.wait().await)
+        Ok(OngoingRequest(id))
+    }
+}
+
+pub struct OngoingRequest<Buffer: ToBuffer + Send + Sync + 'static>(Id<Buffer>);
+
+impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> OngoingRequest<Buffer> {
+    pub async fn wait(self) -> (Id<Buffer>, Response<Buffer>) {
+        let response = self.0.wait().await;
+        (self.0, response)
     }
 }
