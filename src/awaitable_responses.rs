@@ -103,7 +103,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableResponse<Buffer> {
         self.0.done(response);
     }
 
-    pub async fn wait(self) -> Response<Buffer> {
+    pub(crate) async fn wait(self) -> Response<Buffer> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Value<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
