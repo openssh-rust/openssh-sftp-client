@@ -6,6 +6,7 @@ use super::ToBuffer;
 
 use core::fmt::Debug;
 use core::marker::Unpin;
+use std::borrow::Cow;
 
 use std::sync::Arc;
 
@@ -15,7 +16,7 @@ use openssh_sftp_protocol::response::ResponseInner;
 use openssh_sftp_protocol::response::StatusCode;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
-use openssh_sftp_protocol::HandleOwned;
+use openssh_sftp_protocol::{Handle, HandleOwned};
 
 use std::io::IoSlice;
 use tokio::io::AsyncWrite;
@@ -122,6 +123,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     ) -> Result<AwaitableHandle<Buffer>, Error> {
         Ok(AwaitableHandle(
             self.send_request(id, RequestInner::Open(params), None)
+                .await?,
+        ))
+    }
+
+    pub async fn send_close_request(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus(
+            self.send_request(id, RequestInner::Close(handle), None)
                 .await?,
         ))
     }
