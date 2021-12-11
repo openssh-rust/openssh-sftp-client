@@ -138,6 +138,28 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_read_request(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        len: u32,
+        buffer: Buffer,
+    ) -> Result<AwaitableData<Buffer>, Error> {
+        Ok(AwaitableData(
+            self.send_request(
+                id,
+                RequestInner::Read {
+                    handle,
+                    offset,
+                    len,
+                },
+                Some(buffer),
+            )
+            .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
@@ -180,6 +202,18 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Data<Buffer: ToBuffer> {
+    /// The buffer that stores the response of Read,
+    /// since its corresponding response type `ResponseInner::Data`
+    /// does not contain any member, it doesn't have to be stored.
+    Buffer(Buffer),
+
+    /// Same as `Buffer`, this is a fallback
+    /// if `Buffer` isn't provided or it isn't large enough.
+    AllocatedBox(Box<[u8]>),
+}
+
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
         pub struct $name<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
@@ -220,5 +254,19 @@ def_awaitable!(AwaitableHandle, HandleOwned, response, {
             _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
         },
         _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
+    }
+});
+
+def_awaitable!(AwaitableData, Data<Buffer>, response, {
+    match response {
+        Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
+        Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
+        Response::Header(ResponseInner::Status {
+            status_code: StatusCode::Failure(err_code),
+            err_msg,
+        }) => Err(Error::SftpError(err_code, err_msg)),
+        _ => Err(Error::InvalidResponse(
+            &"Unexpected Buffer/AllocatedBox response",
+        )),
     }
 });
