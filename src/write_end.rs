@@ -6,7 +6,9 @@ use super::ToBuffer;
 
 use core::fmt::Debug;
 use core::marker::Unpin;
+
 use std::borrow::Cow;
+use std::path::Path;
 
 use std::sync::Arc;
 
@@ -158,6 +160,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
                 Some(buffer),
             )
             .await?,
+        ))
+    }
+
+    pub async fn send_remove_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus(
+            self.send_request(id, RequestInner::Remove(path), None)
+                .await?,
         ))
     }
 
