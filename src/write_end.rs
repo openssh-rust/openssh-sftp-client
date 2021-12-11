@@ -95,12 +95,12 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     /// Send requests.
     ///
     /// **Please use `Self::send_write_request` for sending write requests.**
-    pub async fn send_request(
+    async fn send_request(
         &mut self,
         id: Id<Buffer>,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
-    ) -> Result<OngoingRequest<Buffer>, Error> {
+    ) -> Result<Id<Buffer>, Error> {
         id.reset(buffer);
 
         self.write(Request {
@@ -111,8 +111,10 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(OngoingRequest(id))
+        Ok(id)
     }
+
+    // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
         &mut self,
@@ -151,17 +153,6 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         self.shared_data.notify_new_packet_event();
 
         Ok(OngoingWriteRequest(id))
-    }
-}
-
-pub struct OngoingRequest<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
-
-impl<Buffer: ToBuffer + Debug + Send + Sync> OngoingRequest<Buffer> {
-    pub async fn wait(self) -> (Id<Buffer>, Response<Buffer>) {
-        let id = self.0;
-
-        let response = id.wait().await;
-        (id, response)
     }
 }
 
