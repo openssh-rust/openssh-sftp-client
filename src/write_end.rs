@@ -119,8 +119,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         &mut self,
         id: Id<Buffer>,
         params: OpenFile<'_>,
-    ) -> Result<OngoingOpenRequest<Buffer>, Error> {
-        Ok(OngoingOpenRequest(
+    ) -> Result<AwaitableHandle<Buffer>, Error> {
+        Ok(AwaitableHandle(
             self.send_request(id, RequestInner::Open(params), None)
                 .await?,
         ))
@@ -196,7 +196,7 @@ def_ongoing_request!(OngoingWriteRequest, (), response, {
     }
 });
 
-def_ongoing_request!(OngoingOpenRequest, HandleOwned, response, {
+def_ongoing_request!(AwaitableHandle, HandleOwned, response, {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Handle(handle) => Ok(handle),
