@@ -1,3 +1,5 @@
+use super::*;
+
 use std::io;
 use thiserror::Error;
 
@@ -35,4 +37,8 @@ pub enum Error {
     /// (OriginalError, RecursiveError): {0:#?}.
     #[error("(OriginalError, RecursiveError): {0:#?}.")]
     RecursiveErrors(Box<(Error, Error)>),
+
+    /// Sftp server error
+    #[error("Sftp server reported error kind {0:#?}, msg: {1:#?}")]
+    SftpError(SftpErrorKind, SftpErrMsg),
 }
