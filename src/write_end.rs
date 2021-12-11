@@ -278,6 +278,18 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_fsetstat_request(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        attrs: FileAttrs,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus(
+            self.send_request(id, RequestInner::Fsetstat { handle, attrs }, None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
