@@ -10,11 +10,12 @@ use core::marker::Unpin;
 use std::sync::Arc;
 
 use openssh_sftp_protocol::extensions::Extensions;
-use openssh_sftp_protocol::request::{Hello, Request, RequestInner};
+use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::response::ResponseInner;
 use openssh_sftp_protocol::response::StatusCode;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
+use openssh_sftp_protocol::HandleOwned;
 
 use std::io::IoSlice;
 use tokio::io::AsyncWrite;
@@ -114,6 +115,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         Ok(id)
     }
 
+    pub async fn send_open_file_request(
+        &mut self,
+        id: Id<Buffer>,
+        params: OpenFile<'_>,
+    ) -> Result<OngoingOpenRequest<Buffer>, Error> {
+        Ok(OngoingOpenRequest(
+            self.send_request(id, RequestInner::Open(params), None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
@@ -179,6 +191,21 @@ def_ongoing_request!(OngoingWriteRequest, (), response, {
         }) => match status_code {
             StatusCode::Success => Ok(()),
             StatusCode::Failure(err_code) => Err(Error::SftpError(err_code, err_msg)),
+        },
+        _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
+    }
+});
+
+def_ongoing_request!(OngoingOpenRequest, HandleOwned, response, {
+    match response {
+        Response::Header(response_inner) => match response_inner {
+            ResponseInner::Handle(handle) => Ok(handle),
+            ResponseInner::Status {
+                status_code: StatusCode::Failure(err_code),
+                err_msg,
+            } => Err(Error::SftpError(err_code, err_msg)),
+
+            _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
         },
         _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
     }
