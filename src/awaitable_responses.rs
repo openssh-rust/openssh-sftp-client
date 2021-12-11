@@ -1,7 +1,7 @@
 use super::Error;
 use super::ToBuffer;
 
-use core::fmt::{Debug, Display};
+use core::fmt::Debug;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -25,34 +25,6 @@ pub enum Response<Buffer: ToBuffer> {
     /// Same as `Buffer`, this is a fallback
     /// if `Buffer` isn't provided or it isn't large enough.
     AllocatedBox(Box<[u8]>),
-}
-
-impl<Buffer: ToBuffer> Response<Buffer> {
-    pub fn expect_header<T: Display>(self, err_msg: T) -> ResponseInner {
-        match self {
-            Response::Header(response) => response,
-            _ => panic!("{}", err_msg),
-        }
-    }
-
-    pub fn expect_buffer<T: Display>(self, err_msg: T) -> Buffer {
-        match self {
-            Response::Buffer(buffer) => buffer,
-            _ => panic!("{}", err_msg),
-        }
-    }
-
-    pub fn expect_alloated_box<T: Display>(self, err_msg: T) -> Box<[u8]> {
-        match self {
-            Response::AllocatedBox(allocated_box) => allocated_box,
-            _ => panic!("{}", err_msg),
-        }
-    }
-
-    /// Return true if `self` contains `Response::Buffer`.
-    pub fn is_buffer(&self) -> bool {
-        matches!(self, Response::Buffer(_))
-    }
 }
 
 pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
