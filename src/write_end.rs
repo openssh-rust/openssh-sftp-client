@@ -15,9 +15,7 @@ use std::sync::Arc;
 use openssh_sftp_protocol::extensions::Extensions;
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::request::*;
-use openssh_sftp_protocol::response::ErrorCode;
-use openssh_sftp_protocol::response::ResponseInner;
-use openssh_sftp_protocol::response::StatusCode;
+use openssh_sftp_protocol::response::*;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::{Handle, HandleOwned};
@@ -221,6 +219,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_readdir_request(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+    ) -> Result<AwaitableName<Buffer>, Error> {
+        Ok(AwaitableName(
+            self.send_request(id, RequestInner::Readdir(handle), None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
@@ -338,6 +347,25 @@ def_awaitable!(AwaitableData, Data<Buffer>, response, {
         },
         _ => Err(Error::InvalidResponse(
             &"Expected Buffer/AllocatedBox response",
+        )),
+    }
+});
+
+def_awaitable!(AwaitableName, Box<[NameEntry]>, response, {
+    match response {
+        Response::Header(response_inner) => match response_inner {
+            ResponseInner::Name(name) => Ok(name),
+            ResponseInner::Status {
+                status_code: StatusCode::Failure(err_code),
+                err_msg,
+            } => Err(Error::SftpError(err_code, err_msg)),
+
+            _ => Err(Error::InvalidResponse(
+                &"Expected Name or err Status response",
+            )),
+        },
+        _ => Err(Error::InvalidResponse(
+            &"Expected Name or err Status response",
         )),
     }
 });
