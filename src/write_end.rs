@@ -242,6 +242,18 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    /// Does not follow symlink
+    pub async fn send_lstat_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableAttrs<Buffer>, Error> {
+        Ok(AwaitableAttrs(
+            self.send_request(id, RequestInner::Lstat(path), None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
