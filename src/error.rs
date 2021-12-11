@@ -41,4 +41,10 @@ pub enum Error {
     /// Sftp server error
     #[error("Sftp server reported error kind {0:#?}, msg: {1:#?}")]
     SftpError(SftpErrorKind, SftpErrMsg),
+
+    /// Invalid response from the sftp-server
+    ///
+    /// Use &&str since &str takes 16 bytes while &str only takes 8 bytes.
+    #[error("Response from sftp server is invalid: {0}")]
+    InvalidResponse(&'static &'static str),
 }
