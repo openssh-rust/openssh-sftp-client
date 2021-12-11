@@ -168,7 +168,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     }
 }
 
-macro_rules! def_ongoing_request {
+macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
         pub struct $name<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
 
@@ -183,7 +183,7 @@ macro_rules! def_ongoing_request {
     };
 }
 
-def_ongoing_request!(AwaitableStatus, (), response, {
+def_awaitable!(AwaitableStatus, (), response, {
     match response {
         Response::Header(ResponseInner::Status {
             status_code,
@@ -196,7 +196,7 @@ def_ongoing_request!(AwaitableStatus, (), response, {
     }
 });
 
-def_ongoing_request!(AwaitableHandle, HandleOwned, response, {
+def_awaitable!(AwaitableHandle, HandleOwned, response, {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Handle(handle) => Ok(handle),
