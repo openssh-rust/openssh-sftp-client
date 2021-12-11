@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 use openssh_sftp_protocol::extensions::Extensions;
 use openssh_sftp_protocol::request::{Hello, Request, RequestInner};
+use openssh_sftp_protocol::response::ResponseInner;
+use openssh_sftp_protocol::response::StatusCode;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 
@@ -142,13 +144,13 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         handle: &[u8],
         offset: u64,
         data: &[u8],
-    ) -> Result<OngoingRequest<Buffer>, Error> {
+    ) -> Result<OngoingWriteRequest<Buffer>, Error> {
         self.send_write_request_impl(id.slot(), handle, offset, data)
             .await?;
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(OngoingRequest(id))
+        Ok(OngoingWriteRequest(id))
     }
 }
 
@@ -162,3 +164,31 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> OngoingRequest<Buffer> {
         (id, response)
     }
 }
+
+macro_rules! def_ongoing_request {
+    ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
+        pub struct $name<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
+
+        impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
+            pub async fn wait(self) -> (Id<Buffer>, Result<$res, Error>) {
+                let id = self.0;
+
+                let $response_name = id.wait().await;
+                (id, $post_processing)
+            }
+        }
+    };
+}
+
+def_ongoing_request!(OngoingWriteRequest, (), response, {
+    match response {
+        Response::Header(ResponseInner::Status {
+            status_code,
+            err_msg,
+        }) => match status_code {
+            StatusCode::Success => Ok(()),
+            StatusCode::Failure(err_code) => Err(Error::SftpError(err_code, err_msg)),
+        },
+        _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
+    }
+});
