@@ -1,7 +1,7 @@
+use super::awaitable_responses::Response;
 use super::connection::SharedData;
 use super::Error;
 use super::Id;
-use super::Response;
 use super::ToBuffer;
 
 use core::fmt::Debug;
