@@ -6,8 +6,6 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use awaitable::Awaitable;
-
 use concurrent_arena::Arena;
 use concurrent_arena::ArenaArc;
 
@@ -27,7 +25,7 @@ pub enum Response<Buffer: ToBuffer> {
     AllocatedBox(Box<[u8]>),
 }
 
-pub(crate) type Value<Buffer> = Awaitable<Buffer, Response<Buffer>>;
+pub(crate) type Awaitable<Buffer> = awaitable::Awaitable<Buffer, Response<Buffer>>;
 
 /// BITARRAY_LEN must be LEN / usize::BITS and LEN must be divisble by usize::BITS.
 const BITARRAY_LEN: usize = 1;
@@ -36,7 +34,7 @@ const LEN: usize = 64;
 /// Check `concurrent_arena::Arena` for `BITARRAY_LEN` and `LEN`.
 #[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
-    Arena<Value<Buffer>, BITARRAY_LEN, LEN>,
+    Arena<Awaitable<Buffer>, BITARRAY_LEN, LEN>,
 );
 
 impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
@@ -46,7 +44,7 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 
     /// Return (slot_id, awaitable_response)
     pub(crate) fn insert(&self, buffer: Option<Buffer>) -> Id<Buffer> {
-        Id(self.0.insert(Value::new(buffer)))
+        Id(self.0.insert(Awaitable::new(buffer)))
     }
 
     pub(crate) fn get(&self, slot: u32) -> Result<Id<Buffer>, Error> {
@@ -58,7 +56,7 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 }
 
 #[derive(Debug)]
-pub struct Id<Buffer: ToBuffer + Send + Sync>(ArenaArc<Value<Buffer>, BITARRAY_LEN, LEN>);
+pub struct Id<Buffer: ToBuffer + Send + Sync>(ArenaArc<Awaitable<Buffer>, BITARRAY_LEN, LEN>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     pub(crate) fn slot(&self) -> u32 {
@@ -78,7 +76,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     }
 
     pub(crate) async fn wait(&self) -> Response<Buffer> {
-        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Value<Buffer>>);
+        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
             type Output = ();
