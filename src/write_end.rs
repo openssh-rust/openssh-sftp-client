@@ -377,8 +377,8 @@ pub enum Data<Buffer: ToBuffer> {
 
 #[derive(Debug, Clone)]
 pub struct Name {
-    filename: Box<str>,
-    longname: Box<str>,
+    pub filename: Box<str>,
+    pub longname: Box<str>,
 }
 
 macro_rules! def_awaitable {
