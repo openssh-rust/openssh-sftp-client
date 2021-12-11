@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use openssh_sftp_protocol::extensions::Extensions;
 use openssh_sftp_protocol::request::*;
+use openssh_sftp_protocol::response::ErrorCode;
 use openssh_sftp_protocol::response::ResponseInner;
 use openssh_sftp_protocol::response::StatusCode;
 use openssh_sftp_protocol::serde::Serialize;
@@ -212,6 +213,9 @@ pub enum Data<Buffer: ToBuffer> {
     /// Same as `Buffer`, this is a fallback
     /// if `Buffer` isn't provided or it isn't large enough.
     AllocatedBox(Box<[u8]>),
+
+    /// EOF is reached before any data can be read.
+    Eof,
 }
 
 macro_rules! def_awaitable {
@@ -266,7 +270,10 @@ def_awaitable!(AwaitableData, Data<Buffer>, response, {
         Response::Header(ResponseInner::Status {
             status_code: StatusCode::Failure(err_code),
             err_msg,
-        }) => Err(Error::SftpError(err_code, err_msg)),
+        }) => match err_code {
+            ErrorCode::Eof => Ok(Data::Eof),
+            _ => Err(Error::SftpError(err_code, err_msg)),
+        },
         _ => Err(Error::InvalidResponse(
             &"Expected Buffer/AllocatedBox response",
         )),
