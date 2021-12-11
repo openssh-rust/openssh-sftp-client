@@ -496,11 +496,19 @@ def_awaitable!(AwaitableAttrs, FileAttrs, response, {
 def_awaitable!(AwaitableName, (Box<str>, Box<str>), response, {
     match response {
         Response::Header(response_inner) => match response_inner {
-            ResponseInner::Name(names) => {
+            ResponseInner::Name(mut names) => {
                 if names.len() != 1 {
-                    Err(Error::InvalidResponse(&"Got expected Name response, but it does not have exactly one and only one entry"))
+                    Err(Error::InvalidResponse(
+                        &"Got expected Name response, but it does not have exactly \
+                        one and only one entry",
+                    ))
                 } else {
-                    Ok((names[0].filename.clone(), names[0].longname.clone()))
+                    let name = &mut names[0];
+
+                    Ok((
+                        replace(&mut name.filename, "".into()),
+                        replace(&mut name.longname, "".into()),
+                    ))
                 }
             }
             ResponseInner::Status {
