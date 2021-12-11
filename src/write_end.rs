@@ -301,6 +301,26 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    /// Create symlink
+    pub async fn send_symlink_request(
+        &mut self,
+        id: Id<Buffer>,
+        linkpath: Cow<'_, Path>,
+        targetpath: Cow<'_, Path>,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus(
+            self.send_request(
+                id,
+                RequestInner::Symlink {
+                    linkpath,
+                    targetpath,
+                },
+                None,
+            )
+            .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
