@@ -13,6 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use openssh_sftp_protocol::extensions::Extensions;
+use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::response::ErrorCode;
 use openssh_sftp_protocol::response::ResponseInner;
@@ -182,6 +183,18 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         Ok(AwaitableStatus(
             self.send_request(id, RequestInner::Rename { oldpath, newpath }, None)
+                .await?,
+        ))
+    }
+
+    pub async fn send_mkdir_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+        attrs: FileAttrs,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus(
+            self.send_request(id, RequestInner::Mkdir { path, attrs }, None)
                 .await?,
         ))
     }
