@@ -12,25 +12,18 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy, sink, AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{copy, sink, AsyncRead, AsyncReadExt};
 use tokio_io_utility::read_exact_to_vec;
 
 #[derive(Debug)]
-pub struct ReadEnd<
-    Writer: AsyncWrite + Unpin,
-    Reader: AsyncRead + Unpin,
-    Buffer: ToBuffer + 'static,
-> {
+pub struct ReadEnd<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + 'static> {
     reader: Reader,
     buffer: Vec<u8>,
     shared_data: Arc<SharedData<Writer, Buffer>>,
 }
 
-impl<
-        Writer: AsyncWrite + Unpin,
-        Reader: AsyncRead + Unpin,
-        Buffer: ToBuffer + Debug + 'static + Send + Sync,
-    > ReadEnd<Writer, Reader, Buffer>
+impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Send + Sync>
+    ReadEnd<Writer, Reader, Buffer>
 {
     pub(crate) fn new(reader: Reader, shared_data: Arc<SharedData<Writer, Buffer>>) -> Self {
         Self {

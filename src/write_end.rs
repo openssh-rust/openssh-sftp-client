@@ -22,20 +22,18 @@ use tokio_io_utility::AsyncWriteUtility;
 ///  - Support IoSlice for data in `send_write_request`
 
 #[derive(Debug)]
-pub struct WriteEnd<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
+pub struct WriteEnd<Writer, Buffer: ToBuffer + 'static> {
     serializer: Serializer,
     shared_data: Arc<SharedData<Writer, Buffer>>,
 }
 
-impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static> Clone
-    for WriteEnd<Writer, Buffer>
-{
+impl<Writer, Buffer: ToBuffer + 'static> Clone for WriteEnd<Writer, Buffer> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> Drop for WriteEnd<Writer, Buffer> {
+impl<Writer, Buffer: ToBuffer + 'static> Drop for WriteEnd<Writer, Buffer> {
     fn drop(&mut self) {
         let shared_data = &self.shared_data;
 
@@ -47,16 +45,18 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> Drop for WriteEnd<W
     }
 }
 
-impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
-    WriteEnd<Writer, Buffer>
-{
+impl<Writer, Buffer: ToBuffer + 'static> WriteEnd<Writer, Buffer> {
     pub(crate) fn new(shared_data: Arc<SharedData<Writer, Buffer>>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
         }
     }
+}
 
+impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
+    WriteEnd<Writer, Buffer>
+{
     pub(crate) async fn send_hello(
         &mut self,
         version: u32,

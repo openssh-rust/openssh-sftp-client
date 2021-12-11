@@ -23,7 +23,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub(crate) struct SharedData<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> {
+pub(crate) struct SharedData<Writer, Buffer: ToBuffer + 'static> {
     pub(crate) writer: Mutex<Writer>,
     pub(crate) responses: AwaitableResponses<Buffer>,
 
@@ -33,7 +33,7 @@ pub(crate) struct SharedData<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'sta
     is_conn_closed: AtomicBool,
 }
 
-impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
+impl<Writer, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
     fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
         self.notify.notify_one();
