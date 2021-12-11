@@ -11,12 +11,12 @@ pub use awaitable_responses::Id;
 
 pub use buffer::*;
 
-pub use openssh_sftp_protocol::file_attrs::{FileAttrs, FileAttrsBox};
-pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile, RequestInner};
+pub use openssh_sftp_protocol::file_attrs::FileAttrs;
+pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile};
 pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
 pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
+pub use openssh_sftp_protocol::response::NameEntry;
 pub use openssh_sftp_protocol::response::StatusCode;
-pub use openssh_sftp_protocol::response::{NameEntry, ResponseInner};
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
 pub use connection::connect;
