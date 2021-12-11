@@ -224,8 +224,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
-    ) -> Result<AwaitableName<Buffer>, Error> {
-        Ok(AwaitableName(
+    ) -> Result<AwaitableNameEntries<Buffer>, Error> {
+        Ok(AwaitableNameEntries(
             self.send_request(id, RequestInner::Readdir(handle), None)
                 .await?,
         ))
@@ -411,7 +411,7 @@ def_awaitable!(AwaitableData, Data<Buffer>, response, {
     }
 });
 
-def_awaitable!(AwaitableName, Box<[NameEntry]>, response, {
+def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, response, {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(name) => Ok(name),
