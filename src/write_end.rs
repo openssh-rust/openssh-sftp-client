@@ -301,6 +301,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_realpath_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableName<Buffer>, Error> {
+        Ok(AwaitableName(
+            self.send_request(id, RequestInner::Realpath(path), None)
+                .await?,
+        ))
+    }
+
     /// Create symlink
     pub async fn send_symlink_request(
         &mut self,
