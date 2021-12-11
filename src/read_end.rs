@@ -157,6 +157,7 @@ impl<
     }
 
     /// Return number of requests sent and number of responses to read in.
+    /// **Read 0 if the connection is closed.**
     pub async fn wait_for_new_request(&self) -> usize {
         self.shared_data.wait_for_new_request().await
     }

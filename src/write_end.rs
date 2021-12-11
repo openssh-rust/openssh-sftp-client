@@ -35,6 +35,18 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     }
 }
 
+impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> Drop for WriteEnd<Writer, Buffer> {
+    fn drop(&mut self) {
+        let shared_data = &self.shared_data;
+
+        // If this is the last reference, except for `ReadEnd`, to the SharedData,
+        // then the connection is closed.
+        if Arc::strong_count(shared_data) == 2 {
+            shared_data.notify_conn_closed();
+        }
+    }
+}
+
 impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
     WriteEnd<Writer, Buffer>
 {

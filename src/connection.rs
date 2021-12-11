@@ -4,7 +4,7 @@ use super::*;
 use core::fmt::Debug;
 use core::marker::Unpin;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -29,26 +29,51 @@ pub(crate) struct SharedData<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'sta
 
     notify: Notify,
     requests_sent: AtomicUsize,
+
+    is_conn_closed: AtomicBool,
 }
 
 impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
-    pub(crate) fn notify_new_packet_event(&self) {
-        self.requests_sent.fetch_add(1, Ordering::Relaxed);
-
+    fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
-        // Notify the `ReadEnd` after the requests_sent is incremented.
         self.notify.notify_one();
     }
 
-    /// Return number of requests and clear requests_sent
+    pub(crate) fn notify_new_packet_event(&self) {
+        self.requests_sent.fetch_add(1, Ordering::Relaxed);
+        // Notify the `ReadEnd` after the requests_sent is incremented.
+        self.notify_read_end();
+    }
+
+    /// Return number of requests and clear requests_sent.
+    /// **Return 0 if the connection is closed.**
     pub(crate) async fn wait_for_new_request(&self) -> usize {
         loop {
             let cnt = self.requests_sent.swap(0, Ordering::Relaxed);
             if cnt > 0 {
                 break cnt;
             }
+
+            if self.is_conn_closed.load(Ordering::Relaxed) {
+                break 0;
+            }
+
             self.notify.notified().await;
         }
+    }
+
+    /// Notify conn closed should only be called once.
+    pub(crate) fn notify_conn_closed(&self) {
+        #[cfg(debug_assertions)]
+        {
+            assert!(!self.is_conn_closed.swap(true, Ordering::Relaxed));
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.is_conn_closed.store(true, Ordering::Relaxed);
+        }
+
+        self.notify_read_end();
     }
 }
 
@@ -65,6 +90,7 @@ pub async fn connect<
         responses: AwaitableResponses::new(),
         notify: Notify::new(),
         requests_sent: AtomicUsize::new(0),
+        is_conn_closed: AtomicBool::new(false),
     });
 
     let mut read_end = ReadEnd::new(reader, shared_data.clone());
