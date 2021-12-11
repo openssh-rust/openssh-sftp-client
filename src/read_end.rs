@@ -126,6 +126,7 @@ impl<
         Ok(Response::Header(response.response_inner))
     }
 
+    /// Precondition: `self.wait_for_new_request()` must not be 0.
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
         let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
 
