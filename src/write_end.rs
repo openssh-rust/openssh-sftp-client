@@ -6,6 +6,7 @@ use super::ToBuffer;
 
 use core::fmt::Debug;
 use core::marker::Unpin;
+use core::mem::replace;
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -230,6 +231,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_stat_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableAttrs<Buffer>, Error> {
+        Ok(AwaitableAttrs(
+            self.send_request(id, RequestInner::Stat(path), None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
@@ -366,6 +378,27 @@ def_awaitable!(AwaitableName, Box<[NameEntry]>, response, {
         },
         _ => Err(Error::InvalidResponse(
             &"Expected Name or err Status response",
+        )),
+    }
+});
+
+def_awaitable!(AwaitableAttrs, FileAttrs, response, {
+    match response {
+        Response::Header(response_inner) => match response_inner {
+            // use replace to avoid allocation that might occur due to
+            // `FileAttrs::clone`.
+            ResponseInner::Attrs(mut attrs) => Ok(replace(&mut attrs, FileAttrs::new())),
+            ResponseInner::Status {
+                status_code: StatusCode::Failure(err_code),
+                err_msg,
+            } => Err(Error::SftpError(err_code, err_msg)),
+
+            _ => Err(Error::InvalidResponse(
+                &"Expected Attrs or err Status response",
+            )),
+        },
+        _ => Err(Error::InvalidResponse(
+            &"Expected Attrs or err Status response",
         )),
     }
 });
