@@ -28,6 +28,7 @@ use tokio_io_utility::AsyncWriteUtility;
 /// TODO:
 ///  - Support IoSlice for data in `send_write_request`
 
+/// It is recommended to create at most one `WriteEnd` per thread.
 #[derive(Debug)]
 pub struct WriteEnd<Writer, Buffer: ToBuffer + 'static> {
     serializer: Serializer,
