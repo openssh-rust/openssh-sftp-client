@@ -12,7 +12,7 @@ use concurrent_arena::ArenaArc;
 use openssh_sftp_protocol::response::ResponseInner;
 
 #[derive(Debug, Clone)]
-pub enum Response<Buffer: ToBuffer> {
+pub(crate) enum Response<Buffer: ToBuffer> {
     Header(ResponseInner),
 
     /// The buffer that stores the response of Read,
