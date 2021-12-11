@@ -210,6 +210,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_opendir_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableHandle<Buffer>, Error> {
+        Ok(AwaitableHandle(
+            self.send_request(id, RequestInner::Opendir(path), None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
