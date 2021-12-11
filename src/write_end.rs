@@ -290,6 +290,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
+    pub async fn send_readlink_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableName<Buffer>, Error> {
+        Ok(AwaitableName(
+            self.send_request(id, RequestInner::Readlink(path), None)
+                .await?,
+        ))
+    }
+
     // TODO: Add one function for every ResponseInner
 
     async fn send_write_request_impl(
@@ -447,6 +458,31 @@ def_awaitable!(AwaitableAttrs, FileAttrs, response, {
         },
         _ => Err(Error::InvalidResponse(
             &"Expected Attrs or err Status response",
+        )),
+    }
+});
+
+def_awaitable!(AwaitableName, (Box<str>, Box<str>), response, {
+    match response {
+        Response::Header(response_inner) => match response_inner {
+            ResponseInner::Name(names) => {
+                if names.len() != 1 {
+                    Err(Error::InvalidResponse(&"Got expected Name response, but it does not have exactly one and only one entry"))
+                } else {
+                    Ok((names[0].filename.clone(), names[0].longname.clone()))
+                }
+            }
+            ResponseInner::Status {
+                status_code: StatusCode::Failure(err_code),
+                err_msg,
+            } => Err(Error::SftpError(err_code, err_msg)),
+
+            _ => Err(Error::InvalidResponse(
+                &"Expected Name or err Status response",
+            )),
+        },
+        _ => Err(Error::InvalidResponse(
+            &"Expected Name or err Status response",
         )),
     }
 });
