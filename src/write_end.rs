@@ -386,6 +386,9 @@ macro_rules! def_awaitable {
         pub struct $name<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
+            /// Return (id, res).
+            ///
+            /// id can be reused in the next request.
             pub async fn wait(self) -> (Id<Buffer>, Result<$res, Error>) {
                 let id = self.0;
 

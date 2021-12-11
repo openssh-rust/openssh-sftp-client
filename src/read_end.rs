@@ -152,6 +152,10 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
 
     /// Return number of requests sent and number of responses to read in.
     /// **Read 0 if the connection is closed.**
+    ///
+    /// You must call this function in a loop, break if this function returns
+    /// 0, otherwise call `read_in_one_packet` for `n` times where `n` in the
+    /// return value of this function, then repeat.
     pub async fn wait_for_new_request(&self) -> usize {
         self.shared_data.wait_for_new_request().await
     }
