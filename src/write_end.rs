@@ -238,7 +238,7 @@ def_awaitable!(AwaitableStatus, (), response, {
             StatusCode::Success => Ok(()),
             StatusCode::Failure(err_code) => Err(Error::SftpError(err_code, err_msg)),
         },
-        _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
+        _ => Err(Error::InvalidResponse(&"Expected Status response")),
     }
 });
 
@@ -253,7 +253,9 @@ def_awaitable!(AwaitableHandle, HandleOwned, response, {
 
             _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
         },
-        _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
+        _ => Err(Error::InvalidResponse(
+            &"Expected Handle or err Status response",
+        )),
     }
 });
 
@@ -266,7 +268,7 @@ def_awaitable!(AwaitableData, Data<Buffer>, response, {
             err_msg,
         }) => Err(Error::SftpError(err_code, err_msg)),
         _ => Err(Error::InvalidResponse(
-            &"Unexpected Buffer/AllocatedBox response",
+            &"Expected Buffer/AllocatedBox response",
         )),
     }
 });
