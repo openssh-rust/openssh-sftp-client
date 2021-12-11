@@ -147,7 +147,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         handle: Cow<'_, Handle>,
         offset: u64,
         len: u32,
-        buffer: Buffer,
+        buffer: Option<Buffer>,
     ) -> Result<AwaitableData<Buffer>, Error> {
         Ok(AwaitableData(
             self.send_request(
@@ -157,7 +157,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
                     offset,
                     len,
                 },
-                Some(buffer),
+                buffer,
             )
             .await?,
         ))
