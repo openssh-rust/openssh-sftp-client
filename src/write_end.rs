@@ -389,6 +389,12 @@ pub enum Data<Buffer: ToBuffer> {
     Eof,
 }
 
+#[derive(Debug, Clone)]
+pub struct Name {
+    filename: Box<str>,
+    longname: Box<str>,
+}
+
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
         pub struct $name<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
@@ -493,7 +499,7 @@ def_awaitable!(AwaitableAttrs, FileAttrs, response, {
     }
 });
 
-def_awaitable!(AwaitableName, (Box<str>, Box<str>), response, {
+def_awaitable!(AwaitableName, Name, response, {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(mut names) => {
@@ -505,10 +511,10 @@ def_awaitable!(AwaitableName, (Box<str>, Box<str>), response, {
                 } else {
                     let name = &mut names[0];
 
-                    Ok((
-                        replace(&mut name.filename, "".into()),
-                        replace(&mut name.longname, "".into()),
-                    ))
+                    Ok(Name {
+                        filename: replace(&mut name.filename, "".into()),
+                        longname: replace(&mut name.longname, "".into()),
+                    })
                 }
             }
             ResponseInner::Status {
