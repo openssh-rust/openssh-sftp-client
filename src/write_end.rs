@@ -152,9 +152,9 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
     }
 }
 
-pub struct OngoingRequest<Buffer: ToBuffer + Send + Sync + 'static>(Id<Buffer>);
+pub struct OngoingRequest<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> OngoingRequest<Buffer> {
+impl<Buffer: ToBuffer + Debug + Send + Sync> OngoingRequest<Buffer> {
     pub async fn wait(self) -> (Id<Buffer>, Response<Buffer>) {
         let id = self.0;
 
