@@ -335,16 +335,17 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
     // TODO: Add one function for every ResponseInner
 
-    async fn send_write_request_impl(
+    /// Send write requests
+    pub async fn send_write_request(
         &mut self,
-        request_id: u32,
+        id: Id<Buffer>,
         handle: &[u8],
         offset: u64,
         data: &[u8],
-    ) -> Result<(), Error> {
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
         let header = Request::serialize_write_request(
             &mut self.serializer,
-            request_id,
+            id.slot(),
             handle,
             offset,
             data.len().try_into().map_err(|_| Error::BufferTooLong)?,
@@ -354,20 +355,6 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
         let mut slices = [IoSlice::new(header), IoSlice::new(data)];
         writer.write_vectored_all(&mut slices).await?;
-
-        Ok(())
-    }
-
-    /// Send write requests
-    pub async fn send_write_request(
-        &mut self,
-        id: Id<Buffer>,
-        handle: &[u8],
-        offset: u64,
-        data: &[u8],
-    ) -> Result<AwaitableStatus<Buffer>, Error> {
-        self.send_write_request_impl(id.slot(), handle, offset, data)
-            .await?;
 
         self.shared_data.notify_new_packet_event();
 
