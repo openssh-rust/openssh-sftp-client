@@ -158,13 +158,13 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         handle: &[u8],
         offset: u64,
         data: &[u8],
-    ) -> Result<OngoingWriteRequest<Buffer>, Error> {
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
         self.send_write_request_impl(id.slot(), handle, offset, data)
             .await?;
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(OngoingWriteRequest(id))
+        Ok(AwaitableStatus(id))
     }
 }
 
@@ -183,7 +183,7 @@ macro_rules! def_ongoing_request {
     };
 }
 
-def_ongoing_request!(OngoingWriteRequest, (), response, {
+def_ongoing_request!(AwaitableStatus, (), response, {
     match response {
         Response::Header(ResponseInner::Status {
             status_code,
