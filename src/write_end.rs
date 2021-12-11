@@ -333,8 +333,6 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         ))
     }
 
-    // TODO: Add one function for every ResponseInner
-
     /// Send write requests
     pub async fn send_write_request(
         &mut self,
