@@ -315,7 +315,9 @@ def_awaitable!(AwaitableHandle, HandleOwned, response, {
                 err_msg,
             } => Err(Error::SftpError(err_code, err_msg)),
 
-            _ => Err(Error::InvalidResponse(&"Unexpected Data response")),
+            _ => Err(Error::InvalidResponse(
+                &"Expected Handle or err Status response",
+            )),
         },
         _ => Err(Error::InvalidResponse(
             &"Expected Handle or err Status response",
