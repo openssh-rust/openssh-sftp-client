@@ -30,6 +30,8 @@ pub enum Error {
 
     /// The response id is invalid.
     ///
+    /// This could happen if the `Awaitable` is dropped without waiting.
+    ///
     /// The user of `Connection` can choose to log this error and continue operation.
     #[error("The response id {response_id} is invalid.")]
     InvalidResponseId { response_id: u32 },
