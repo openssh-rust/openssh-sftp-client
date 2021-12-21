@@ -1,7 +1,7 @@
 use super::Error;
 use super::ToBuffer;
 
-use core::fmt::{self, Debug};
+use core::fmt::Debug;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -32,19 +32,10 @@ const BITARRAY_LEN: usize = 1;
 const LEN: usize = 64;
 
 /// Check `concurrent_arena::Arena` for `BITARRAY_LEN` and `LEN`.
-//#[derive(Debug)]
+#[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
     Arena<Awaitable<Buffer>, BITARRAY_LEN, LEN>,
 );
-
-impl<Buffer: ToBuffer + 'static> Debug for AwaitableResponses<Buffer> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // dummy implementation, should be removed in favor of
-        // `derive(Debug)` once `concurrent_arena::Arena` implemented
-        // `derive(Debug)`.
-        f.debug_tuple("AwaitableResponses").field(&()).finish()
-    }
-}
 
 impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
     pub(crate) fn new() -> Self {
