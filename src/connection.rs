@@ -119,6 +119,8 @@ mod tests {
 
     use tokio::process;
 
+    use tempfile::{Builder, TempDir};
+
     fn get_sftp_path() -> &'static path::Path {
         static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
 
@@ -160,6 +162,52 @@ mod tests {
     #[tokio::test]
     async fn test_connect() {
         let mut child = connect().await.2;
+        assert!(child.wait().await.unwrap().success());
+    }
+
+    fn create_tmpdir() -> TempDir {
+        Builder::new()
+            .prefix(".openssh-sftp-client-test")
+            .tempdir_in("/tmp")
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_file_desc() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+
+        let filename = tempdir.path().join("file");
+
+        let mut file_attrs = FileAttrs::new();
+        file_attrs.set_size(2000);
+        //file_attrs.set_permissions(libc::S_IRUSR | libc::S_IWUSR);
+        let file_attrs = file_attrs;
+
+        let awaitable = write_end
+            .send_open_file_request(
+                id,
+                OpenFile::create(
+                    (&filename).into(),
+                    FileMode::READ | FileMode::WRITE,
+                    CreateFlags::EXCL,
+                    file_attrs,
+                ),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(read_end.wait_for_new_request().await, 1);
+        read_end.read_in_one_packet().await.unwrap();
+
+        let handle = awaitable.wait().await.unwrap();
+
+        drop(write_end);
+        drop(read_end);
+
         assert!(child.wait().await.unwrap().success());
     }
 }
