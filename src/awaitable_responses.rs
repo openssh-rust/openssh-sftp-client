@@ -108,37 +108,35 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
         self.0.do_callback(response)
     }
 
-    pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Result<Response<Buffer>, Error> {
+    pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Response<Buffer> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
-            type Output = Result<(), Error>;
+            type Output = ();
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 if let Some(value) = self.0.take() {
                     let waker = cx.waker().clone();
 
-                    match value.install_waker(waker) {
-                        Ok(res) => {
-                            if res {
-                                Poll::Ready(Ok(()))
-                            } else {
-                                Poll::Pending
-                            }
-                        }
-                        Err(err) => Poll::Ready(Err(err.into())),
+                    let res = value
+                        .install_waker(waker)
+                        .expect("AwaitableResponse should either in state Ongoing or Done");
+
+                    if res {
+                        Poll::Ready(())
+                    } else {
+                        Poll::Pending
                     }
                 } else {
-                    Poll::Ready(Ok(()))
+                    Poll::Ready(())
                 }
             }
         }
 
-        WaitFuture(Some(this)).await?;
+        WaitFuture(Some(this)).await;
 
-        Ok(this
-            .take_output()
-            .expect("The request should be done by now"))
+        this.take_output()
+            .expect("The request should be done by now")
     }
 
     pub(crate) fn remove_if_cancelled(&self) {

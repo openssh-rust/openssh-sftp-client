@@ -422,7 +422,7 @@ macro_rules! def_awaitable {
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
                 let arc = self.0.destructure().0;
 
-                let $response_name = Id::wait(&arc).await?;
+                let $response_name = Id::wait(&arc).await;
                 Ok((Id::new(arc), $post_processing?))
             }
         }
