@@ -26,6 +26,8 @@ use std::io::IoSlice;
 use tokio::io::AsyncWrite;
 use tokio_io_utility::AsyncWriteUtility;
 
+use derive_destructure::destructure;
+
 /// TODO:
 ///  - Support IoSlice for data in `send_write_request`
 
@@ -107,7 +109,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         id: Id<Buffer>,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
-    ) -> Result<ArenaArc<Buffer>, Error> {
+    ) -> Result<ArenaArcWrapper<Buffer>, Error> {
         // Call id.into_inner to prevent id from being removed
         // if the future is cancelled.
         let arc = id.into_inner();
@@ -122,7 +124,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(arc)
+        Ok(ArenaArcWrapper(arc))
     }
 
     pub async fn send_open_file_request(
@@ -367,7 +369,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(AwaitableStatus(arc))
+        Ok(AwaitableStatus(ArenaArcWrapper(arc)))
     }
 }
 
@@ -392,16 +394,28 @@ pub struct Name {
     pub longname: Box<str>,
 }
 
+/// Provides drop impl
+#[derive(Debug, destructure)]
+struct ArenaArcWrapper<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
+
+impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
+    fn drop(&mut self) {
+        if self.0.is_done() {
+            ArenaArc::remove(&self.0);
+        }
+    }
+}
+
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
-        pub struct $name<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
+        pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArcWrapper<Buffer>);
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
             /// Return (id, res).
             ///
             /// id can be reused in the next request.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                let arc = self.0;
+                let arc = self.0.destructure().0;
 
                 let $response_name = Id::wait(&arc).await?;
                 Ok((Id::new(arc), $post_processing?))
