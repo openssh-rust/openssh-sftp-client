@@ -408,6 +408,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
 
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
+        #[derive(Debug)]
         pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArcWrapper<Buffer>);
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
