@@ -140,18 +140,29 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
         };
 
         let response = if response::Response::is_data(packet_type) {
-            self.read_in_data_packet(len, callback.get_input()).await?
+            let buffer = match callback.get_input() {
+                Ok(buffer) => buffer,
+                Err(err) => {
+                    // Consume the invalid data to return self to a valid state
+                    // where read_in_one_packet can be called again.
+                    if let Err(consumption_err) = self.consume_data_packet(len).await {
+                        return Err(Error::RecursiveErrors(Box::new((err, consumption_err))));
+                    }
+                    return Err(err);
+                }
+            };
+            self.read_in_data_packet(len, buffer).await?
         } else {
             self.read_in_packet(len).await?
         };
 
-        callback.do_callback(response);
+        let res = callback.do_callback(response);
 
         // NOTE that if it is cancelled after this call, then the callback
         // would not be removed.
         callback.remove_if_cancelled();
 
-        Ok(())
+        res
     }
 
     /// Return number of requests sent and number of responses to read in.

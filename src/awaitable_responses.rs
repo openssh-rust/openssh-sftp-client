@@ -46,8 +46,8 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
     }
 
     /// Return (slot_id, awaitable_response)
-    pub(crate) fn insert(&self, buffer: Option<Buffer>) -> Id<Buffer> {
-        Id::new(self.0.insert(Awaitable::new(buffer)))
+    pub(crate) fn insert(&self) -> Id<Buffer> {
+        Id::new(self.0.insert(Awaitable::new()))
     }
 
     pub(crate) fn get(&self, slot: u32) -> Result<Id<Buffer>, Error> {
@@ -62,12 +62,12 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 struct IdInner<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> IdInner<Buffer> {
-    pub(crate) fn get_input(&self) -> Option<Buffer> {
-        self.0.take_input()
+    pub(crate) fn get_input(&self) -> Result<Option<Buffer>, Error> {
+        Ok(self.0.take_input()?)
     }
 
-    pub(crate) fn do_callback(&self, response: Response<Buffer>) {
-        self.0.done(response);
+    pub(crate) fn do_callback(&self, response: Response<Buffer>) -> Result<(), Error> {
+        Ok(self.0.done(response)?)
     }
 
     pub(crate) fn remove_if_cancelled(&self) {
@@ -100,39 +100,45 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
         self.0.destructure().0
     }
 
-    pub(crate) fn get_input(&self) -> Option<Buffer> {
+    pub(crate) fn get_input(&self) -> Result<Option<Buffer>, Error> {
         self.0.get_input()
     }
 
-    pub(crate) fn do_callback(&self, response: Response<Buffer>) {
-        self.0.do_callback(response);
+    pub(crate) fn do_callback(&self, response: Response<Buffer>) -> Result<(), Error> {
+        self.0.do_callback(response)
     }
 
-    pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Response<Buffer> {
+    pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Result<Response<Buffer>, Error> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
-            type Output = ();
+            type Output = Result<(), Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 if let Some(value) = self.0.take() {
                     let waker = cx.waker().clone();
 
-                    if value.install_waker(waker) {
-                        Poll::Ready(())
-                    } else {
-                        Poll::Pending
+                    match value.install_waker(waker) {
+                        Ok(res) => {
+                            if res {
+                                Poll::Ready(Ok(()))
+                            } else {
+                                Poll::Pending
+                            }
+                        }
+                        Err(err) => Poll::Ready(Err(err.into())),
                     }
                 } else {
-                    Poll::Ready(())
+                    Poll::Ready(Ok(()))
                 }
             }
         }
 
-        WaitFuture(Some(this)).await;
+        WaitFuture(Some(this)).await?;
 
-        this.take_output()
-            .expect("The request should be done by now")
+        Ok(this
+            .take_output()
+            .expect("The request should be done by now"))
     }
 
     pub(crate) fn remove_if_cancelled(&self) {

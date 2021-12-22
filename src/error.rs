@@ -24,6 +24,10 @@ pub enum Error {
     #[error("Failed to serialize/deserialize the message: {0}.")]
     FormatError(#[from] ssh_format::Error),
 
+    /// Error when waiting for response
+    #[error("Error when waiting for response: {0}.")]
+    AwaitableError(#[from] awaitable::Error),
+
     /// Sftp protocol can only send and receive at most u32::MAX data in one request.
     #[error("Sftp protocol can only send and receive at most u32::MAX data in one request.")]
     BufferTooLong,

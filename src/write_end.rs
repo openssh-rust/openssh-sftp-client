@@ -96,7 +96,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
     /// Create a useable response id.
     pub fn create_response_id(&self) -> Id<Buffer> {
-        self.shared_data.responses.insert(None)
+        self.shared_data.responses.insert()
     }
 
     /// Send requests.
@@ -398,11 +398,11 @@ macro_rules! def_awaitable {
             /// Return (id, res).
             ///
             /// id can be reused in the next request.
-            pub async fn wait(self) -> (Id<Buffer>, Result<$res, Error>) {
+            pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
                 let arc = self.0;
 
-                let $response_name = Id::wait(&arc).await;
-                (Id::new(arc), $post_processing)
+                let $response_name = Id::wait(&arc).await?;
+                Ok((Id::new(arc), $post_processing?))
             }
         }
     };
@@ -481,7 +481,7 @@ def_awaitable!(AwaitableAttrs, FileAttrs, response, {
         Response::Header(response_inner) => match response_inner {
             // use replace to avoid allocation that might occur due to
             // `FileAttrs::clone`.
-            ResponseInner::Attrs(mut attrs) => Ok(replace(&mut attrs, FileAttrs::new())),
+            ResponseInner::Attrs(mut attrs) => Ok(replace(&mut *attrs, FileAttrs::new())),
             ResponseInner::Status {
                 status_code: StatusCode::Failure(err_code),
                 err_msg,
