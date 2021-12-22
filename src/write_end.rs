@@ -1,3 +1,4 @@
+use super::awaitable_responses::ArenaArc;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
 use super::Error;
@@ -106,18 +107,22 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         id: Id<Buffer>,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
-    ) -> Result<Id<Buffer>, Error> {
-        id.reset(buffer);
+    ) -> Result<ArenaArc<Buffer>, Error> {
+        // Call id.into_inner to prevent id from being removed
+        // if the future is cancelled.
+        let arc = id.into_inner();
+
+        arc.reset(buffer);
 
         self.write(Request {
-            request_id: id.slot(),
+            request_id: ArenaArc::slot(&arc),
             inner: request,
         })
         .await?;
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(id)
+        Ok(arc)
     }
 
     pub async fn send_open_file_request(
@@ -341,9 +346,13 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         offset: u64,
         data: &[u8],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
+        // Call id.into_inner to prevent id from being removed
+        // if the future is cancelled.
+        let arc = id.into_inner();
+
         let header = Request::serialize_write_request(
             &mut self.serializer,
-            id.slot(),
+            ArenaArc::slot(&arc),
             handle,
             offset,
             data.len().try_into().map_err(|_| Error::BufferTooLong)?,
@@ -356,7 +365,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(AwaitableStatus(id))
+        Ok(AwaitableStatus(arc))
     }
 }
 
@@ -383,17 +392,17 @@ pub struct Name {
 
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
-        pub struct $name<Buffer: ToBuffer + Send + Sync>(Id<Buffer>);
+        pub struct $name<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
             /// Return (id, res).
             ///
             /// id can be reused in the next request.
             pub async fn wait(self) -> (Id<Buffer>, Result<$res, Error>) {
-                let id = self.0;
+                let arc = self.0;
 
-                let $response_name = id.wait().await;
-                (id, $post_processing)
+                let $response_name = Id::wait(&arc).await;
+                (Id::new(arc), $post_processing)
             }
         }
     };

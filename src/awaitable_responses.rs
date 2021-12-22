@@ -7,9 +7,10 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use concurrent_arena::Arena;
-use concurrent_arena::ArenaArc;
 
 use openssh_sftp_protocol::response::ResponseInner;
+
+use derive_destructure::destructure;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Response<Buffer: ToBuffer> {
@@ -31,6 +32,8 @@ pub(crate) type Awaitable<Buffer> = awaitable::Awaitable<Buffer, Response<Buffer
 const BITARRAY_LEN: usize = 1;
 const LEN: usize = 64;
 
+pub(crate) type ArenaArc<Buffer> = concurrent_arena::ArenaArc<Awaitable<Buffer>, BITARRAY_LEN, LEN>;
+
 /// Check `concurrent_arena::Arena` for `BITARRAY_LEN` and `LEN`.
 #[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
@@ -44,29 +47,21 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 
     /// Return (slot_id, awaitable_response)
     pub(crate) fn insert(&self, buffer: Option<Buffer>) -> Id<Buffer> {
-        Id(self.0.insert(Awaitable::new(buffer)))
+        Id::new(self.0.insert(Awaitable::new(buffer)))
     }
 
     pub(crate) fn get(&self, slot: u32) -> Result<Id<Buffer>, Error> {
         self.0
             .get(slot)
-            .map(Id)
+            .map(Id::new)
             .ok_or(Error::InvalidResponseId { response_id: slot })
     }
 }
 
-#[derive(Debug)]
-pub struct Id<Buffer: ToBuffer + Send + Sync>(ArenaArc<Awaitable<Buffer>, BITARRAY_LEN, LEN>);
+#[derive(Debug, destructure)]
+struct IdInner<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
-    pub(crate) fn slot(&self) -> u32 {
-        ArenaArc::slot(&self.0)
-    }
-
-    pub(crate) fn reset(&self, input: Option<Buffer>) {
-        self.0.reset(input);
-    }
-
+impl<Buffer: ToBuffer + Debug + Send + Sync> IdInner<Buffer> {
     pub(crate) fn get_input(&self) -> Option<Buffer> {
         self.0.take_input()
     }
@@ -74,8 +69,35 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     pub(crate) fn do_callback(&self, response: Response<Buffer>) {
         self.0.done(response);
     }
+}
 
-    pub(crate) async fn wait(&self) -> Response<Buffer> {
+impl<Buffer: ToBuffer + Send + Sync> Drop for IdInner<Buffer> {
+    fn drop(&mut self) {
+        ArenaArc::remove(&self.0);
+    }
+}
+
+#[derive(Debug)]
+pub struct Id<Buffer: ToBuffer + Send + Sync>(IdInner<Buffer>);
+
+impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
+    pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
+        Id(IdInner(arc))
+    }
+
+    pub(crate) fn into_inner(self) -> ArenaArc<Buffer> {
+        self.0.destructure().0
+    }
+
+    pub(crate) fn get_input(&self) -> Option<Buffer> {
+        self.0.get_input()
+    }
+
+    pub(crate) fn do_callback(&self, response: Response<Buffer>) {
+        self.0.do_callback(response);
+    }
+
+    pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Response<Buffer> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
@@ -96,16 +118,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
             }
         }
 
-        WaitFuture(Some(&self.0)).await;
+        WaitFuture(Some(this)).await;
 
-        self.0
-            .take_output()
+        this.take_output()
             .expect("The request should be done by now")
-    }
-}
-
-impl<Buffer: ToBuffer + Send + Sync> Drop for Id<Buffer> {
-    fn drop(&mut self) {
-        ArenaArc::remove(&self.0);
     }
 }
