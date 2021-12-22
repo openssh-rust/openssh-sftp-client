@@ -395,11 +395,15 @@ pub struct Name {
 }
 
 /// Provides drop impl
+///
+/// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
+/// over removal of `ArenaArc`.
 #[derive(Debug, destructure)]
 struct ArenaArcWrapper<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
     fn drop(&mut self) {
+        // Remove ArenaArc only if the `AwaitableResponse` is done.
         if self.0.is_done() {
             ArenaArc::remove(&self.0);
         }
