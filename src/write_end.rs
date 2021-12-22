@@ -350,6 +350,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         // if the future is cancelled.
         let arc = id.into_inner();
 
+        arc.reset(None);
+
         let header = Request::serialize_write_request(
             &mut self.serializer,
             ArenaArc::slot(&arc),
