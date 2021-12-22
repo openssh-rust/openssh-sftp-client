@@ -69,6 +69,17 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> IdInner<Buffer> {
     pub(crate) fn do_callback(&self, response: Response<Buffer>) {
         self.0.done(response);
     }
+
+    pub(crate) fn remove_if_cancelled(&self) {
+        // There is only two references:
+        //  - self.0
+        //  - AwaitableResponses
+        //
+        // Then the callback is cancelled.
+        if ArenaArc::strong_count(&self.0) == 2 {
+            ArenaArc::remove(&self.0);
+        }
+    }
 }
 
 impl<Buffer: ToBuffer + Send + Sync> Drop for IdInner<Buffer> {
@@ -122,5 +133,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
 
         this.take_output()
             .expect("The request should be done by now")
+    }
+
+    pub(crate) fn remove_if_cancelled(&self) {
+        self.0.remove_if_cancelled();
     }
 }

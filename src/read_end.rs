@@ -147,6 +147,10 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
 
         callback.do_callback(response);
 
+        // NOTE that if it is cancelled after this call, then the callback
+        // would not be removed.
+        callback.remove_if_cancelled();
+
         Ok(())
     }
 
