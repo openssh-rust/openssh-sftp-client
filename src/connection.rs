@@ -40,7 +40,10 @@ impl<Writer, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
     }
 
     pub(crate) fn notify_new_packet_event(&self) {
-        self.requests_sent.fetch_add(1, Ordering::Relaxed);
+        let prev_requests_sent = self.requests_sent.fetch_add(1, Ordering::Relaxed);
+
+        debug_assert_ne!(prev_requests_sent, u32::MAX);
+
         // Notify the `ReadEnd` after the requests_sent is incremented.
         self.notify_read_end();
     }
