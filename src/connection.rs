@@ -4,7 +4,7 @@ use super::*;
 use core::fmt::Debug;
 use core::marker::Unpin;
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -28,7 +28,7 @@ pub(crate) struct SharedData<Writer, Buffer: ToBuffer + 'static> {
     pub(crate) responses: AwaitableResponses<Buffer>,
 
     notify: Notify,
-    requests_sent: AtomicUsize,
+    requests_sent: AtomicU32,
 
     is_conn_closed: AtomicBool,
 }
@@ -47,7 +47,7 @@ impl<Writer, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
 
     /// Return number of requests and clear requests_sent.
     /// **Return 0 if the connection is closed.**
-    pub(crate) async fn wait_for_new_request(&self) -> usize {
+    pub(crate) async fn wait_for_new_request(&self) -> u32 {
         loop {
             let cnt = self.requests_sent.swap(0, Ordering::Relaxed);
             if cnt > 0 {
@@ -89,7 +89,7 @@ pub async fn connect<
         writer: Mutex::new(writer),
         responses: AwaitableResponses::new(),
         notify: Notify::new(),
-        requests_sent: AtomicUsize::new(0),
+        requests_sent: AtomicU32::new(0),
         is_conn_closed: AtomicBool::new(false),
     });
 

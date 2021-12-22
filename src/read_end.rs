@@ -171,7 +171,7 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
     /// You must call this function in a loop, break if this function returns
     /// 0, otherwise call `read_in_one_packet` for `n` times where `n` in the
     /// return value of this function, then repeat.
-    pub async fn wait_for_new_request(&self) -> usize {
+    pub async fn wait_for_new_request(&self) -> u32 {
         self.shared_data.wait_for_new_request().await
     }
 }
