@@ -1,3 +1,4 @@
+use super::awaitable_responses::ArenaArc;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
 use super::Error;
@@ -140,9 +141,11 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
         };
 
         let response = if response::Response::is_data(packet_type) {
-            let buffer = match callback.get_input() {
+            let buffer = match callback.take_input() {
                 Ok(buffer) => buffer,
                 Err(err) => {
+                    let err = err.into();
+
                     // Consume the invalid data to return self to a valid state
                     // where read_in_one_packet can be called again.
                     if let Err(consumption_err) = self.consume_data_packet(len).await {
@@ -156,13 +159,15 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
             self.read_in_packet(len).await?
         };
 
-        let res = callback.do_callback(response);
+        let res = callback.done(response);
 
         // NOTE that if it is cancelled after this call, then the callback
         // would not be removed.
-        callback.remove_if_cancelled();
+        if ArenaArc::strong_count(&callback) == 2 {
+            ArenaArc::remove(&callback);
+        }
 
-        res
+        Ok(res?)
     }
 
     /// Return number of requests sent and number of responses to read in.

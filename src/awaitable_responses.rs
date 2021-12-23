@@ -50,37 +50,15 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
         Id::new(self.0.insert(Awaitable::new()))
     }
 
-    pub(crate) fn get(&self, slot: u32) -> Result<Id<Buffer>, Error> {
+    pub(crate) fn get(&self, slot: u32) -> Result<ArenaArc<Buffer>, Error> {
         self.0
             .get(slot)
-            .map(Id::new)
             .ok_or(Error::InvalidResponseId { response_id: slot })
     }
 }
 
 #[derive(Debug, destructure)]
 struct IdInner<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
-
-impl<Buffer: ToBuffer + Debug + Send + Sync> IdInner<Buffer> {
-    pub(crate) fn get_input(&self) -> Result<Option<Buffer>, Error> {
-        Ok(self.0.take_input()?)
-    }
-
-    pub(crate) fn do_callback(&self, response: Response<Buffer>) -> Result<(), Error> {
-        Ok(self.0.done(response)?)
-    }
-
-    pub(crate) fn remove_if_cancelled(&self) {
-        // There is only two references:
-        //  - self.0
-        //  - AwaitableResponses
-        //
-        // Then the callback is cancelled.
-        if ArenaArc::strong_count(&self.0) == 2 {
-            ArenaArc::remove(&self.0);
-        }
-    }
-}
 
 impl<Buffer: ToBuffer + Send + Sync> Drop for IdInner<Buffer> {
     fn drop(&mut self) {
@@ -98,14 +76,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
 
     pub(crate) fn into_inner(self) -> ArenaArc<Buffer> {
         self.0.destructure().0
-    }
-
-    pub(crate) fn get_input(&self) -> Result<Option<Buffer>, Error> {
-        self.0.get_input()
-    }
-
-    pub(crate) fn do_callback(&self, response: Response<Buffer>) -> Result<(), Error> {
-        self.0.do_callback(response)
     }
 
     pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Response<Buffer> {
@@ -137,9 +107,5 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
 
         this.take_output()
             .expect("The request should be done by now")
-    }
-
-    pub(crate) fn remove_if_cancelled(&self) {
-        self.0.remove_if_cancelled();
     }
 }
