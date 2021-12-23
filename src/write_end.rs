@@ -364,10 +364,12 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
             data.len().try_into().map_err(|_| Error::BufferTooLong)?,
         )?;
 
-        let mut writer = self.shared_data.writer.lock().await;
+        {
+            let mut writer = self.shared_data.writer.lock().await;
 
-        let mut slices = [IoSlice::new(header), IoSlice::new(data)];
-        write_vectored_all(&mut *writer, &mut slices).await?;
+            let mut slices = [IoSlice::new(header), IoSlice::new(data)];
+            write_vectored_all(&mut *writer, &mut slices).await?;
+        }
 
         self.shared_data.notify_new_packet_event();
 
