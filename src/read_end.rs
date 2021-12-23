@@ -87,6 +87,11 @@ impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Sen
         len: u32,
         buffer: Option<Buffer>,
     ) -> Result<Response<Buffer>, Error> {
+        // Since the data is sent as a string, we need to consume the 4-byte length first.
+        copy(&mut (&mut self.reader).take(4), &mut sink()).await?;
+
+        let len = len - 4;
+
         if let Some(mut buffer) = buffer {
             match buffer.get_buffer() {
                 crate::Buffer::Vector(vec) => {
