@@ -172,6 +172,16 @@ mod tests {
             .unwrap()
     }
 
+    async fn read_one_packet(
+        read_end: &mut ReadEnd<process::ChildStdin, process::ChildStdout, Vec<u8>>,
+    ) {
+        eprintln!("Wait for new request");
+        assert_eq!(read_end.wait_for_new_request().await, 1);
+
+        eprintln!("Read in one packet");
+        read_end.read_in_one_packet().await.unwrap();
+    }
+
     #[tokio::test]
     async fn test_file_desc() {
         let (mut write_end, mut read_end, mut child) = connect().await;
@@ -184,7 +194,7 @@ mod tests {
 
         let mut file_attrs = FileAttrs::new();
         file_attrs.set_size(2000);
-        //file_attrs.set_permissions(libc::S_IRUSR | libc::S_IWUSR);
+        file_attrs.set_permissions(Permissions::READ_BY_OWNER | Permissions::WRITE_BY_OWNER);
         let file_attrs = file_attrs;
 
         let awaitable = write_end
@@ -200,10 +210,20 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(read_end.wait_for_new_request().await, 1);
-        read_end.read_in_one_packet().await.unwrap();
+        read_one_packet(&mut read_end).await;
+        let (id, handle) = awaitable.wait().await.unwrap();
 
-        let handle = awaitable.wait().await.unwrap();
+        eprintln!("handle = {:#?}", handle);
+
+        let awaitable = write_end
+            .send_write_request(id, &handle, 0, "Hello, world!".as_bytes())
+            .await
+            .unwrap();
+
+        eprintln!("Waiting for write response");
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
 
         drop(write_end);
         drop(read_end);
