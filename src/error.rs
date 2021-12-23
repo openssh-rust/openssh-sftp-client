@@ -1,6 +1,7 @@
 use super::*;
 
 use std::io;
+use std::num::TryFromIntError;
 use thiserror::Error;
 
 use openssh_sftp_protocol::ssh_format;
@@ -30,7 +31,7 @@ pub enum Error {
 
     /// Sftp protocol can only send and receive at most u32::MAX data in one request.
     #[error("Sftp protocol can only send and receive at most u32::MAX data in one request.")]
-    BufferTooLong,
+    BufferTooLong(#[from] TryFromIntError),
 
     /// The response id is invalid.
     ///

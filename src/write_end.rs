@@ -361,7 +361,7 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
             ArenaArc::slot(&arc),
             handle,
             offset,
-            data.len().try_into().map_err(|_| Error::BufferTooLong)?,
+            data.len().try_into()?,
         )?;
 
         {
