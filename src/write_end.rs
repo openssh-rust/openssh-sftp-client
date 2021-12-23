@@ -354,8 +354,6 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
         // if the future is cancelled.
         let arc = id.into_inner();
 
-        arc.reset(None);
-
         let header = Request::serialize_write_request(
             &mut self.serializer,
             ArenaArc::slot(&arc),
@@ -368,6 +366,8 @@ impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'stati
             let mut writer = self.shared_data.writer.lock().await;
 
             let mut slices = [IoSlice::new(header), IoSlice::new(data)];
+
+            arc.reset(None);
             write_vectored_all(&mut *writer, &mut slices).await?;
         }
 
