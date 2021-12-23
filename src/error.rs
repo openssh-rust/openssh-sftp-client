@@ -44,7 +44,7 @@ pub enum Error {
     RecursiveErrors(Box<(Error, Error)>),
 
     /// Sftp server error
-    #[error("Sftp server reported error kind {0:#?}, msg: {1:#?}")]
+    #[error("Sftp server reported error kind {0:#?}, msg: {1}")]
     SftpError(SftpErrorKind, SftpErrMsg),
 
     /// Invalid response from the sftp-server
