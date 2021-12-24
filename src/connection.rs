@@ -112,6 +112,7 @@ pub async fn connect<
 mod tests {
     use crate::*;
 
+    use std::borrow::Cow;
     use std::path;
     use std::process::Stdio;
 
@@ -192,6 +193,7 @@ mod tests {
 
         let filename = tempdir.path().join("file");
 
+        // Create one file and write to it
         let mut file_attrs = FileAttrs::new();
         file_attrs.set_size(2000);
         file_attrs.set_permissions(Permissions::READ_BY_OWNER | Permissions::WRITE_BY_OWNER);
@@ -215,8 +217,10 @@ mod tests {
 
         eprintln!("handle = {:#?}", handle);
 
+        let msg = "Hello, world!".as_bytes();
+
         let awaitable = write_end
-            .send_write_request(id, &handle, 0, "Hello, world!".as_bytes())
+            .send_write_request(id, &handle, 0, msg)
             .await
             .unwrap();
 
@@ -225,6 +229,39 @@ mod tests {
         read_one_packet(&mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
+        let awaitable = write_end
+            .send_close_request(id, Cow::Borrowed(&handle))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // Open it again and read from it
+        let awaitable = write_end
+            .send_open_file_request(id, OpenFile::open((&filename).into(), FileMode::READ))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, handle) = awaitable.wait().await.unwrap();
+
+        eprintln!("handle = {:#?}", handle);
+
+        let awaitable = write_end
+            .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, data) = awaitable.wait().await.unwrap();
+
+        match data {
+            Data::AllocatedBox(data) => assert_eq!(&*data, msg),
+            _ => panic!("Unexpected data"),
+        };
+
+        drop(id);
         drop(write_end);
         drop(read_end);
 
