@@ -3,6 +3,6 @@ name = "child_io_to_pipe"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+tokio = { version = "1.11.0", features = ["process"] }
+tokio-pipe = "0.2.8"
