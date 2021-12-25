@@ -12,6 +12,11 @@ repository = "https://github.com/NobodyXu/openssh-sftp-client"
 keywords = ["ssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
+[workspace]
+members = [
+    "child_io_to_pipe",
+]
+
 [dependencies]
 thiserror = "1.0.29"
 awaitable = "0.3.0"
