@@ -23,6 +23,7 @@ openssh-sftp-protocol = "0.12.0"
 
 tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync"] }
 tokio-io-utility = "0.3.0"
+tokio-pipe = "0.2.8"
 
 [dev-dependencies]
 tokio = { version = "1.11.0", features = ["rt", "macros", "process"] }
