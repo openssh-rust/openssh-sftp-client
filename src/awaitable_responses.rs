@@ -12,7 +12,7 @@ use openssh_sftp_protocol::response::ResponseInner;
 
 use derive_destructure::destructure;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) enum Response<Buffer: ToBuffer> {
     Header(ResponseInner),
 
