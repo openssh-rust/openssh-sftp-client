@@ -5,7 +5,6 @@ use super::Error;
 use super::ToBuffer;
 
 use core::fmt::Debug;
-use core::marker::Unpin;
 
 use std::sync::Arc;
 
@@ -13,20 +12,19 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy, sink, AsyncRead, AsyncReadExt};
+use tokio::io::{copy, sink, AsyncReadExt};
 use tokio_io_utility::read_exact_to_vec;
+use tokio_pipe::PipeRead;
 
 #[derive(Debug)]
-pub struct ReadEnd<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + 'static> {
-    reader: Reader,
+pub struct ReadEnd<Buffer: ToBuffer + 'static> {
+    reader: PipeRead,
     buffer: Vec<u8>,
-    shared_data: Arc<SharedData<Writer, Buffer>>,
+    shared_data: Arc<SharedData<Buffer>>,
 }
 
-impl<Writer, Reader: AsyncRead + Unpin, Buffer: ToBuffer + Debug + 'static + Send + Sync>
-    ReadEnd<Writer, Reader, Buffer>
-{
-    pub(crate) fn new(reader: Reader, shared_data: Arc<SharedData<Writer, Buffer>>) -> Self {
+impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
+    pub(crate) fn new(reader: PipeRead, shared_data: Arc<SharedData<Buffer>>) -> Self {
         Self {
             reader,
             buffer: Vec::new(),

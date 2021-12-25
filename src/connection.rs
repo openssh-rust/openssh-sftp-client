@@ -2,15 +2,13 @@ use super::awaitable_responses::AwaitableResponses;
 use super::*;
 
 use core::fmt::Debug;
-use core::marker::Unpin;
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_pipe::{PipeRead, PipeWrite};
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
@@ -23,8 +21,8 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub(crate) struct SharedData<Writer, Buffer: ToBuffer + 'static> {
-    pub(crate) writer: Mutex<Writer>,
+pub(crate) struct SharedData<Buffer: ToBuffer + 'static> {
+    pub(crate) writer: Mutex<PipeWrite>,
     pub(crate) responses: AwaitableResponses<Buffer>,
 
     notify: Notify,
@@ -33,7 +31,7 @@ pub(crate) struct SharedData<Writer, Buffer: ToBuffer + 'static> {
     is_conn_closed: AtomicBool,
 }
 
-impl<Writer, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
+impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
     fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
         self.notify.notify_one();
@@ -80,14 +78,10 @@ impl<Writer, Buffer: ToBuffer + 'static> SharedData<Writer, Buffer> {
     }
 }
 
-pub async fn connect<
-    Buffer: ToBuffer + Debug + Send + Sync + 'static,
-    Writer: AsyncWrite + Unpin,
-    Reader: AsyncRead + Unpin,
->(
-    reader: Reader,
-    writer: Writer,
-) -> Result<(WriteEnd<Writer, Buffer>, ReadEnd<Writer, Reader, Buffer>), Error> {
+pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
+    reader: PipeRead,
+    writer: PipeWrite,
+) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>), Error> {
     let shared_data = Arc::new(SharedData {
         writer: Mutex::new(writer),
         responses: AwaitableResponses::new(),
@@ -112,6 +106,7 @@ pub async fn connect<
 mod tests {
     use crate::*;
 
+    use child_io_to_pipe::*;
     use std::borrow::Cow;
     use std::path;
     use std::process::Stdio;
@@ -150,12 +145,12 @@ mod tests {
         (child, stdin, stdout)
     }
 
-    async fn connect() -> (
-        WriteEnd<process::ChildStdin, Vec<u8>>,
-        ReadEnd<process::ChildStdin, process::ChildStdout, Vec<u8>>,
-        process::Child,
-    ) {
+    async fn connect() -> (WriteEnd<Vec<u8>>, ReadEnd<Vec<u8>>, process::Child) {
         let (child, stdin, stdout) = launch_sftp().await;
+
+        let stdout = child_stdout_to_pipewrite(stdout).unwrap();
+        let stdin = child_stdin_to_pipewrite(stdin).unwrap();
+
         let (write_end, read_end) = crate::connect(stdout, stdin).await.unwrap();
         (write_end, read_end, child)
     }
@@ -173,9 +168,7 @@ mod tests {
             .unwrap()
     }
 
-    async fn read_one_packet(
-        read_end: &mut ReadEnd<process::ChildStdin, process::ChildStdout, Vec<u8>>,
-    ) {
+    async fn read_one_packet(read_end: &mut ReadEnd<Vec<u8>>) {
         eprintln!("Wait for new request");
         assert_eq!(read_end.wait_for_new_request().await, 1);
 

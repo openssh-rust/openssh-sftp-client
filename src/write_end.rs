@@ -6,7 +6,6 @@ use super::Id;
 use super::ToBuffer;
 
 use core::fmt::Debug;
-use core::marker::Unpin;
 use core::mem::replace;
 
 use std::borrow::Cow;
@@ -23,7 +22,6 @@ use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::{Handle, HandleOwned};
 
 use std::io::IoSlice;
-use tokio::io::AsyncWrite;
 use tokio_io_utility::write_vectored_all;
 
 use derive_destructure::destructure;
@@ -33,18 +31,18 @@ use derive_destructure::destructure;
 
 /// It is recommended to create at most one `WriteEnd` per thread.
 #[derive(Debug)]
-pub struct WriteEnd<Writer, Buffer: ToBuffer + 'static> {
+pub struct WriteEnd<Buffer: ToBuffer + 'static> {
     serializer: Serializer,
-    shared_data: Arc<SharedData<Writer, Buffer>>,
+    shared_data: Arc<SharedData<Buffer>>,
 }
 
-impl<Writer, Buffer: ToBuffer + 'static> Clone for WriteEnd<Writer, Buffer> {
+impl<Buffer: ToBuffer + 'static> Clone for WriteEnd<Buffer> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<Writer, Buffer: ToBuffer + 'static> Drop for WriteEnd<Writer, Buffer> {
+impl<Buffer: ToBuffer + 'static> Drop for WriteEnd<Buffer> {
     fn drop(&mut self) {
         let shared_data = &self.shared_data;
 
@@ -56,8 +54,8 @@ impl<Writer, Buffer: ToBuffer + 'static> Drop for WriteEnd<Writer, Buffer> {
     }
 }
 
-impl<Writer, Buffer: ToBuffer + 'static> WriteEnd<Writer, Buffer> {
-    pub(crate) fn new(shared_data: Arc<SharedData<Writer, Buffer>>) -> Self {
+impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
+    pub(crate) fn new(shared_data: Arc<SharedData<Buffer>>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
@@ -65,9 +63,7 @@ impl<Writer, Buffer: ToBuffer + 'static> WriteEnd<Writer, Buffer> {
     }
 }
 
-impl<Writer: AsyncWrite + Unpin, Buffer: ToBuffer + Debug + Send + Sync + 'static>
-    WriteEnd<Writer, Buffer>
-{
+impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(
         &mut self,
         version: u32,
