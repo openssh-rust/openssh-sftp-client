@@ -42,9 +42,9 @@ pub struct Name {
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
 /// over removal of `ArenaArc`.
 #[derive(Debug)]
-struct ArenaArcWrapper<Buffer: ToBuffer + Debug + Send + Sync>(Option<ArenaArc<Buffer>>);
+struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(Option<ArenaArc<Buffer>>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> ArenaArcWrapper<Buffer> {
+impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
     async fn wait(&self) -> Response<Buffer> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
@@ -80,7 +80,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> ArenaArcWrapper<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
+impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
     fn drop(&mut self) {
         if let Some(arc) = self.0.take() {
             // Remove ArenaArc only if the `AwaitableResponse` is done.
@@ -94,11 +94,11 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
         #[derive(Debug)]
-        pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArcWrapper<Buffer>);
+        pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(AwaitableInner<Buffer>);
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
             pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
-                Self(ArenaArcWrapper(Some(arc)))
+                Self(AwaitableInner(Some(arc)))
             }
 
             /// Return (id, res).
