@@ -1,4 +1,5 @@
 use super::awaitable_responses::ArenaArc;
+use super::awaitable_responses::Awaitable;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
 use super::Error;
@@ -7,6 +8,10 @@ use super::ToBuffer;
 
 use core::fmt::Debug;
 use core::mem::replace;
+
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -22,8 +27,6 @@ use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::{Handle, HandleOwned};
 
 use std::io::IoSlice;
-
-use derive_destructure::destructure;
 
 /// TODO:
 ///  - Support IoSlice for data in `send_write_request`
@@ -118,7 +121,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(ArenaArcWrapper(arc))
+        Ok(ArenaArcWrapper::new(arc))
     }
 
     pub async fn send_open_file_request(
@@ -362,7 +365,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(AwaitableStatus(ArenaArcWrapper(arc)))
+        Ok(AwaitableStatus(ArenaArcWrapper::new(arc)))
     }
 }
 
@@ -391,14 +394,56 @@ pub struct Name {
 ///
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
 /// over removal of `ArenaArc`.
-#[derive(Debug, destructure)]
-struct ArenaArcWrapper<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
+#[derive(Debug)]
+struct ArenaArcWrapper<Buffer: ToBuffer + Debug + Send + Sync>(Option<ArenaArc<Buffer>>);
+
+impl<Buffer: ToBuffer + Debug + Send + Sync> ArenaArcWrapper<Buffer> {
+    fn new(arc: ArenaArc<Buffer>) -> Self {
+        Self(Some(arc))
+    }
+
+    async fn wait(&self) -> Response<Buffer> {
+        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
+
+        impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
+            type Output = ();
+
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                if let Some(value) = self.0.take() {
+                    let waker = cx.waker().clone();
+
+                    let res = value
+                        .install_waker(waker)
+                        .expect("AwaitableResponse should either in state Ongoing or Done");
+
+                    if res {
+                        Poll::Ready(())
+                    } else {
+                        Poll::Pending
+                    }
+                } else {
+                    Poll::Ready(())
+                }
+            }
+        }
+
+        WaitFuture(Some(self.0.as_ref().unwrap())).await;
+
+        self.0
+            .as_ref()
+            .unwrap()
+            .take_output()
+            .expect("The request should be done by now")
+    }
+}
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
     fn drop(&mut self) {
-        // Remove ArenaArc only if the `AwaitableResponse` is done.
-        if self.0.is_done() {
-            ArenaArc::remove(&self.0);
+        if let Some(arc) = self.0.take() {
+            // Remove ArenaArc only if the `AwaitableResponse` is done.
+            if arc.is_done() {
+                ArenaArc::remove(&arc);
+            }
         }
     }
 }
@@ -412,11 +457,9 @@ macro_rules! def_awaitable {
             /// Return (id, res).
             ///
             /// id can be reused in the next request.
-            pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                let arc = self.0.destructure().0;
-
-                let $response_name = Id::wait(&arc).await;
-                Ok((Id::new(arc), $post_processing?))
+            pub async fn wait(mut self) -> Result<(Id<Buffer>, $res), Error> {
+                let $response_name = self.0.wait().await;
+                Ok((Id::new(self.0 .0.take().unwrap()), $post_processing?))
             }
         }
     };
