@@ -107,7 +107,9 @@ mod tests {
     use crate::*;
 
     use child_io_to_pipe::*;
+
     use std::borrow::Cow;
+    use std::env;
     use std::path;
     use std::process::Stdio;
 
@@ -121,9 +123,11 @@ mod tests {
         static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
 
         SFTP_PATH.get_or_init(|| {
-            let mut sftp_path = path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            sftp_path.push("static-openssh-sftp-server");
+            let mut sftp_path: path::PathBuf = env::var("OUT_DIR").unwrap().into();
+            sftp_path.push("openssh-portable");
             sftp_path.push("sftp-server");
+
+            eprintln!("sftp_path = {:#?}", sftp_path);
 
             sftp_path
         })
