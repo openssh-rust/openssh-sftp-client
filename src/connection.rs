@@ -256,6 +256,9 @@ mod tests {
 
         drop(id);
         drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
         drop(read_end);
 
         assert!(child.wait().await.unwrap().success());
