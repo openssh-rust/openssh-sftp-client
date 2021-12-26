@@ -1,3 +1,6 @@
 [submodule "static-openssh-sftp-server"]
 	path = static-openssh-sftp-server
 	url = https://github.com/NobodyXu/static-openssh-sftp-server
+[submodule "openssh-portable"]
+	path = openssh-portable
+	url = https://github.com/openssh/openssh-portable
