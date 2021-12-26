@@ -164,7 +164,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
         let res = callback.done(response);
 
-        // NOTE that if it is cancelled after this call, then the callback
+        // NOTE that if the arc is dropped after this call, then the callback
         // would not be removed.
         if ArenaArc::strong_count(&callback) == 2 {
             ArenaArc::remove(&callback);
