@@ -22,7 +22,6 @@ use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::{Handle, HandleOwned};
 
 use std::io::IoSlice;
-use tokio_io_utility::write_vectored_all;
 
 use derive_destructure::destructure;
 
@@ -83,13 +82,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         self.serializer.reset();
         value.serialize(&mut self.serializer)?;
 
-        let mut writer = self.shared_data.writer.lock().await;
-
-        write_vectored_all(
-            &mut *writer,
-            &mut [IoSlice::new(self.serializer.get_output()?)],
-        )
-        .await?;
+        self.shared_data
+            .writer
+            .write_all(self.serializer.get_output()?)
+            .await?;
 
         Ok(())
     }
@@ -358,14 +354,11 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             data.len().try_into()?,
         )?;
 
-        {
-            let mut writer = self.shared_data.writer.lock().await;
-
-            let mut slices = [IoSlice::new(header), IoSlice::new(data)];
-
-            arc.reset(None);
-            write_vectored_all(&mut *writer, &mut slices).await?;
-        }
+        arc.reset(None);
+        self.shared_data
+            .writer
+            .write_vectored_all(&mut [IoSlice::new(header), IoSlice::new(data)])
+            .await?;
 
         self.shared_data.notify_new_packet_event();
 

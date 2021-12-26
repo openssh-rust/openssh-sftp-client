@@ -1,4 +1,5 @@
 use super::awaitable_responses::AwaitableResponses;
+use super::writer::Writer;
 use super::*;
 
 use core::fmt::Debug;
@@ -6,7 +7,6 @@ use core::fmt::Debug;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_pipe::{PipeRead, PipeWrite};
 
@@ -22,7 +22,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
 pub(crate) struct SharedData<Buffer: ToBuffer + 'static> {
-    pub(crate) writer: Mutex<PipeWrite>,
+    pub(crate) writer: Writer,
     pub(crate) responses: AwaitableResponses<Buffer>,
 
     notify: Notify,
@@ -83,7 +83,7 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     writer: PipeWrite,
 ) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>), Error> {
     let shared_data = Arc::new(SharedData {
-        writer: Mutex::new(writer),
+        writer: Writer::new(writer),
         responses: AwaitableResponses::new(),
         notify: Notify::new(),
         requests_sent: AtomicU32::new(0),

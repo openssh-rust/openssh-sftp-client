@@ -6,6 +6,7 @@ mod connection;
 mod error;
 mod read_end;
 mod write_end;
+mod writer;
 
 pub use awaitable_responses::Id;
 
