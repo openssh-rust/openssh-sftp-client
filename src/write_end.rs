@@ -1,17 +1,8 @@
 use super::awaitable_responses::ArenaArc;
-use super::awaitable_responses::Awaitable;
-use super::awaitable_responses::Response;
 use super::connection::SharedData;
-use super::Error;
-use super::Id;
-use super::ToBuffer;
+use crate::*;
 
 use core::fmt::Debug;
-use core::mem::replace;
-
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -21,10 +12,9 @@ use std::sync::Arc;
 use openssh_sftp_protocol::extensions::Extensions;
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::request::*;
-use openssh_sftp_protocol::response::*;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
-use openssh_sftp_protocol::{Handle, HandleOwned};
+use openssh_sftp_protocol::Handle;
 
 use std::io::IoSlice;
 
@@ -106,7 +96,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
-    ) -> Result<ArenaArcWrapper<Buffer>, Error> {
+    ) -> Result<ArenaArc<Buffer>, Error> {
         // Call id.into_inner to prevent id from being removed
         // if the future is cancelled.
         let arc = id.into_inner();
@@ -121,7 +111,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(ArenaArcWrapper::new(arc))
+        Ok(arc)
     }
 
     pub async fn send_open_file_request(
@@ -129,7 +119,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         params: OpenFile<'_>,
     ) -> Result<AwaitableHandle<Buffer>, Error> {
-        Ok(AwaitableHandle(
+        Ok(AwaitableHandle::new(
             self.send_request(id, RequestInner::Open(params), None)
                 .await?,
         ))
@@ -140,7 +130,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Close(handle), None)
                 .await?,
         ))
@@ -154,7 +144,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         len: u32,
         buffer: Option<Buffer>,
     ) -> Result<AwaitableData<Buffer>, Error> {
-        Ok(AwaitableData(
+        Ok(AwaitableData::new(
             self.send_request(
                 id,
                 RequestInner::Read {
@@ -173,7 +163,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Remove(path), None)
                 .await?,
         ))
@@ -185,7 +175,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         oldpath: Cow<'_, Path>,
         newpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Rename { oldpath, newpath }, None)
                 .await?,
         ))
@@ -197,7 +187,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         path: Cow<'_, Path>,
         attrs: FileAttrs,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Mkdir { path, attrs }, None)
                 .await?,
         ))
@@ -208,7 +198,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Rmdir(path), None)
                 .await?,
         ))
@@ -219,7 +209,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableHandle<Buffer>, Error> {
-        Ok(AwaitableHandle(
+        Ok(AwaitableHandle::new(
             self.send_request(id, RequestInner::Opendir(path), None)
                 .await?,
         ))
@@ -230,7 +220,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableNameEntries<Buffer>, Error> {
-        Ok(AwaitableNameEntries(
+        Ok(AwaitableNameEntries::new(
             self.send_request(id, RequestInner::Readdir(handle), None)
                 .await?,
         ))
@@ -241,7 +231,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableAttrs<Buffer>, Error> {
-        Ok(AwaitableAttrs(
+        Ok(AwaitableAttrs::new(
             self.send_request(id, RequestInner::Stat(path), None)
                 .await?,
         ))
@@ -253,7 +243,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableAttrs<Buffer>, Error> {
-        Ok(AwaitableAttrs(
+        Ok(AwaitableAttrs::new(
             self.send_request(id, RequestInner::Lstat(path), None)
                 .await?,
         ))
@@ -265,7 +255,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableAttrs<Buffer>, Error> {
-        Ok(AwaitableAttrs(
+        Ok(AwaitableAttrs::new(
             self.send_request(id, RequestInner::Fstat(handle), None)
                 .await?,
         ))
@@ -277,7 +267,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         path: Cow<'_, Path>,
         attrs: FileAttrs,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Setstat { path, attrs }, None)
                 .await?,
         ))
@@ -289,7 +279,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         handle: Cow<'_, Handle>,
         attrs: FileAttrs,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(id, RequestInner::Fsetstat { handle, attrs }, None)
                 .await?,
         ))
@@ -300,7 +290,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableName<Buffer>, Error> {
-        Ok(AwaitableName(
+        Ok(AwaitableName::new(
             self.send_request(id, RequestInner::Readlink(path), None)
                 .await?,
         ))
@@ -311,7 +301,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableName<Buffer>, Error> {
-        Ok(AwaitableName(
+        Ok(AwaitableName::new(
             self.send_request(id, RequestInner::Realpath(path), None)
                 .await?,
         ))
@@ -324,7 +314,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         linkpath: Cow<'_, Path>,
         targetpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus(
+        Ok(AwaitableStatus::new(
             self.send_request(
                 id,
                 RequestInner::Symlink {
@@ -365,224 +355,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(AwaitableStatus(ArenaArcWrapper::new(arc)))
+        Ok(AwaitableStatus::new(arc))
     }
 }
-
-#[derive(Debug, Clone)]
-pub enum Data<Buffer: ToBuffer> {
-    /// The buffer that stores the response of Read,
-    /// since its corresponding response type `ResponseInner::Data`
-    /// does not contain any member, it doesn't have to be stored.
-    Buffer(Buffer),
-
-    /// Same as `Buffer`, this is a fallback
-    /// if `Buffer` isn't provided or it isn't large enough.
-    AllocatedBox(Box<[u8]>),
-
-    /// EOF is reached before any data can be read.
-    Eof,
-}
-
-#[derive(Debug, Clone)]
-pub struct Name {
-    pub filename: Box<str>,
-    pub longname: Box<str>,
-}
-
-/// Provides drop impl
-///
-/// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
-/// over removal of `ArenaArc`.
-#[derive(Debug)]
-struct ArenaArcWrapper<Buffer: ToBuffer + Debug + Send + Sync>(Option<ArenaArc<Buffer>>);
-
-impl<Buffer: ToBuffer + Debug + Send + Sync> ArenaArcWrapper<Buffer> {
-    fn new(arc: ArenaArc<Buffer>) -> Self {
-        Self(Some(arc))
-    }
-
-    async fn wait(&self) -> Response<Buffer> {
-        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
-
-        impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
-            type Output = ();
-
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                if let Some(value) = self.0.take() {
-                    let waker = cx.waker().clone();
-
-                    let res = value
-                        .install_waker(waker)
-                        .expect("AwaitableResponse should either in state Ongoing or Done");
-
-                    if res {
-                        Poll::Ready(())
-                    } else {
-                        Poll::Pending
-                    }
-                } else {
-                    Poll::Ready(())
-                }
-            }
-        }
-
-        WaitFuture(Some(self.0.as_ref().unwrap())).await;
-
-        self.0
-            .as_ref()
-            .unwrap()
-            .take_output()
-            .expect("The request should be done by now")
-    }
-}
-
-impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for ArenaArcWrapper<Buffer> {
-    fn drop(&mut self) {
-        if let Some(arc) = self.0.take() {
-            // Remove ArenaArc only if the `AwaitableResponse` is done.
-            if arc.is_done() {
-                ArenaArc::remove(&arc);
-            }
-        }
-    }
-}
-
-macro_rules! def_awaitable {
-    ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
-        #[derive(Debug)]
-        pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArcWrapper<Buffer>);
-
-        impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
-            /// Return (id, res).
-            ///
-            /// id can be reused in the next request.
-            pub async fn wait(mut self) -> Result<(Id<Buffer>, $res), Error> {
-                let $response_name = self.0.wait().await;
-                Ok((Id::new(self.0 .0.take().unwrap()), $post_processing?))
-            }
-        }
-    };
-}
-
-def_awaitable!(AwaitableStatus, (), response, {
-    match response {
-        Response::Header(ResponseInner::Status {
-            status_code,
-            err_msg,
-        }) => match status_code {
-            StatusCode::Success => Ok(()),
-            StatusCode::Failure(err_code) => Err(Error::SftpError(err_code, err_msg)),
-        },
-        _ => Err(Error::InvalidResponse(&"Expected Status response")),
-    }
-});
-
-def_awaitable!(AwaitableHandle, HandleOwned, response, {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            ResponseInner::Handle(handle) => Ok(handle),
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
-            _ => Err(Error::InvalidResponse(
-                &"Expected Handle or err Status response",
-            )),
-        },
-        _ => Err(Error::InvalidResponse(
-            &"Expected Handle or err Status response",
-        )),
-    }
-});
-
-def_awaitable!(AwaitableData, Data<Buffer>, response, {
-    match response {
-        Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
-        Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
-        Response::Header(ResponseInner::Status {
-            status_code: StatusCode::Failure(err_code),
-            err_msg,
-        }) => match err_code {
-            ErrorCode::Eof => Ok(Data::Eof),
-            _ => Err(Error::SftpError(err_code, err_msg)),
-        },
-        _ => Err(Error::InvalidResponse(
-            &"Expected Buffer/AllocatedBox response",
-        )),
-    }
-});
-
-def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, response, {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            ResponseInner::Name(name) => Ok(name),
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
-            _ => Err(Error::InvalidResponse(
-                &"Expected Name or err Status response",
-            )),
-        },
-        _ => Err(Error::InvalidResponse(
-            &"Expected Name or err Status response",
-        )),
-    }
-});
-
-def_awaitable!(AwaitableAttrs, FileAttrs, response, {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            // use replace to avoid allocation that might occur due to
-            // `FileAttrs::clone`.
-            ResponseInner::Attrs(mut attrs) => Ok(replace(&mut *attrs, FileAttrs::new())),
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
-            _ => Err(Error::InvalidResponse(
-                &"Expected Attrs or err Status response",
-            )),
-        },
-        _ => Err(Error::InvalidResponse(
-            &"Expected Attrs or err Status response",
-        )),
-    }
-});
-
-def_awaitable!(AwaitableName, Name, response, {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            ResponseInner::Name(mut names) => {
-                if names.len() != 1 {
-                    Err(Error::InvalidResponse(
-                        &"Got expected Name response, but it does not have exactly \
-                        one and only one entry",
-                    ))
-                } else {
-                    let name = &mut names[0];
-
-                    Ok(Name {
-                        filename: replace(&mut name.filename, "".into()),
-                        longname: replace(&mut name.longname, "".into()),
-                    })
-                }
-            }
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
-            _ => Err(Error::InvalidResponse(
-                &"Expected Name or err Status response",
-            )),
-        },
-        _ => Err(Error::InvalidResponse(
-            &"Expected Name or err Status response",
-        )),
-    }
-});

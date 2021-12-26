@@ -2,9 +2,6 @@ use super::Error;
 use super::ToBuffer;
 
 use core::fmt::Debug;
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
 
 use concurrent_arena::Arena;
 
@@ -76,36 +73,5 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
 
     pub(crate) fn into_inner(self) -> ArenaArc<Buffer> {
         self.0.destructure().0
-    }
-
-    pub(crate) async fn wait(this: &ArenaArc<Buffer>) -> Response<Buffer> {
-        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
-
-        impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
-            type Output = ();
-
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                if let Some(value) = self.0.take() {
-                    let waker = cx.waker().clone();
-
-                    let res = value
-                        .install_waker(waker)
-                        .expect("AwaitableResponse should either in state Ongoing or Done");
-
-                    if res {
-                        Poll::Ready(())
-                    } else {
-                        Poll::Pending
-                    }
-                } else {
-                    Poll::Ready(())
-                }
-            }
-        }
-
-        WaitFuture(Some(this)).await;
-
-        this.take_output()
-            .expect("The request should be done by now")
     }
 }

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod awaitable_responses;
+mod awaitables;
 mod buffer;
 mod connection;
 mod error;
@@ -26,3 +27,8 @@ pub use connection::connect;
 pub use error::Error;
 pub use read_end::ReadEnd;
 pub use write_end::*;
+
+pub use awaitables::{
+    AwaitableAttrs, AwaitableData, AwaitableHandle, AwaitableName, AwaitableNameEntries,
+    AwaitableStatus, Data, Name,
+};
