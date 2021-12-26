@@ -88,6 +88,16 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         self.shared_data.responses.insert()
     }
 
+    /// Return true if reserve succeeds, false otherwise.
+    pub fn try_reserve_id(&self, new_id_cnt: u32) -> bool {
+        self.shared_data.responses.try_reserve(new_id_cnt)
+    }
+
+    /// Return true if reserve succeeds, false otherwise.
+    pub fn reserve_id(&self, new_id_cnt: u32) {
+        self.shared_data.responses.reserve(new_id_cnt);
+    }
+
     /// Send requests.
     ///
     /// **Please use `Self::send_write_request` for sending write requests.**

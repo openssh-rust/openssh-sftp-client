@@ -47,6 +47,14 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
         Id::new(self.0.insert(Awaitable::new()))
     }
 
+    pub(crate) fn try_reserve(&self, new_id_cnt: u32) -> bool {
+        self.0.try_reserve(new_id_cnt / (LEN as u32))
+    }
+
+    pub(crate) fn reserve(&self, new_id_cnt: u32) {
+        self.0.reserve(new_id_cnt / (LEN as u32));
+    }
+
     pub(crate) fn get(&self, slot: u32) -> Result<ArenaArc<Buffer>, Error> {
         self.0
             .get(slot)
