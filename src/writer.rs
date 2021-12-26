@@ -77,10 +77,10 @@ impl Writer {
     /// * `buf` - Must not be empty
     pub(crate) async fn write_all(&self, buf: &[u8]) -> Result<(), io::Error> {
         if let Some(buf) = AtomicWriteBuffer::new(buf) {
-            if buf.into_inner().len() <= MAX_ATOMIC_SIZE {
-                if let Some(_len) = self.atomic_write_all(buf).await? {
-                    return Ok(());
-                }
+            if buf.into_inner().len() <= MAX_ATOMIC_SIZE
+                && self.atomic_write_all(buf).await?.is_some()
+            {
+                return Ok(());
             }
         }
 
@@ -104,10 +104,9 @@ impl Writer {
         if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
             let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
 
-            if len <= MAX_ATOMIC_SIZE {
-                if let Some(_len) = self.atomic_write_vectored_all(bufs, len).await? {
-                    return Ok(());
-                }
+            if len <= MAX_ATOMIC_SIZE && self.atomic_write_vectored_all(bufs, len).await?.is_some()
+            {
+                return Ok(());
             }
         }
 
