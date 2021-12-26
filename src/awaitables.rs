@@ -16,6 +16,8 @@ use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::response::*;
 use openssh_sftp_protocol::HandleOwned;
 
+use derive_destructure::destructure;
+
 #[derive(Debug, Clone)]
 pub enum Data<Buffer: ToBuffer> {
     /// The buffer that stores the response of Read,
@@ -41,8 +43,8 @@ pub struct Name {
 ///
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
 /// over removal of `ArenaArc`.
-#[derive(Debug)]
-struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(Option<ArenaArc<Buffer>>);
+#[derive(Debug, destructure)]
+struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
     async fn wait(&self) -> Response<Buffer> {
@@ -70,26 +72,23 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
             }
         }
 
-        let arc = self.0.as_ref().unwrap();
+        WaitFuture(Some(&self.0)).await;
 
-        WaitFuture(Some(arc)).await;
-
-        arc.take_output()
+        self.0
+            .take_output()
             .expect("The request should be done by now")
     }
 
-    fn into_inner(mut self) -> ArenaArc<Buffer> {
-        self.0.take().unwrap()
+    fn into_inner(self) -> ArenaArc<Buffer> {
+        self.destructure().0
     }
 }
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
     fn drop(&mut self) {
-        if let Some(arc) = self.0.take() {
-            // Remove ArenaArc only if the `AwaitableResponse` is done.
-            if arc.is_done() {
-                ArenaArc::remove(&arc);
-            }
+        // Remove ArenaArc only if the `AwaitableResponse` is done.
+        if self.0.is_done() {
+            ArenaArc::remove(&self.0);
         }
     }
 }
@@ -101,7 +100,7 @@ macro_rules! def_awaitable {
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
             pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
-                Self(AwaitableInner(Some(arc)))
+                Self(AwaitableInner(arc))
             }
 
             /// Return (id, res).
