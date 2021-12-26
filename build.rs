@@ -1,27 +1,30 @@
-use std::env;
-use std::fs::{canonicalize, create_dir_all};
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-
 fn main() {
-    let mut build_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
-    build_dir.push("openssh-portable");
+    #[cfg(ci)]
+    {
+        use std::env;
+        use std::fs::{canonicalize, create_dir_all};
+        use std::path::PathBuf;
+        use std::process::{Command, Stdio};
 
-    let build_dir = build_dir;
+        let mut build_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
+        build_dir.push("openssh-portable");
 
-    create_dir_all(&build_dir).unwrap();
+        let build_dir = build_dir;
 
-    println!("cargo:rerun-if-changed=openssh-portable");
+        create_dir_all(&build_dir).unwrap();
 
-    let script = canonicalize("./compile-sftp-server.sh").unwrap();
+        println!("cargo:rerun-if-changed=openssh-portable");
 
-    let status = Command::new(&script)
-        .stdin(Stdio::null())
-        .current_dir(&build_dir)
-        .status()
-        .unwrap();
+        let script = canonicalize("./compile-sftp-server.sh").unwrap();
 
-    if !status.success() {
-        panic!("{:#?} failed: {:#?}", script, status);
+        let status = Command::new(&script)
+            .stdin(Stdio::null())
+            .current_dir(&build_dir)
+            .status()
+            .unwrap();
+
+        if !status.success() {
+            panic!("{:#?} failed: {:#?}", script, status);
+        }
     }
 }

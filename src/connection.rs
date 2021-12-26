@@ -103,6 +103,7 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
 }
 
 #[cfg(test)]
+#[cfg(ci)]
 mod tests {
     use crate::*;
 
