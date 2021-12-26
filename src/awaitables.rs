@@ -47,7 +47,7 @@ pub struct Name {
 struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
-    async fn wait(&self) -> Response<Buffer> {
+    async fn wait(&self) {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
@@ -73,10 +73,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
         }
 
         WaitFuture(Some(&self.0)).await;
-
-        self.0
-            .take_output()
-            .expect("The request should be done by now")
     }
 
     fn into_inner(self) -> ArenaArc<Buffer> {
@@ -87,6 +83,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
 impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
     fn drop(&mut self) {
         // Remove ArenaArc only if the `AwaitableResponse` is done.
+        //
+        // If the ArenaArc is in `Consumed` state, then the user cannot have the future
+        // cancelled unless they played with fire (`unsafe`).
         if self.0.is_done() {
             ArenaArc::remove(&self.0);
         }
@@ -108,7 +107,17 @@ macro_rules! def_awaitable {
             /// id can be reused in the next request.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
                 let post_processing = |$response_name| $post_processing;
-                let res = post_processing(self.0.wait().await)?;
+
+                self.0.wait().await;
+
+                let response = self
+                    .0
+                     .0
+                    .take_output()
+                    .expect("The request should be done by now");
+
+                let res = post_processing(response)?;
+
                 Ok((Id::new(self.0.into_inner()), res))
             }
         }
