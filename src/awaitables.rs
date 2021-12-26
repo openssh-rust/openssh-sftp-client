@@ -70,13 +70,16 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
             }
         }
 
-        WaitFuture(Some(self.0.as_ref().unwrap())).await;
+        let arc = self.0.as_ref().unwrap();
 
-        self.0
-            .as_ref()
-            .unwrap()
-            .take_output()
+        WaitFuture(Some(arc)).await;
+
+        arc.take_output()
             .expect("The request should be done by now")
+    }
+
+    fn into_inner(mut self) -> ArenaArc<Buffer> {
+        self.0.take().unwrap()
     }
 }
 
@@ -92,7 +95,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
 }
 
 macro_rules! def_awaitable {
-    ($name:ident, $res:ty, $response_name:ident, $post_processing:block) => {
+    ($name:ident, $res:ty, | $response_name:ident | $post_processing:block) => {
         #[derive(Debug)]
         pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(AwaitableInner<Buffer>);
 
@@ -104,15 +107,16 @@ macro_rules! def_awaitable {
             /// Return (id, res).
             ///
             /// id can be reused in the next request.
-            pub async fn wait(mut self) -> Result<(Id<Buffer>, $res), Error> {
-                let $response_name = self.0.wait().await;
-                Ok((Id::new(self.0 .0.take().unwrap()), $post_processing?))
+            pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
+                let post_processing = |$response_name| $post_processing;
+                let res = post_processing(self.0.wait().await)?;
+                Ok((Id::new(self.0.into_inner()), res))
             }
         }
     };
 }
 
-def_awaitable!(AwaitableStatus, (), response, {
+def_awaitable!(AwaitableStatus, (), |response| {
     match response {
         Response::Header(ResponseInner::Status {
             status_code,
@@ -125,7 +129,7 @@ def_awaitable!(AwaitableStatus, (), response, {
     }
 });
 
-def_awaitable!(AwaitableHandle, HandleOwned, response, {
+def_awaitable!(AwaitableHandle, HandleOwned, |response| {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Handle(handle) => Ok(handle),
@@ -144,7 +148,7 @@ def_awaitable!(AwaitableHandle, HandleOwned, response, {
     }
 });
 
-def_awaitable!(AwaitableData, Data<Buffer>, response, {
+def_awaitable!(AwaitableData, Data<Buffer>, |response| {
     match response {
         Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
         Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
@@ -161,7 +165,7 @@ def_awaitable!(AwaitableData, Data<Buffer>, response, {
     }
 });
 
-def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, response, {
+def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(name) => Ok(name),
@@ -180,7 +184,7 @@ def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, response, {
     }
 });
 
-def_awaitable!(AwaitableAttrs, FileAttrs, response, {
+def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
     match response {
         Response::Header(response_inner) => match response_inner {
             // use replace to avoid allocation that might occur due to
@@ -201,7 +205,7 @@ def_awaitable!(AwaitableAttrs, FileAttrs, response, {
     }
 });
 
-def_awaitable!(AwaitableName, Name, response, {
+def_awaitable!(AwaitableName, Name, |response| {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(mut names) => {
