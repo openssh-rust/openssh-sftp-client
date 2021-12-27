@@ -22,7 +22,7 @@ thiserror = "1.0.29"
 awaitable = "0.3.0"
 concurrent_arena = "0.1.2"
 
-derive_destructure = "1.0.0"
+derive_destructure2 = "0.0.1"
 
 openssh-sftp-protocol = "0.12.0"
 

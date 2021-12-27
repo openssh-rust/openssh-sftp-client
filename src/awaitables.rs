@@ -16,7 +16,7 @@ use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::response::*;
 use openssh_sftp_protocol::HandleOwned;
 
-use derive_destructure::destructure;
+use derive_destructure2::destructure;
 
 #[derive(Debug, Clone)]
 pub enum Data<Buffer: ToBuffer> {

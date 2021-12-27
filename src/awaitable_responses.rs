@@ -7,7 +7,7 @@ use concurrent_arena::Arena;
 
 use openssh_sftp_protocol::response::ResponseInner;
 
-use derive_destructure::destructure;
+use derive_destructure2::destructure;
 
 #[derive(Debug)]
 pub(crate) enum Response<Buffer: ToBuffer> {
