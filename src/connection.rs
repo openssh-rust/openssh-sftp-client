@@ -341,4 +341,35 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_mkdir() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let dirname = tempdir.path().join("dir");
+
+        // mkdir it
+        let awaitable = write_end
+            .send_mkdir_request(id, Cow::Borrowed(&dirname), FileAttrs::default())
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // Open it
+        assert!(fs::read_dir(&dirname).unwrap().next().is_none());
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
