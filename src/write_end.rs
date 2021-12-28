@@ -115,6 +115,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(arc)
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
@@ -126,6 +129,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_close_request(
         &mut self,
         id: Id<Buffer>,
@@ -137,6 +143,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_read_request(
         &mut self,
         id: Id<Buffer>,
@@ -159,6 +168,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_remove_request(
         &mut self,
         id: Id<Buffer>,
@@ -170,6 +182,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_rename_request(
         &mut self,
         id: Id<Buffer>,
@@ -182,6 +197,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_mkdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -194,6 +212,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_rmdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -205,6 +226,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_opendir_request(
         &mut self,
         id: Id<Buffer>,
@@ -216,6 +240,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_readdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -227,6 +254,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_stat_request(
         &mut self,
         id: Id<Buffer>,
@@ -239,6 +269,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Does not follow symlink
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_lstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -251,6 +285,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Does not follow symlink
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_fstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -262,6 +300,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_setstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -274,6 +315,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_fsetstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -286,6 +330,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_readlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -297,6 +344,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_realpath_request(
         &mut self,
         id: Id<Buffer>,
@@ -309,6 +359,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Create symlink
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -329,6 +383,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Send write requests
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     pub async fn send_write_request(
         &mut self,
         id: Id<Buffer>,
