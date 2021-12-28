@@ -1,0 +1,73 @@
+name: Rust
+
+env:
+  CARGO_TERM_COLOR: always
+
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ github.event.repository.name }}-${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}-v2
+    - name: Run check
+      run: cargo check --all
+  check_format:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check format
+      run: cargo fmt --all -- --check
+  Run_clippy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ github.event.repository.name }}-${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}-v2
+    - name: Run clippy
+      run: cargo clippy --all
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ github.event.repository.name }}-${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}-v2
+    - name: Run tests
+      run: ./run_tests.sh
