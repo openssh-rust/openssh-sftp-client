@@ -454,7 +454,11 @@ mod tests {
                 continue;
             }
 
-            assert!(filename == subdir || filename == file, "{:#?}", filename);
+            assert!(
+                filename == path::Path::new("subdir") || filename == path::Path::new("file"),
+                "{:#?}",
+                filename
+            );
 
             if filename == file {
                 assert_eq!(entry.attrs.get_size().unwrap(), 2000);
