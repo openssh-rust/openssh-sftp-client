@@ -96,7 +96,7 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     // negotiate
     let version = SSH2_FILEXFER_VERSION;
 
-    write_end.send_hello(version, Default::default()).await?;
+    write_end.send_hello(version).await?;
     read_end.receive_server_version(version).await?;
 
     Ok((write_end, read_end))

@@ -9,7 +9,6 @@ use std::path::Path;
 
 use std::sync::Arc;
 
-use openssh_sftp_protocol::extensions::Extensions;
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::serde::Serialize;
@@ -56,16 +55,8 @@ impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
 }
 
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
-    pub(crate) async fn send_hello(
-        &mut self,
-        version: u32,
-        extensions: Extensions,
-    ) -> Result<(), Error> {
-        self.write(Hello {
-            version,
-            extensions,
-        })
-        .await
+    pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
+        self.write(Hello { version }).await
     }
 
     async fn write<T>(&mut self, value: T) -> Result<(), Error>
