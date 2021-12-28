@@ -410,4 +410,64 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_dir_desc() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let dirname = tempdir.path().join("dir");
+
+        let subdir = dirname.join("subdir");
+        fs::DirBuilder::new()
+            .recursive(true)
+            .create(&subdir)
+            .unwrap();
+
+        let file = dirname.join("file");
+        fs::File::create(&file).unwrap().set_len(2000).unwrap();
+
+        // open it
+        let awaitable = write_end
+            .send_opendir_request(id, Cow::Borrowed(&dirname))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, handle) = awaitable.wait().await.unwrap();
+
+        // read it
+        let awaitable = write_end
+            .send_readdir_request(id, Cow::Borrowed(&*handle))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, entries) = awaitable.wait().await.unwrap();
+
+        for entry in entries.iter() {
+            let filename = &*entry.filename;
+
+            if filename == path::Path::new(".") || filename == path::Path::new("..") {
+                continue;
+            }
+
+            assert!(filename == subdir || filename == file, "{:#?}", filename);
+
+            if filename == file {
+                assert_eq!(entry.attrs.get_size().unwrap(), 2000);
+            }
+        }
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
