@@ -122,6 +122,10 @@ mod tests {
 
     use tempfile::{Builder, TempDir};
 
+    fn assert_not_found(err: io::Error) {
+        assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
+    }
+
     fn get_sftp_path() -> &'static path::Path {
         static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
 
@@ -293,7 +297,7 @@ mod tests {
         // Try open it again
         let err = fs::File::open(&filename).unwrap_err();
 
-        assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
+        assert_not_found(err);
 
         drop(id);
         drop(write_end);
@@ -362,6 +366,40 @@ mod tests {
 
         // Open it
         assert!(fs::read_dir(&dirname).unwrap().next().is_none());
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
+
+    #[tokio::test]
+    async fn test_rmdir() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let dirname = tempdir.path().join("dir");
+
+        fs::DirBuilder::new().create(&dirname).unwrap();
+
+        // rmdir it
+        let awaitable = write_end
+            .send_rmdir_request(id, Cow::Borrowed(&dirname))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // Try open it
+        let err = fs::read_dir(&dirname).unwrap_err();
+        assert_not_found(err);
 
         drop(id);
         drop(write_end);
