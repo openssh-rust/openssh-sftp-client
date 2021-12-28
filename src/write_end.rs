@@ -197,6 +197,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// * `attrs` - `attrs.get_size()` must be equal to `None`.
+    ///
     /// # Cancel Safety
     ///
     /// This function is not cancel safe
