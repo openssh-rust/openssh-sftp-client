@@ -12,6 +12,8 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
+use std::path::Path;
+
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::response::*;
 use openssh_sftp_protocol::HandleOwned;
@@ -35,7 +37,7 @@ pub enum Data<Buffer: ToBuffer> {
 
 #[derive(Debug, Clone)]
 pub struct Name {
-    pub filename: Box<str>,
+    pub filename: Box<Path>,
     pub longname: Box<str>,
 }
 
@@ -226,7 +228,7 @@ def_awaitable!(AwaitableName, Name, |response| {
                     let name = &mut names[0];
 
                     Ok(Name {
-                        filename: replace(&mut name.filename, "".into()),
+                        filename: replace(&mut name.filename, Path::new("").into()),
                         longname: replace(&mut name.longname, "".into()),
                     })
                 }
