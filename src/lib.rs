@@ -9,6 +9,24 @@ mod read_end;
 mod write_end;
 mod writer;
 
+/// Default size of buffer for up/download in openssh-portable
+pub const OPENSSH_PORTABLE_DEFAULT_COPY_BUFLEN: usize = 32768;
+
+/// Default number of concurrent outstanding requests in openssh-portable
+pub const OPENSSH_PORTABLE_DEFAULT_NUM_REQUESTS: usize = 64;
+
+/// Minimum amount of data to read at a time in openssh-portable
+pub const OPENSSH_PORTABLE_MIN_READ_SIZE: usize = 512;
+
+/// Maximum depth to descend in directory trees in openssh-portable
+pub const OPENSSH_PORTABLE_MAX_DIR_DEPTH: usize = 64;
+
+/// Default length of download buffer in openssh-portable
+pub const OPENSSH_PORTABLE_DEFAULT_DOWNLOAD_BUFLEN: usize = 20480;
+
+/// Default length of upload buffer in openssh-portable
+pub const OPENSSH_PORTABLE_DEFAULT_UPLOAD_BUFLEN: usize = 20480;
+
 pub use awaitable_responses::Id;
 
 pub use buffer::*;
