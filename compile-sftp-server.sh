@@ -2,7 +2,7 @@
 
 openssh="$(dirname `realpath $0`)/openssh-portable"
 
-rsync -aHAX --inplace --open-noatime --sparse --preallocate  "$openssh/" .
+rsync -aHAX --inplace --sparse --preallocate  "$openssh/" .
 
 if [ ! -e configured ]; then
     autoreconf
