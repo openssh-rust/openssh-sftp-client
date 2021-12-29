@@ -24,7 +24,8 @@ concurrent_arena = "0.1.2"
 
 derive_destructure2 = "0.0.1"
 
-openssh-sftp-protocol = "0.14.0"
+#openssh-sftp-protocol = "0.14.0"
+openssh-sftp-protocol = { git = "https://github.com/NobodyXu/openssh-sftp-protocol" }
 
 tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync"] }
 tokio-io-utility = "0.3.0"
