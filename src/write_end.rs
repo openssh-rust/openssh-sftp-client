@@ -286,6 +286,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// * `handle` - Must be opened with `FileMode::READ`.
+    ///
     /// Does not follow symlink
     ///
     /// # Cancel Safety
@@ -317,6 +319,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// * `handle` - Must be opened with `FileMode::WRITE`.
+    ///
     /// # Cancel Safety
     ///
     /// This function is not cancel safe
