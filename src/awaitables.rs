@@ -35,12 +35,6 @@ pub enum Data<Buffer: ToBuffer> {
     Eof,
 }
 
-#[derive(Debug, Clone)]
-pub struct Name {
-    pub filename: Box<Path>,
-    pub longname: Box<str>,
-}
-
 /// Provides drop impl
 ///
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
@@ -215,7 +209,7 @@ def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
     }
 });
 
-def_awaitable!(AwaitableName, Name, |response| {
+def_awaitable!(AwaitableName, Box<Path>, |response| {
     match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(mut names) => {
@@ -227,10 +221,7 @@ def_awaitable!(AwaitableName, Name, |response| {
                 } else {
                     let name = &mut names[0];
 
-                    Ok(Name {
-                        filename: replace(&mut name.filename, Path::new("").into()),
-                        longname: replace(&mut name.longname, "".into()),
-                    })
+                    Ok(replace(&mut name.filename, Path::new("").into()))
                 }
             }
             ResponseInner::Status {

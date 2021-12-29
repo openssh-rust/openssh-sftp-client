@@ -48,5 +48,5 @@ pub use write_end::*;
 
 pub use awaitables::{
     AwaitableAttrs, AwaitableData, AwaitableHandle, AwaitableName, AwaitableNameEntries,
-    AwaitableStatus, Data, Name,
+    AwaitableStatus, Data,
 };
