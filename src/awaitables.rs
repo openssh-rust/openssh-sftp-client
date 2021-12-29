@@ -193,7 +193,7 @@ def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
         Response::Header(response_inner) => match response_inner {
             // use replace to avoid allocation that might occur due to
             // `FileAttrs::clone`.
-            ResponseInner::Attrs(mut attrs) => Ok(replace(&mut *attrs, FileAttrs::new())),
+            ResponseInner::Attrs(attrs) => Ok(*attrs),
             ResponseInner::Status {
                 status_code: StatusCode::Failure(err_code),
                 err_msg,
