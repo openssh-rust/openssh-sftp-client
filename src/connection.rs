@@ -487,9 +487,12 @@ mod tests {
 
         fs::File::create(&filename).unwrap().set_len(2000).unwrap();
 
+        let linkname = tempdir.path().join("symlink");
+        symlink(&filename, &linkname).unwrap();
+
         // stat
         let awaitable = write_end
-            .send_stat_request(id, Cow::Borrowed(&filename))
+            .send_stat_request(id, Cow::Borrowed(&linkname))
             .await
             .unwrap();
 
