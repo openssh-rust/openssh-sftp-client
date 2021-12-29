@@ -634,4 +634,62 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_fsetstat() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let filename = tempdir.path().join("file");
+
+        fs::File::create(&filename).unwrap().set_len(2000).unwrap();
+
+        // open
+        let awaitable = write_end
+            .send_open_file_request(
+                id,
+                OpenFile::open(Cow::Borrowed(&filename), FileMode::READ | FileMode::WRITE),
+            )
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, handle) = awaitable.wait().await.unwrap();
+
+        // fsetstat
+        let mut fileattrs = FileAttrs::default();
+        fileattrs.set_size(10000);
+
+        let awaitable = write_end
+            .send_fsetstat_request(id, Cow::Borrowed(&handle), fileattrs)
+            .await
+            .unwrap();
+
+        // Error here
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // fstat
+        let awaitable = write_end
+            .send_fstat_request(id, Cow::Borrowed(&handle))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, attrs) = awaitable.wait().await.unwrap();
+
+        assert_eq!(attrs.get_size().unwrap(), 10000);
+        assert_eq!(attrs.get_filetype().unwrap(), FileType::RegularFile);
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
