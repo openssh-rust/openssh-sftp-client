@@ -113,6 +113,7 @@ mod tests {
     use std::env;
     use std::fs;
     use std::io;
+    use std::os::unix::fs::symlink;
     use std::path;
     use std::process::Stdio;
 
@@ -497,6 +498,41 @@ mod tests {
 
         assert_eq!(attrs.get_size().unwrap(), 2000);
         assert_eq!(attrs.get_filetype().unwrap(), FileType::RegularFile);
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
+
+    #[tokio::test]
+    async fn test_lstat() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let filename = tempdir.path().join("file");
+
+        fs::File::create(&filename).unwrap().set_len(2000).unwrap();
+
+        let linkname = tempdir.path().join("symlink");
+        symlink(&filename, &linkname).unwrap();
+
+        // lstat
+        let awaitable = write_end
+            .send_lstat_request(id, Cow::Borrowed(&linkname))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, attrs) = awaitable.wait().await.unwrap();
+
+        assert_eq!(attrs.get_filetype().unwrap(), FileType::Symlink);
 
         drop(id);
         drop(write_end);
