@@ -588,4 +588,50 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_setstat() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let filename = tempdir.path().join("file");
+
+        fs::File::create(&filename).unwrap().set_len(2000).unwrap();
+
+        let mut fileattrs = FileAttrs::default();
+
+        fileattrs.set_size(10000);
+
+        // setstat
+        let awaitable = write_end
+            .send_setstat_request(id, Cow::Borrowed(&filename), fileattrs)
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // stat
+        let awaitable = write_end
+            .send_stat_request(id, Cow::Borrowed(&filename))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, attrs) = awaitable.wait().await.unwrap();
+
+        assert_eq!(attrs.get_size().unwrap(), 10000);
+        assert_eq!(attrs.get_filetype().unwrap(), FileType::RegularFile);
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
