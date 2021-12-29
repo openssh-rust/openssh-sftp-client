@@ -32,7 +32,7 @@ pub use awaitable_responses::Id;
 pub use buffer::*;
 
 pub use openssh_sftp_protocol::file_attrs::{
-    FileAttrs, Permissions, UnixTimeStamp, UnixTimeStampError,
+    FileAttrs, FileType, Permissions, UnixTimeStamp, UnixTimeStampError,
 };
 pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile};
 pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
