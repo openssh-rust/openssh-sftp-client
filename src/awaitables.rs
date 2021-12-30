@@ -128,6 +128,8 @@ def_awaitable!(AwaitableStatus, (), |response| {
         }) => match status_code {
             StatusCode::Success => Ok(()),
             StatusCode::Failure(err_code) => Err(Error::SftpError(err_code, err_msg)),
+
+            StatusCode::Eof => Err(Error::InvalidResponse(&"Expected Status response")),
         },
         _ => Err(Error::InvalidResponse(&"Expected Status response")),
     }
@@ -159,10 +161,12 @@ def_awaitable!(AwaitableData, Data<Buffer>, |response| {
         Response::Header(ResponseInner::Status {
             status_code: StatusCode::Failure(err_code),
             err_msg,
-        }) => match err_code {
-            ErrorCode::Eof => Ok(Data::Eof),
-            _ => Err(Error::SftpError(err_code, err_msg)),
-        },
+        }) => Err(Error::SftpError(err_code, err_msg)),
+
+        Response::Header(ResponseInner::Status {
+            status_code: StatusCode::Eof,
+            ..
+        }) => Ok(Data::Eof),
         _ => Err(Error::InvalidResponse(
             &"Expected Buffer/AllocatedBox response",
         )),
