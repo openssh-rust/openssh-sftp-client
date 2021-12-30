@@ -372,8 +372,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub async fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
-        linkpath: Cow<'_, Path>,
         targetpath: Cow<'_, Path>,
+        linkpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         Ok(AwaitableStatus::new(
             self.send_request(
