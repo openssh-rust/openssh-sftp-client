@@ -182,6 +182,11 @@ def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
                 err_msg,
             } => Err(Error::SftpError(err_code, err_msg)),
 
+            ResponseInner::Status {
+                status_code: StatusCode::Eof,
+                ..
+            } => Ok(Vec::new().into_boxed_slice()),
+
             _ => Err(Error::InvalidResponse(
                 &"Expected Name or err Status response",
             )),
