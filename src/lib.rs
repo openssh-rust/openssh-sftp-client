@@ -34,7 +34,8 @@ pub use buffer::*;
 pub use openssh_sftp_protocol::file_attrs::{
     FileAttrs, FileType, Permissions, UnixTimeStamp, UnixTimeStampError,
 };
-pub use openssh_sftp_protocol::request::{CreateFlags, FileMode, OpenFile};
+pub use openssh_sftp_protocol::open_options::{CreateFlags, OpenOptions};
+pub use openssh_sftp_protocol::request::OpenFile;
 pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
 pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
 pub use openssh_sftp_protocol::response::NameEntry;

@@ -207,10 +207,9 @@ mod tests {
         let awaitable = write_end
             .send_open_file_request(
                 id,
-                OpenFile::create(
-                    (&filename).into(),
-                    FileMode::READ | FileMode::WRITE,
-                    CreateFlags::EXCL,
+                OpenOptions::new().read(true).write(true).create(
+                    Cow::Borrowed(&filename),
+                    CreateFlags::Excl,
                     file_attrs,
                 ),
             )
@@ -244,7 +243,7 @@ mod tests {
 
         // Open it again and read from it
         let awaitable = write_end
-            .send_open_file_request(id, OpenFile::open((&filename).into(), FileMode::READ))
+            .send_open_file_request(id, OpenFile::open(Cow::Borrowed(&filename)))
             .await
             .unwrap();
 
@@ -560,7 +559,7 @@ mod tests {
 
         // open
         let awaitable = write_end
-            .send_open_file_request(id, OpenFile::open(Cow::Borrowed(&filename), FileMode::READ))
+            .send_open_file_request(id, OpenFile::open(Cow::Borrowed(&filename)))
             .await
             .unwrap();
 
@@ -650,7 +649,10 @@ mod tests {
         let awaitable = write_end
             .send_open_file_request(
                 id,
-                OpenFile::open(Cow::Borrowed(&filename), FileMode::READ | FileMode::WRITE),
+                OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(Cow::Borrowed(&filename)),
             )
             .await
             .unwrap();
