@@ -2,6 +2,7 @@ use super::awaitable_responses::ArenaArc;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
 use super::Error;
+use super::Extensions;
 use super::ToBuffer;
 
 use core::fmt::Debug;
@@ -32,7 +33,10 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         }
     }
 
-    pub(crate) async fn receive_server_version(&mut self, version: u32) -> Result<(), Error> {
+    pub(crate) async fn receive_server_version(
+        &mut self,
+        version: u32,
+    ) -> Result<Extensions, Error> {
         // Receive server version
         let len: u32 = self.read_and_deserialize(4).await?;
         self.read_exact(len as usize).await?;
@@ -43,7 +47,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
                 version: server_version.version,
             })
         } else {
-            Ok(())
+            Ok(server_version.extensions)
         }
     }
 

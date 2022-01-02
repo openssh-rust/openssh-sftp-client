@@ -36,9 +36,9 @@ pub use openssh_sftp_protocol::file_attrs::{
 };
 pub use openssh_sftp_protocol::open_options::{CreateFlags, OpenOptions};
 pub use openssh_sftp_protocol::request::OpenFile;
-pub use openssh_sftp_protocol::response::ErrMsg as SftpErrMsg;
-pub use openssh_sftp_protocol::response::ErrorCode as SftpErrorKind;
-pub use openssh_sftp_protocol::response::NameEntry;
+pub use openssh_sftp_protocol::response::{
+    ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, Extensions, NameEntry,
+};
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
 pub use connection::connect;

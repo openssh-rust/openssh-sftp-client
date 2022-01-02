@@ -81,7 +81,7 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
 pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     reader: PipeRead,
     writer: PipeWrite,
-) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>), Error> {
+) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>, Extensions), Error> {
     let shared_data = Arc::new(SharedData {
         writer: Writer::new(writer),
         responses: AwaitableResponses::new(),
@@ -97,9 +97,9 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     let version = SSH2_FILEXFER_VERSION;
 
     write_end.send_hello(version).await?;
-    read_end.receive_server_version(version).await?;
+    let extensions = read_end.receive_server_version(version).await?;
 
-    Ok((write_end, read_end))
+    Ok((write_end, read_end, extensions))
 }
 
 #[cfg(test)]
@@ -157,13 +157,23 @@ mod tests {
         (child, stdin, stdout)
     }
 
-    async fn connect() -> (WriteEnd<Vec<u8>>, ReadEnd<Vec<u8>>, process::Child) {
+    async fn connect_with_extensions() -> (
+        WriteEnd<Vec<u8>>,
+        ReadEnd<Vec<u8>>,
+        process::Child,
+        Extensions,
+    ) {
         let (child, stdin, stdout) = launch_sftp().await;
 
         let stdout = child_stdout_to_pipewrite(stdout).unwrap();
         let stdin = child_stdin_to_pipewrite(stdin).unwrap();
 
-        let (write_end, read_end) = crate::connect(stdout, stdin).await.unwrap();
+        let (write_end, read_end, extensions) = crate::connect(stdout, stdin).await.unwrap();
+        (write_end, read_end, child, extensions)
+    }
+
+    async fn connect() -> (WriteEnd<Vec<u8>>, ReadEnd<Vec<u8>>, process::Child) {
+        let (write_end, read_end, child, _extensions) = connect_with_extensions().await;
         (write_end, read_end, child)
     }
 
