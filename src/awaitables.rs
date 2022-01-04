@@ -135,19 +135,22 @@ def_awaitable!(AwaitableStatus, (), |response| {
     }
 });
 
-def_awaitable!(AwaitableHandle, HandleOwned, |response| {
+fn propagate_error<Buffer: ToBuffer>(
+    response: Response<Buffer>,
+) -> Result<Response<Buffer>, Error> {
     match response {
-        Response::Header(response_inner) => match response_inner {
-            ResponseInner::Handle(handle) => Ok(handle),
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
+        Response::Header(ResponseInner::Status {
+            status_code: StatusCode::Failure(err_code),
+            err_msg,
+        }) => Err(Error::SftpError(err_code, err_msg)),
 
-            _ => Err(Error::InvalidResponse(
-                &"Expected Handle or err Status response",
-            )),
-        },
+        response => Ok(response),
+    }
+}
+
+def_awaitable!(AwaitableHandle, HandleOwned, |response| {
+    match propagate_error(response)? {
+        Response::Header(ResponseInner::Handle(handle)) => Ok(handle),
         _ => Err(Error::InvalidResponse(
             &"Expected Handle or err Status response",
         )),
@@ -198,20 +201,8 @@ def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
 });
 
 def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            // use replace to avoid allocation that might occur due to
-            // `FileAttrs::clone`.
-            ResponseInner::Attrs(attrs) => Ok(*attrs),
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
-            _ => Err(Error::InvalidResponse(
-                &"Expected Attrs or err Status response",
-            )),
-        },
+    match propagate_error(response)? {
+        Response::Header(ResponseInner::Attrs(attrs)) => Ok(*attrs),
         _ => Err(Error::InvalidResponse(
             &"Expected Attrs or err Status response",
         )),
@@ -219,29 +210,19 @@ def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
 });
 
 def_awaitable!(AwaitableName, Box<Path>, |response| {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            ResponseInner::Name(mut names) => {
-                if names.len() != 1 {
-                    Err(Error::InvalidResponse(
-                        &"Got expected Name response, but it does not have exactly \
+    match propagate_error(response)? {
+        Response::Header(ResponseInner::Name(mut names)) => {
+            if names.len() != 1 {
+                Err(Error::InvalidResponse(
+                    &"Got expected Name response, but it does not have exactly \
                         one and only one entry",
-                    ))
-                } else {
-                    let name = &mut names[0];
+                ))
+            } else {
+                let name = &mut names[0];
 
-                    Ok(replace(&mut name.filename, Path::new("").into()))
-                }
+                Ok(replace(&mut name.filename, Path::new("").into()))
             }
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
-            _ => Err(Error::InvalidResponse(
-                &"Expected Name or err Status response",
-            )),
-        },
+        }
         _ => Err(Error::InvalidResponse(
             &"Expected Name or err Status response",
         )),
