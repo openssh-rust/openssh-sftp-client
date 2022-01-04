@@ -120,21 +120,6 @@ macro_rules! def_awaitable {
     };
 }
 
-def_awaitable!(AwaitableStatus, (), |response| {
-    match response {
-        Response::Header(ResponseInner::Status {
-            status_code,
-            err_msg,
-        }) => match status_code {
-            StatusCode::Success => Ok(()),
-            StatusCode::Failure(err_code) => Err(Error::SftpError(err_code, err_msg)),
-
-            StatusCode::Eof => Err(Error::InvalidResponse(&"Expected Status response")),
-        },
-        _ => Err(Error::InvalidResponse(&"Expected Status response")),
-    }
-});
-
 fn propagate_error<Buffer: ToBuffer>(
     response: Response<Buffer>,
 ) -> Result<Response<Buffer>, Error> {
@@ -147,6 +132,16 @@ fn propagate_error<Buffer: ToBuffer>(
         response => Ok(response),
     }
 }
+
+def_awaitable!(AwaitableStatus, (), |response| {
+    match propagate_error(response)? {
+        Response::Header(ResponseInner::Status {
+            status_code: StatusCode::Success,
+            ..
+        }) => Ok(()),
+        _ => Err(Error::InvalidResponse(&"Expected Status response")),
+    }
+});
 
 def_awaitable!(AwaitableHandle, HandleOwned, |response| {
     match propagate_error(response)? {
