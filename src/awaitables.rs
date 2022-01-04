@@ -158,14 +158,9 @@ def_awaitable!(AwaitableHandle, HandleOwned, |response| {
 });
 
 def_awaitable!(AwaitableData, Data<Buffer>, |response| {
-    match response {
+    match propagate_error(response)? {
         Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
         Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
-        Response::Header(ResponseInner::Status {
-            status_code: StatusCode::Failure(err_code),
-            err_msg,
-        }) => Err(Error::SftpError(err_code, err_msg)),
-
         Response::Header(ResponseInner::Status {
             status_code: StatusCode::Eof,
             ..
