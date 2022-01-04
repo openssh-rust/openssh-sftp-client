@@ -112,6 +112,8 @@ macro_rules! def_awaitable {
                     .take_output()
                     .expect("The request should be done by now");
 
+                let id = Id::new(self.0.into_inner());
+
                 // Propagate failure
                 let response = match response {
                     Response::Header(ResponseInner::Status {
@@ -124,7 +126,7 @@ macro_rules! def_awaitable {
 
                 let res = post_processing(response)?;
 
-                Ok((Id::new(self.0.into_inner()), res))
+                Ok((id, res))
             }
         }
     };
