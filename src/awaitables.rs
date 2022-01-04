@@ -112,6 +112,16 @@ macro_rules! def_awaitable {
                     .take_output()
                     .expect("The request should be done by now");
 
+                // Propagate failure
+                let response = match response {
+                    Response::Header(ResponseInner::Status {
+                        status_code: StatusCode::Failure(err_code),
+                        err_msg,
+                    }) => return Err(Error::SftpError(err_code, err_msg)),
+
+                    response => response,
+                };
+
                 let res = post_processing(response)?;
 
                 Ok((Id::new(self.0.into_inner()), res))
@@ -120,21 +130,8 @@ macro_rules! def_awaitable {
     };
 }
 
-fn propagate_error<Buffer: ToBuffer>(
-    response: Response<Buffer>,
-) -> Result<Response<Buffer>, Error> {
-    match response {
-        Response::Header(ResponseInner::Status {
-            status_code: StatusCode::Failure(err_code),
-            err_msg,
-        }) => Err(Error::SftpError(err_code, err_msg)),
-
-        response => Ok(response),
-    }
-}
-
 def_awaitable!(AwaitableStatus, (), |response| {
-    match propagate_error(response)? {
+    match response {
         Response::Header(ResponseInner::Status {
             status_code: StatusCode::Success,
             ..
@@ -144,7 +141,7 @@ def_awaitable!(AwaitableStatus, (), |response| {
 });
 
 def_awaitable!(AwaitableHandle, HandleOwned, |response| {
-    match propagate_error(response)? {
+    match response {
         Response::Header(ResponseInner::Handle(handle)) => Ok(handle),
         _ => Err(Error::InvalidResponse(
             &"Expected Handle or err Status response",
@@ -153,7 +150,7 @@ def_awaitable!(AwaitableHandle, HandleOwned, |response| {
 });
 
 def_awaitable!(AwaitableData, Data<Buffer>, |response| {
-    match propagate_error(response)? {
+    match response {
         Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
         Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
         Response::Header(ResponseInner::Status {
@@ -167,7 +164,7 @@ def_awaitable!(AwaitableData, Data<Buffer>, |response| {
 });
 
 def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
-    match propagate_error(response)? {
+    match response {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(name) => Ok(name),
             ResponseInner::Status {
@@ -186,7 +183,7 @@ def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
 });
 
 def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
-    match propagate_error(response)? {
+    match response {
         Response::Header(ResponseInner::Attrs(attrs)) => Ok(*attrs),
         _ => Err(Error::InvalidResponse(
             &"Expected Attrs or err Status response",
@@ -195,7 +192,7 @@ def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
 });
 
 def_awaitable!(AwaitableName, Box<Path>, |response| {
-    match propagate_error(response)? {
+    match response {
         Response::Header(ResponseInner::Name(mut names)) => {
             if names.len() != 1 {
                 Err(Error::InvalidResponse(
