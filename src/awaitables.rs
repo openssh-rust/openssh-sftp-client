@@ -172,14 +172,9 @@ def_awaitable!(AwaitableData, Data<Buffer>, |response| {
 });
 
 def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
-    match response {
+    match propagate_error(response)? {
         Response::Header(response_inner) => match response_inner {
             ResponseInner::Name(name) => Ok(name),
-            ResponseInner::Status {
-                status_code: StatusCode::Failure(err_code),
-                err_msg,
-            } => Err(Error::SftpError(err_code, err_msg)),
-
             ResponseInner::Status {
                 status_code: StatusCode::Eof,
                 ..
