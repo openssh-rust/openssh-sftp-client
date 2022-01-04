@@ -63,23 +63,19 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 }
 
 #[derive(Debug, destructure)]
-struct IdInner<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
-
-impl<Buffer: ToBuffer + Send + Sync> Drop for IdInner<Buffer> {
-    fn drop(&mut self) {
-        ArenaArc::remove(&self.0);
-    }
-}
-
-#[derive(Debug)]
-pub struct Id<Buffer: ToBuffer + Send + Sync>(IdInner<Buffer>);
+pub struct Id<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
-        Id(IdInner(arc))
+        Id(arc)
     }
 
     pub(crate) fn into_inner(self) -> ArenaArc<Buffer> {
-        self.0.destructure().0
+        self.destructure().0
+    }
+}
+impl<Buffer: ToBuffer + Send + Sync> Drop for Id<Buffer> {
+    fn drop(&mut self) {
+        ArenaArc::remove(&self.0);
     }
 }
