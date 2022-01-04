@@ -37,7 +37,7 @@ pub use openssh_sftp_protocol::file_attrs::{
 pub use openssh_sftp_protocol::open_options::{CreateFlags, OpenOptions};
 pub use openssh_sftp_protocol::request::OpenFile;
 pub use openssh_sftp_protocol::response::{
-    ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, Extensions, NameEntry,
+    ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, Extensions, Limits, NameEntry,
 };
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
@@ -47,6 +47,6 @@ pub use read_end::ReadEnd;
 pub use write_end::*;
 
 pub use awaitables::{
-    AwaitableAttrs, AwaitableData, AwaitableHandle, AwaitableName, AwaitableNameEntries,
-    AwaitableStatus, Data,
+    AwaitableAttrs, AwaitableData, AwaitableHandle, AwaitableLimits, AwaitableName,
+    AwaitableNameEntries, AwaitableStatus, Data,
 };

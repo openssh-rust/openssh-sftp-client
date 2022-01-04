@@ -16,6 +16,7 @@ use std::path::Path;
 
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::response::*;
+use openssh_sftp_protocol::ssh_format;
 use openssh_sftp_protocol::HandleOwned;
 
 use derive_destructure2::destructure;
@@ -102,7 +103,7 @@ macro_rules! def_awaitable {
             ///
             /// id can be reused in the next request.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                let post_processing = |$response_name| $post_processing;
+                let post_processing = |$response_name: Response<Buffer>| $post_processing;
 
                 self.0.wait().await;
 
@@ -210,5 +211,12 @@ def_awaitable!(AwaitableName, Box<Path>, |response| {
         _ => Err(Error::InvalidResponse(
             &"Expected Name or err Status response",
         )),
+    }
+});
+
+def_awaitable!(AwaitableLimits, Limits, |response| {
+    match response {
+        Response::AllocatedBox(boxed) => Ok(ssh_format::from_bytes(&boxed)?.0),
+        _ => Err(Error::InvalidResponse(&"Expected Buffer response")),
     }
 });
