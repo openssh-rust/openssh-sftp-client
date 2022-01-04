@@ -147,7 +147,9 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
             }
         };
 
-        let response = if response::Response::is_data(packet_type) {
+        let response = if response::Response::is_data(packet_type)
+            || response::Response::is_extended_reply(packet_type)
+        {
             let buffer = match callback.take_input() {
                 Ok(buffer) => buffer,
                 Err(err) => {
