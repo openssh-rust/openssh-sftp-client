@@ -422,4 +422,22 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         Ok(AwaitableStatus::new(arc))
     }
+
+    /// Return limits of the server
+    ///
+    /// # Precondition
+    ///
+    /// Requires `Extensions::limits` to be true.
+    ///
+    /// # Cancel safety
+    ///
+    /// This function is not cancel safe
+    pub async fn send_limits_request(
+        &mut self,
+        id: Id<Buffer>,
+    ) -> Result<AwaitableLimits<Buffer>, Error> {
+        Ok(AwaitableLimits::new(
+            self.send_request(id, RequestInner::Limits, None).await?,
+        ))
+    }
 }
