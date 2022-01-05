@@ -440,4 +440,28 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             self.send_request(id, RequestInner::Limits, None).await?,
         ))
     }
+
+    /// This supports canonicalisation of relative paths and those that need
+    /// tilde-expansion, i.e. "~", "~/..." and "~user/...".
+    ///
+    /// These paths are expanded using shell-lilke rules and the resultant path
+    /// is canonicalised similarly to [`WriteEnd::send_realpath_request`].
+    ///
+    /// # Precondition
+    ///
+    /// Requires `Extensions::expand_path` to be true.
+    ///
+    /// # Cancel safety
+    ///
+    /// This function is not cancel safe
+    pub async fn send_expand_path_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableName<Buffer>, Error> {
+        Ok(AwaitableName::new(
+            self.send_request(id, RequestInner::ExpandPath(path), None)
+                .await?,
+        ))
+    }
 }
