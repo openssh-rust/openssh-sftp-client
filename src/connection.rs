@@ -811,4 +811,28 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_limits() {
+        let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+
+        let id = write_end.create_response_id();
+
+        assert!(extensions.limits);
+        let awaitable = write_end.send_limits_request(id).await.unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, limits) = awaitable.wait().await.unwrap();
+
+        eprintln!("{:#?}", limits);
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
