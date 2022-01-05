@@ -127,6 +127,14 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         Ok(Response::Header(response.response_inner))
     }
 
+    /// * `len` - excludes packet_type and request_id.
+    async fn read_in_extended_reply(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
+        let mut vec = Vec::new();
+        read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
+
+        Ok(Response::AllocatedBox(vec.into_boxed_slice()))
+    }
+
     /// Precondition: `self.wait_for_new_request()` must not be 0.
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
         let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
@@ -147,9 +155,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
             }
         };
 
-        let response = if response::Response::is_data(packet_type)
-            || response::Response::is_extended_reply(packet_type)
-        {
+        let response = if response::Response::is_data(packet_type) {
             let buffer = match callback.take_input() {
                 Ok(buffer) => buffer,
                 Err(err) => {
@@ -164,6 +170,8 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
                 }
             };
             self.read_in_data_packet(len, buffer).await?
+        } else if response::Response::is_extended_reply(packet_type) {
+            self.read_in_extended_reply(len).await?
         } else {
             self.read_in_packet(len).await?
         };
