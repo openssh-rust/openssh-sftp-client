@@ -464,4 +464,22 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
                 .await?,
         ))
     }
+
+    /// # Precondition
+    ///
+    /// Requires `Extensions::fsync` to be true.
+    ///
+    /// # Cancel safety
+    ///
+    /// This function is not cancel safe
+    pub async fn send_fsync_request(
+        &mut self,
+        id: Id<Buffer>,
+        handle: &[u8],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus::new(
+            self.send_request(id, RequestInner::Fsync(Cow::Borrowed(handle)), None)
+                .await?,
+        ))
+    }
 }
