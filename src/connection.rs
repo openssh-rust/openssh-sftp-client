@@ -835,4 +835,35 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_expand_path() {
+        let home: path::PathBuf = env::var("HOME").unwrap().into();
+
+        env::set_current_dir(&home).unwrap();
+
+        let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+
+        let id = write_end.create_response_id();
+
+        assert!(extensions.expand_path);
+        let awaitable = write_end
+            .send_expand_path_request(id, Cow::Borrowed(path::Path::new("~")))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, expanded_path) = awaitable.wait().await.unwrap();
+
+        assert_eq!(&*expanded_path, &*home);
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
