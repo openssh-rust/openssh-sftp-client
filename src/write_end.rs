@@ -482,4 +482,23 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
                 .await?,
         ))
     }
+
+    /// # Precondition
+    ///
+    /// Requires `Extensions::hardlink` to be true.
+    ///
+    /// # Cancel safety
+    ///
+    /// This function is not cancel safe
+    pub async fn send_hardlink_requst(
+        &mut self,
+        id: Id<Buffer>,
+        oldpath: Cow<'_, Path>,
+        newpath: Cow<'_, Path>,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        Ok(AwaitableStatus::new(
+            self.send_request(id, RequestInner::HardLink { oldpath, newpath }, None)
+                .await?,
+        ))
+    }
 }
