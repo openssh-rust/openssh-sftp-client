@@ -909,4 +909,44 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_hardlink() {
+        let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+        assert!(extensions.hardlink);
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let filename = tempdir.path().join("file");
+        fs::File::create(&filename).unwrap().set_len(2000).unwrap();
+
+        // hardlink it
+        let new_filename = tempdir.path().join("file2");
+
+        let awaitable = write_end
+            .send_hardlink_requst(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // Open the new name and old name again
+        for name in [filename, new_filename] {
+            let metadata = fs::File::open(name).unwrap().metadata().unwrap();
+
+            assert!(metadata.is_file());
+            assert_eq!(metadata.len(), 2000);
+        }
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
