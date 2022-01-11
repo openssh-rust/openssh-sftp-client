@@ -178,8 +178,11 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
         let res = callback.done(response);
 
-        // NOTE that if the arc is dropped after this call, then the callback
+        // NOTE that if the arc is dropped after this call while having the
+        // `Awaitable*::drop` executed before `callback.done`, then the callback
         // would not be removed.
+        //
+        // Though this kind of situation is rare.
         if ArenaArc::strong_count(&callback) == 2 {
             ArenaArc::remove(&callback);
         }
