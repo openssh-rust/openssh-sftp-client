@@ -866,4 +866,47 @@ mod tests {
 
         assert!(child.wait().await.unwrap().success());
     }
+
+    #[tokio::test]
+    async fn test_fsync() {
+        let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+        assert!(extensions.fsync);
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+        let filename = tempdir.path().join("file");
+
+        fs::File::create(&filename).unwrap().set_len(2000).unwrap();
+
+        // open
+        let awaitable = write_end
+            .send_open_file_request(
+                id,
+                OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(Cow::Borrowed(&filename)),
+            )
+            .await
+            .unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let (id, handle) = awaitable.wait().await.unwrap();
+
+        // fsync
+        let awaitable = write_end.send_fsync_request(id, &handle).await.unwrap();
+
+        read_one_packet(&mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
 }
