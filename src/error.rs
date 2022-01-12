@@ -11,7 +11,7 @@ pub use openssh_sftp_protocol::response::ResponseInner;
 #[derive(Debug, Error)]
 pub enum Error {
     /// Server speaks sftp protocol other than protocol 3.
-    #[error("Server speaks sftp protocol {version} other than protocol 3.")]
+    #[error("Server does not support sftp protocol v3: It only support sftp protocol newer than {version}.")]
     UnsupportedSftpProtocol {
         /// The minimal sftp protocol version the server supported.
         version: u32,
