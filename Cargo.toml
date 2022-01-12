@@ -26,7 +26,10 @@ derive_destructure2 = "0.0.1"
 
 openssh-sftp-protocol = "0.16.0"
 
+# Since concurrent_arena uses dependency parking_lot anyway,
+# enabling feature parking_lot on tokio does not pull in any new dependency.
 tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync"] }
+
 tokio-io-utility = "0.3.0"
 tokio-pipe = "0.2.8"
 
@@ -34,6 +37,7 @@ tokio-pipe = "0.2.8"
 tokio = { version = "1.11.0", features = ["rt", "macros", "process"] }
 once_cell = "1.8.0"
 tempfile = "3.1.0"
+
 # Since openssh-sftp-client forbids unsafe code, I have
 # to put these code in another workspace.
 child_io_to_pipe = { path = "child_io_to_pipe" }
