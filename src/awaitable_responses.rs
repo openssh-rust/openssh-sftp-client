@@ -26,8 +26,8 @@ pub(crate) enum Response<Buffer: ToBuffer> {
 pub(crate) type Awaitable<Buffer> = awaitable::Awaitable<Buffer, Response<Buffer>>;
 
 /// BITARRAY_LEN must be LEN / usize::BITS and LEN must be divisble by usize::BITS.
-const BITARRAY_LEN: usize = 1;
-const LEN: usize = 64;
+const BITARRAY_LEN: usize = 2;
+const LEN: usize = 128;
 
 pub(crate) type ArenaArc<Buffer> = concurrent_arena::ArenaArc<Awaitable<Buffer>, BITARRAY_LEN, LEN>;
 
