@@ -76,11 +76,15 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         Ok(())
     }
 
-    async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
+    async fn read_into_vec(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
         let mut vec = Vec::new();
         read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
 
         Ok(Response::AllocatedBox(vec.into_boxed_slice()))
+    }
+
+    async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
+        self.read_into_vec(len).await
     }
 
     /// * `len` - excludes packet_type and request_id.
@@ -129,10 +133,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
     /// * `len` - excludes packet_type and request_id.
     async fn read_in_extended_reply(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
-        let mut vec = Vec::new();
-        read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
-
-        Ok(Response::AllocatedBox(vec.into_boxed_slice()))
+        self.read_into_vec(len).await
     }
 
     /// Precondition: `self.wait_for_new_request()` must not be 0.
