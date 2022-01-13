@@ -114,6 +114,8 @@ macro_rules! def_awaitable {
                     .take_output()
                     .expect("The request should be done by now");
 
+                // Reconstruct Id here so that it will be automatically
+                // released on error.
                 let id = Id::new(self.0.into_inner());
 
                 // Propagate failure
