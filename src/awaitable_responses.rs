@@ -67,7 +67,7 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 }
 
 #[derive(Debug, destructure)]
-pub struct Id<Buffer: ToBuffer + Send + Sync>(ArenaArc<Buffer>);
+pub struct Id<Buffer: ToBuffer + Send + Sync>(pub(crate) ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {

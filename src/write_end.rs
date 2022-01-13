@@ -410,17 +410,17 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         offset: u64,
         data: &[u8],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        // Call id.into_inner to prevent id from being removed
-        // if the future is cancelled.
-        let arc = id.into_inner();
-
         let header = Request::serialize_write_request(
             &mut self.serializer,
-            ArenaArc::slot(&arc),
+            ArenaArc::slot(&id.0),
             handle,
             offset,
             data.len().try_into()?,
         )?;
+
+        // Call id.into_inner to prevent id from being removed
+        // if the future is cancelled.
+        let arc = id.into_inner();
 
         arc.reset(None);
         self.shared_data
