@@ -78,6 +78,8 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
     }
 }
 
+/// Initialize connection to remote sftp server and
+/// negotiate the sftp version.
 pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     reader: PipeRead,
     writer: PipeWrite,
