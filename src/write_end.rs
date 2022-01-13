@@ -21,7 +21,7 @@ use std::io::IoSlice;
 //  - Support IoSlice for data in `send_write_request`
 
 /// It is recommended to create at most one `WriteEnd` per thread
-/// using `WriteEnd::clone`.
+/// using [`WriteEnd::clone`].
 #[derive(Debug)]
 pub struct WriteEnd<Buffer: ToBuffer + 'static> {
     serializer: Serializer,
@@ -144,6 +144,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// - `buffer` - If set to `None` or the buffer is not long enough,
+    ///   then `Data::AllocatedBox` will be returned.
+    ///   Return `Data::Buffer` if not EOF, otherwise returns `Data::EOF`.
+    ///
     /// # Cancel Safety
     ///
     /// This function is not cancel safe
@@ -325,7 +329,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
-    /// * `handle` - Must be opened with `FileMode::WRITE`.
+    /// * `handle` - Must be opened with `OpenOptions::write` set.
     ///
     /// # Cancel Safety
     ///
@@ -433,7 +437,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Precondition
     ///
-    /// Requires `Extensions::limits` to be true.
+    /// Requires [`Extensions::limits`] to be true.
     ///
     /// # Cancel safety
     ///
@@ -455,7 +459,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Precondition
     ///
-    /// Requires `Extensions::expand_path` to be true.
+    /// Requires [`Extensions::expand_path`] to be true.
     ///
     /// # Cancel safety
     ///
@@ -473,7 +477,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Precondition
     ///
-    /// Requires `Extensions::fsync` to be true.
+    /// Requires [`Extensions::fsync`] to be true.
     ///
     /// # Cancel safety
     ///
@@ -491,7 +495,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Precondition
     ///
-    /// Requires `Extensions::hardlink` to be true.
+    /// Requires [`Extensions::hardlink`] to be true.
     ///
     /// # Cancel safety
     ///
@@ -510,7 +514,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Precondition
     ///
-    /// Requires `Extensions::posix_rename` to be true.
+    /// Requires [`Extensions::posix_rename`] to be true.
     ///
     /// # Cancel safety
     ///
