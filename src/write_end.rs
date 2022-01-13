@@ -75,18 +75,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(serializer.get_output()?)
     }
 
-    async fn write<T>(&mut self, value: T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        self.shared_data
-            .writer
-            .write_all(Self::serialize(&mut self.serializer, value)?)
-            .await?;
-
-        Ok(())
-    }
-
     /// Create a useable response id.
     pub fn create_response_id(&self) -> Id<Buffer> {
         self.shared_data.responses.insert()
