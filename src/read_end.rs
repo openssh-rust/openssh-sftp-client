@@ -94,7 +94,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         buffer: Option<Buffer>,
     ) -> Result<Response<Buffer>, Error> {
         // Since the data is sent as a string, we need to consume the 4-byte length first.
-        copy(&mut (&mut self.reader).take(4), &mut sink()).await?;
+        self.reader.read_exact(&mut [0; 4]).await?;
 
         let len = len - 4;
 
