@@ -92,7 +92,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// Send requests.
     ///
-    /// **Please use `Self::send_write_request` for sending write requests.**
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe
     async fn send_request(
         &mut self,
         id: Id<Buffer>,
