@@ -26,10 +26,10 @@ pub enum Data<Buffer: ToBuffer> {
     /// The buffer that stores the response of Read.
     ///
     /// It will be returned if you provided a buffer to
-    /// `crate::WriteEnd::send_read_request`.
+    /// [`crate::WriteEnd::send_read_request`].
     Buffer(Buffer),
 
-    /// Same as `Buffer`, this is a fallback
+    /// This is a fallback that is returned
     /// if `Buffer` isn't provided or it isn't large enough.
     AllocatedBox(Box<[u8]>),
 
