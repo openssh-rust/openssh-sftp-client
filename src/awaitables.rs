@@ -23,9 +23,10 @@ use derive_destructure2::destructure;
 
 #[derive(Debug, Clone)]
 pub enum Data<Buffer: ToBuffer> {
-    /// The buffer that stores the response of Read,
-    /// since its corresponding response type `ResponseInner::Data`
-    /// does not contain any member, it doesn't have to be stored.
+    /// The buffer that stores the response of Read.
+    ///
+    /// It will be returned if you provided a buffer to
+    /// `crate::WriteEnd::send_read_request`.
     Buffer(Buffer),
 
     /// Same as `Buffer`, this is a fallback
