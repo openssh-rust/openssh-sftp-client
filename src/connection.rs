@@ -12,8 +12,8 @@ use tokio_pipe::{PipeRead, PipeWrite};
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
-/// TODO:
-///  - Support for zero copy API
+// TODO:
+//  - Support for zero copy API
 
 /// SharedData contains both the writer and the responses because:
 ///  - The overhead of `Arc` and a separate allocation;
