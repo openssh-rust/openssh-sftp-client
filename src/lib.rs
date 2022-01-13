@@ -10,11 +10,11 @@
 //!
 //! This crate supports all operations supported by sftp v3, in additional to
 //! the following extensions:
-//!  - `WriteEnd::send_limits_request`
-//!  - `WriteEnd::send_expand_path_request`
-//!  - `WriteEnd::send_fsync_request`
-//!  - `WriteEnd::send_hardlink_requst`
-//!  - `WriteEnd::send_posix_rename_request`
+//!  - [`WriteEnd::send_limits_request`]
+//!  - [`WriteEnd::send_expand_path_request`]
+//!  - [`WriteEnd::send_fsync_request`]
+//!  - [`WriteEnd::send_hardlink_requst`]
+//!  - [`WriteEnd::send_posix_rename_request`]
 
 #![forbid(unsafe_code)]
 
