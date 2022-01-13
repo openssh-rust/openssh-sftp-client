@@ -29,13 +29,13 @@ pub enum Error {
     #[error("Error when waiting for response: {0}.")]
     AwaitableError(#[from] awaitable::Error),
 
-    /// Sftp protocol can only send and receive at most u32::MAX data in one request.
+    /// Sftp protocol can only send and receive at most [`u32::MAX`] data in one request.
     #[error("Sftp protocol can only send and receive at most u32::MAX data in one request.")]
     BufferTooLong(#[from] TryFromIntError),
 
     /// The response id is invalid.
     ///
-    /// The user of `Connection` can choose to log this error and continue operation.
+    /// The user can choose to log this error and continue operation.
     #[error("The response id {response_id} is invalid.")]
     InvalidResponseId { response_id: u32 },
 
@@ -48,8 +48,9 @@ pub enum Error {
     SftpError(SftpErrorKind, SftpErrMsg),
 
     /// Invalid response from the sftp-server
-    ///
-    /// Use &&str since &str takes 16 bytes while &str only takes 8 bytes.
     #[error("Response from sftp server is invalid: {0}")]
-    InvalidResponse(&'static &'static str),
+    InvalidResponse(
+        // Use `&&str` since `&str` takes 16 bytes while `&str` only takes 8 bytes.
+        &'static &'static str,
+    ),
 }
