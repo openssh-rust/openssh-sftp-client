@@ -22,6 +22,9 @@ pub(crate) enum Response<Buffer: ToBuffer> {
     /// This is a fallback that is returned
     /// if `Buffer` isn't provided or it isn't large enough.
     AllocatedBox(Box<[u8]>),
+
+    /// Extended reply
+    ExtendedReply(Box<[u8]>),
 }
 
 pub(crate) type Awaitable<Buffer> = awaitable::Awaitable<Buffer, Response<Buffer>>;

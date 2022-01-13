@@ -217,7 +217,7 @@ def_awaitable!(AwaitableName, Box<Path>, |response| {
 
 def_awaitable!(AwaitableLimits, Limits, |response| {
     match response {
-        Response::AllocatedBox(boxed) => Ok(ssh_format::from_bytes(&boxed)?.0),
+        Response::ExtendedReply(boxed) => Ok(ssh_format::from_bytes(&boxed)?.0),
         _ => Err(Error::InvalidResponse(&"Expected Buffer response")),
     }
 });
