@@ -137,6 +137,24 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     }
 
     /// Precondition: `self.wait_for_new_request()` must not be 0.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let readend = ...;
+    /// loop {
+    ///     let new_requests_submit = readend.wait_for_new_request().await;
+    ///     if new_requests_submit == 0 {
+    ///         break;
+    ///     }
+    ///
+    ///     // If attempt to read in more than new_requests_submit, then
+    ///     // `read_in_one_packet` might block forever.
+    ///     for _ in 0..new_requests_submit {
+    ///         readend.read_in_one_packet().await.unwrap();
+    ///     }
+    /// }
+    /// ```
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
         let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
 
