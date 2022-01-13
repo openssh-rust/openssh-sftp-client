@@ -242,6 +242,11 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
+    /// Return all entries in the directory specified by the `handle`, including
+    /// `.` and `..`.
+    ///
+    /// The `filename` only contains the basename.
+    ///
     /// # Cancel Safety
     ///
     /// This function is not cancel safe
