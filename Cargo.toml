@@ -12,6 +12,8 @@ repository = "https://github.com/NobodyXu/openssh-sftp-client"
 keywords = ["ssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
+exclude = ["openssh-portable"]
+
 [workspace]
 members = [
     "child_io_to_pipe",
