@@ -1,3 +1,21 @@
+//! This crate provides a set of APIs to access the remote filesystem using
+//! the sftp protocol and is implemented in pure Rust.
+//!
+//! It supports sending multiple requests concurrently using [`WriteEnd`]
+//! (it can be `clone`d), however receiving responses have to be done sequentially
+//! using [`ReadEnd::read_in_one_packet`].
+//!
+//! To create [`WriteEnd`] and [`ReadEnd`], simply pass the `stdin` and `stdout` of
+//! the `sftp-server` launched at remote to [`connect`].
+//!
+//! This crate supports all operations supported by sftp v3, in additional to
+//! the following extensions:
+//!  - `WriteEnd::send_limits_request`
+//!  - `WriteEnd::send_expand_path_request`
+//!  - `WriteEnd::send_fsync_request`
+//!  - `WriteEnd::send_hardlink_requst`
+//!  - `WriteEnd::send_posix_rename_request`
+
 #![forbid(unsafe_code)]
 
 mod awaitable_responses;
