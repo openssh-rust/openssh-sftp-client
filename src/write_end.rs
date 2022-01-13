@@ -17,10 +17,11 @@ use openssh_sftp_protocol::Handle;
 
 use std::io::IoSlice;
 
-/// TODO:
-///  - Support IoSlice for data in `send_write_request`
+// TODO:
+//  - Support IoSlice for data in `send_write_request`
 
-/// It is recommended to create at most one `WriteEnd` per thread.
+/// It is recommended to create at most one `WriteEnd` per thread
+/// using `WriteEnd::clone`.
 #[derive(Debug)]
 pub struct WriteEnd<Buffer: ToBuffer + 'static> {
     serializer: Serializer,
