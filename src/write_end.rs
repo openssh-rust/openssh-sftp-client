@@ -57,19 +57,31 @@ impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
 
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
-        self.write(Hello { version }).await
+        self.shared_data
+            .writer
+            .write_all(Self::serialize(&mut self.serializer, Hello { version })?)
+            .await?;
+
+        Ok(())
+    }
+
+    fn serialize<T>(serializer: &mut Serializer, value: T) -> Result<&[u8], Error>
+    where
+        T: Serialize,
+    {
+        serializer.reset();
+        value.serialize(&mut *serializer)?;
+
+        Ok(serializer.get_output()?)
     }
 
     async fn write<T>(&mut self, value: T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        self.serializer.reset();
-        value.serialize(&mut self.serializer)?;
-
         self.shared_data
             .writer
-            .write_all(self.serializer.get_output()?)
+            .write_all(Self::serialize(&mut self.serializer, value)?)
             .await?;
 
         Ok(())
@@ -99,17 +111,21 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         request: RequestInner<'_>,
         buffer: Option<Buffer>,
     ) -> Result<ArenaArc<Buffer>, Error> {
+        let serialized = Self::serialize(
+            &mut self.serializer,
+            Request {
+                request_id: ArenaArc::slot(&id.0),
+                inner: request,
+            },
+        )?;
+
         // Call id.into_inner to prevent id from being removed
         // if the future is cancelled.
         let arc = id.into_inner();
 
         arc.reset(buffer);
 
-        self.write(Request {
-            request_id: ArenaArc::slot(&arc),
-            inner: request,
-        })
-        .await?;
+        self.shared_data.writer.write_all(serialized).await?;
 
         self.shared_data.notify_new_packet_event();
 
