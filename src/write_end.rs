@@ -119,17 +119,11 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             },
         )?;
 
-        // Call id.into_inner to prevent id from being removed
-        // if the future is cancelled.
-        let arc = id.into_inner();
-
-        arc.reset(buffer);
-
+        id.0.reset(buffer);
         self.shared_data.writer.write_all(serialized).await?;
-
         self.shared_data.notify_new_packet_event();
 
-        Ok(arc)
+        Ok(id.into_inner())
     }
 
     /// # Cancel Safety
