@@ -428,11 +428,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             data.len().try_into()?,
         )?;
 
-        // Call id.into_inner to prevent id from being removed
-        // if the future is cancelled.
-        let arc = id.into_inner();
-
-        arc.reset(None);
+        id.0.reset(None);
         self.shared_data
             .writer
             .write_vectored_all(&mut [IoSlice::new(header), IoSlice::new(data)])
@@ -440,7 +436,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         self.shared_data.notify_new_packet_event();
 
-        Ok(AwaitableStatus::new(arc))
+        Ok(AwaitableStatus::new(id.into_inner()))
     }
 
     /// Return limits of the server
