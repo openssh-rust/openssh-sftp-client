@@ -253,7 +253,7 @@ mod tests {
 
         // Open it again and read from it
         let awaitable = write_end
-            .send_open_file_request(id, OpenFile::open(Cow::Borrowed(&filename)))
+            .send_open_file_request(id, OpenFileRequest::open(Cow::Borrowed(&filename)))
             .await
             .unwrap();
 
@@ -569,7 +569,7 @@ mod tests {
 
         // open
         let awaitable = write_end
-            .send_open_file_request(id, OpenFile::open(Cow::Borrowed(&filename)))
+            .send_open_file_request(id, OpenFileRequest::open(Cow::Borrowed(&filename)))
             .await
             .unwrap();
 

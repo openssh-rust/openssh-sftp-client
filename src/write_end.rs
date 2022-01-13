@@ -121,7 +121,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub async fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
-        params: OpenFile<'_>,
+        params: OpenFileRequest<'_>,
     ) -> Result<AwaitableHandle<Buffer>, Error> {
         Ok(AwaitableHandle::new(
             self.send_request(id, RequestInner::Open(params), None)
