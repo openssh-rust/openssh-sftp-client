@@ -1,4 +1,4 @@
-/// Any type that can be converted to a buffer.
+/// Any type that can act as a buffer.
 pub trait ToBuffer {
     fn get_buffer(&mut self) -> Buffer<'_>;
 }
