@@ -2,6 +2,8 @@ use super::*;
 
 use std::io;
 use std::num::TryFromIntError;
+use std::process::ExitStatus;
+
 use thiserror::Error;
 
 use openssh_sftp_protocol::ssh_format;
@@ -16,6 +18,13 @@ pub enum Error {
         /// The minimal sftp protocol version the server supported.
         version: u32,
     },
+
+    /// This error is meant to be a dummy error created by user of this crate
+    /// to signal that the sftp-server run on remote server failed.
+    ///
+    /// openssh-sftp-client would never return this error.
+    #[error("sftp-server run on remote server failed: {0}.")]
+    SftpServerFailure(ExitStatus),
 
     /// IO Error (Excluding `EWOULDBLOCK`): {0}.
     #[error("IO Error (Excluding `EWOULDBLOCK`): {0}.")]
