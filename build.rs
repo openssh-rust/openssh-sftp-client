@@ -1,11 +1,13 @@
-fn main() {
-    #[cfg(ci)]
-    {
-        use std::env;
-        use std::fs::{canonicalize, create_dir_all};
-        use std::path::PathBuf;
-        use std::process::{Command, Stdio};
+use std::env;
+use std::fs::{canonicalize, create_dir_all, metadata};
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
+fn main() {
+    // openssh-portable only exists in development.
+    //
+    // It is excluded from release.
+    if metadata("openssh-portable").is_ok() {
         let mut build_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
         build_dir.push("openssh-portable");
 
