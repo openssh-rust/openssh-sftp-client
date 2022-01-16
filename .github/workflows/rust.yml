@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-      submodules: "recursive"
+      submodules: 'recursive'
     - uses: actions/cache@v2
       with:
         path: |
@@ -41,7 +41,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-      submodules: "recursive"
+      submodules: 'recursive'
     - uses: actions/cache@v2
       with:
         path: |
