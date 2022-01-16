@@ -71,9 +71,17 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         self.deserialize()
     }
 
-    async fn consume_packet(&mut self, len: u32) -> Result<(), Error> {
-        copy(&mut (&mut self.reader).take(len as u64), &mut sink()).await?;
-        Ok(())
+    async fn consume_packet(&mut self, len: u32, err: Error) -> Result<(), Error> {
+        if let Err(consumption_err) =
+            copy(&mut (&mut self.reader).take(len as u64), &mut sink()).await
+        {
+            Err(Error::RecursiveErrors(Box::new((
+                err,
+                consumption_err.into(),
+            ))))
+        } else {
+            Err(err)
+        }
     }
 
     async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
@@ -166,10 +174,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
             Err(err) => {
                 // Consume the invalid data to return self to a valid state
                 // where read_in_one_packet can be called again.
-                if let Err(consumption_err) = self.consume_packet(len).await {
-                    return Err(Error::RecursiveErrors(Box::new((err, consumption_err))));
-                }
-                return Err(err);
+                return self.consume_packet(len, err).await;
             }
         };
 
@@ -177,14 +182,9 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
             let buffer = match callback.take_input() {
                 Ok(buffer) => buffer,
                 Err(err) => {
-                    let err = err.into();
-
                     // Consume the invalid data to return self to a valid state
                     // where read_in_one_packet can be called again.
-                    if let Err(consumption_err) = self.consume_packet(len).await {
-                        return Err(Error::RecursiveErrors(Box::new((err, consumption_err))));
-                    }
-                    return Err(err);
+                    return self.consume_packet(len, err.into()).await;
                 }
             };
             self.read_in_data_packet(len, buffer).await?
