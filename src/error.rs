@@ -19,6 +19,10 @@ pub enum Error {
         version: u32,
     },
 
+    /// Server returned a hello message that is too long.
+    #[error("sftp server returned hello message of length {len}, which is too long.")]
+    SftpServerHelloMsgTooLong { len: u32 },
+
     /// This error is meant to be a dummy error created by user of this crate
     /// to signal that the sftp-server run on remote server failed.
     ///
