@@ -23,6 +23,7 @@ members = [
 thiserror = "1.0.29"
 awaitable = "0.3.0"
 concurrent_arena = "0.1.2"
+parking_lot = "0.11.2"
 
 derive_destructure2 = "0.0.1"
 
