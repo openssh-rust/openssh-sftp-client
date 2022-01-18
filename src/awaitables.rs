@@ -152,7 +152,13 @@ def_awaitable!(AwaitableStatus, (), |response| {
 
 def_awaitable!(AwaitableHandle, HandleOwned, |response| {
     match response {
-        Response::Header(ResponseInner::Handle(handle)) => Ok(handle),
+        Response::Header(ResponseInner::Handle(handle)) => {
+            if handle.into_inner().len() > 256 {
+                Err(Error::HandleTooLong)
+            } else {
+                Ok(handle)
+            }
+        }
         _ => Err(Error::InvalidResponse(
             &"Expected Handle or err Status response",
         )),
