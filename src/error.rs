@@ -10,6 +10,7 @@ use openssh_sftp_protocol::ssh_format;
 
 pub use openssh_sftp_protocol::response::ResponseInner;
 
+#[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
     /// Server speaks sftp protocol other than protocol 3.
