@@ -62,7 +62,7 @@ pub use openssh_sftp_protocol::{Handle, HandleOwned};
 pub use connection::connect;
 pub use error::Error;
 pub use read_end::ReadEnd;
-pub use write_end::*;
+pub use write_end::WriteEnd;
 
 pub use awaitables::{
     AwaitableAttrs, AwaitableData, AwaitableHandle, AwaitableLimits, AwaitableName,
