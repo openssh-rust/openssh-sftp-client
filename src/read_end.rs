@@ -13,13 +13,13 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy, sink, AsyncReadExt};
+use tokio::io::{copy, sink, AsyncReadExt, BufReader};
 use tokio_io_utility::read_exact_to_vec;
-use tokio_pipe::PipeRead;
+use tokio_pipe::{PipeRead, PIPE_BUF};
 
 #[derive(Debug)]
 pub struct ReadEnd<Buffer: ToBuffer + 'static> {
-    reader: PipeRead,
+    reader: BufReader<PipeRead>,
     buffer: Vec<u8>,
     shared_data: Arc<SharedData<Buffer>>,
 }
@@ -27,7 +27,7 @@ pub struct ReadEnd<Buffer: ToBuffer + 'static> {
 impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     pub(crate) fn new(reader: PipeRead, shared_data: Arc<SharedData<Buffer>>) -> Self {
         Self {
-            reader,
+            reader: BufReader::with_capacity(PIPE_BUF, reader),
             buffer: Vec::new(),
             shared_data,
         }
