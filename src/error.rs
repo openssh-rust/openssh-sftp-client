@@ -67,4 +67,8 @@ pub enum Error {
         // Use `&&str` since `&str` takes 16 bytes while `&str` only takes 8 bytes.
         &'static &'static str,
     ),
+
+    /// Handle returned by server is longer than the limit 256 bytes specified in sftp v3.
+    #[error("Handle returned by server is longer than the limit 256 bytes specified in sftp v3")]
+    HandleTooLong,
 }
