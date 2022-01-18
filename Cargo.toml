@@ -32,6 +32,7 @@ openssh-sftp-protocol = "0.18.0"
 # enabling feature parking_lot on tokio does not pull in any new dependency.
 tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync"] }
 
+bytes = "1"
 tokio-io-utility = "0.3.0"
 tokio-pipe = "0.2.8"
 
