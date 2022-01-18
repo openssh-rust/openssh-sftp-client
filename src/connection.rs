@@ -241,7 +241,7 @@ mod tests {
         let msg = "Hello, world!".as_bytes();
 
         let awaitable = write_end
-            .send_write_request(id, &handle, 0, msg)
+            .send_write_request(id, Cow::Borrowed(&handle), 0, msg)
             .await
             .unwrap();
 
@@ -902,7 +902,10 @@ mod tests {
         let (id, handle) = awaitable.wait().await.unwrap();
 
         // fsync
-        let awaitable = write_end.send_fsync_request(id, &handle).await.unwrap();
+        let awaitable = write_end
+            .send_fsync_request(id, Cow::Borrowed(&handle))
+            .await
+            .unwrap();
 
         read_one_packet(&mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;

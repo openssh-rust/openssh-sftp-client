@@ -444,7 +444,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub async fn send_write_request(
         &mut self,
         id: Id<Buffer>,
-        handle: &[u8],
+        handle: Cow<'_, Handle>,
         offset: u64,
         data: &[u8],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
@@ -525,10 +525,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub async fn send_fsync_request(
         &mut self,
         id: Id<Buffer>,
-        handle: &[u8],
+        handle: Cow<'_, Handle>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Fsync(Cow::Borrowed(handle)), None)
+            self.send_request(id, RequestInner::Fsync(handle), None)
                 .await?,
         ))
     }
