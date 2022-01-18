@@ -80,6 +80,12 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
 
 /// Initialize connection to remote sftp server and
 /// negotiate the sftp version.
+///
+/// # Cancel Safety
+///
+/// This function is not cancel safe.
+///
+/// After dropping the future, the connection would be in a undefined state.
 pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     reader: PipeRead,
     writer: PipeWrite,
