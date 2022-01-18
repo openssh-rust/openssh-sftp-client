@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use super::awaitable_responses::ArenaArc;
 use super::connection::SharedData;
 use crate::*;

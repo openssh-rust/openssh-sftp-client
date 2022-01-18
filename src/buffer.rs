@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 /// Any type that can act as a buffer.
 pub trait ToBuffer {
     fn get_buffer(&mut self) -> Buffer<'_>;

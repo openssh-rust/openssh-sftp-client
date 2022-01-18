@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use crate::awaitable_responses::ArenaArc;
 use crate::awaitable_responses::Awaitable;
 use crate::awaitable_responses::Response;

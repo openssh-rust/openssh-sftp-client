@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::cmp::max;
 
 use std::future::Future;

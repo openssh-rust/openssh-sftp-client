@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use super::awaitable_responses::AwaitableResponses;
 use super::writer::Writer;
 use super::*;

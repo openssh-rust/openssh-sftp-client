@@ -16,8 +16,6 @@
 //!  - [`WriteEnd::send_hardlink_requst`]
 //!  - [`WriteEnd::send_posix_rename_request`]
 
-#![forbid(unsafe_code)]
-
 mod awaitable_responses;
 mod awaitables;
 mod buffer;

@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use super::Error;
 use super::ToBuffer;
 
