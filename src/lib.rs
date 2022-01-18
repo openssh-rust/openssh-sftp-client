@@ -47,7 +47,7 @@ pub const OPENSSH_PORTABLE_DEFAULT_UPLOAD_BUFLEN: usize = 20480;
 
 pub use awaitable_responses::Id;
 
-pub use buffer::*;
+pub use buffer::{Buffer, ToBuffer};
 
 pub use openssh_sftp_protocol::file_attrs::{
     FileAttrs, FileType, Permissions, UnixTimeStamp, UnixTimeStampError,
