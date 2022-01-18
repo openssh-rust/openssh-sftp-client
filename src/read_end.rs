@@ -166,6 +166,12 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     ///     }
     /// }
     /// ```
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe.
+    ///
+    /// Dropping the future might cause the response packet to be partially read,
+    /// and the next read would treat the partial response as a new response.
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
         let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
 
@@ -218,6 +224,10 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     /// You must call this function in a loop, break if this function returns
     /// 0, otherwise call `read_in_one_packet` for `n` times where `n` in the
     /// return value of this function, then repeat.
+    ///
+    /// # Cancel Safety
+    ///
+    /// It is perfectly safe to cancel this future.
     pub async fn wait_for_new_request(&self) -> u32 {
         self.shared_data.wait_for_new_request().await
     }
