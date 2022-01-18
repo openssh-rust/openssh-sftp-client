@@ -13,7 +13,7 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy, sink, AsyncReadExt, BufReader};
+use tokio::io::{copy_buf, sink, AsyncReadExt, BufReader};
 use tokio_io_utility::read_exact_to_vec;
 use tokio_pipe::{PipeRead, PIPE_BUF};
 
@@ -77,7 +77,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
     async fn consume_packet(&mut self, len: u32, err: Error) -> Result<(), Error> {
         if let Err(consumption_err) =
-            copy(&mut (&mut self.reader).take(len as u64), &mut sink()).await
+            copy_buf(&mut (&mut self.reader).take(len as u64), &mut sink()).await
         {
             Err(Error::RecursiveErrors(Box::new((
                 err,
