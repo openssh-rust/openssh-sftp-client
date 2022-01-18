@@ -6,6 +6,9 @@ use std::task::{Context, Poll};
 
 use std::io;
 
+use bytes::{BufMut, Bytes, BytesMut};
+use openssh_sftp_protocol::ssh_format::SerBacker;
+
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use tokio_io_utility::write_vectored_all;
@@ -107,5 +110,45 @@ impl Writer {
         }
 
         write_vectored_all(&mut *self.0.write().await, bufs).await
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct WriteBuffer(BytesMut);
+
+impl WriteBuffer {
+    /// split out one buffer
+    pub(crate) fn split(&mut self) -> Bytes {
+        let ret = self.0.split().freeze();
+        self.0.put([0_u8, 0_u8, 0_u8, 0_u8].as_ref());
+        ret
+    }
+}
+
+impl SerBacker for WriteBuffer {
+    fn new() -> Self {
+        let mut bytes = BytesMut::with_capacity(4);
+        bytes.put([0_u8, 0_u8, 0_u8, 0_u8].as_ref());
+        Self(bytes)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn get_first_4byte_slice(&mut self) -> &mut [u8; 4] {
+        (&mut (*self.0)[..4]).try_into().unwrap()
+    }
+
+    fn extend_from_slice(&mut self, other: &[u8]) {
+        self.0.extend_from_slice(other);
+    }
+
+    fn push(&mut self, byte: u8) {
+        self.0.put_u8(byte);
+    }
+
+    fn truncate(&mut self, len: usize) {
+        self.0.truncate(len);
     }
 }
