@@ -103,6 +103,10 @@ macro_rules! def_awaitable {
             /// Return (id, res).
             ///
             /// id can be reused in the next request.
+            ///
+            /// # Cancel Safety
+            ///
+            /// It is perfectly safe to cancel the future.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
                 let post_processing = |$response_name: Response<Buffer>| $post_processing;
 
