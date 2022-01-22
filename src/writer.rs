@@ -1,31 +1,29 @@
 #![forbid(unsafe_code)]
 
 use std::cmp::max;
-
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-
-use std::io;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use openssh_sftp_protocol::ssh_format::SerBacker;
 
 use tokio::io::AsyncWriteExt;
-use tokio::sync::RwLock;
+use tokio::sync::RwLock as RwLockAsync;
 use tokio_io_utility::write_vectored_all;
 use tokio_pipe::{AtomicWriteBuffer, AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
 
 #[derive(Debug)]
-pub(crate) struct Writer(RwLock<PipeWrite>);
+pub(crate) struct Writer(RwLockAsync<PipeWrite>);
 
 type PollFn<T> = fn(Pin<&PipeWrite>, cx: &mut Context<'_>, T) -> Poll<Result<usize, io::Error>>;
 
 impl Writer {
     pub(crate) fn new(pipe_write: PipeWrite) -> Self {
-        Self(RwLock::new(pipe_write))
+        Self(RwLockAsync::new(pipe_write))
     }
 
     async fn do_atomic_write_all<T: Copy + Unpin>(
