@@ -3,6 +3,7 @@
 use std::cmp::max;
 use std::future::Future;
 use std::io;
+use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -11,19 +12,22 @@ use openssh_sftp_protocol::ssh_format::SerBacker;
 
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
-use tokio_io_utility::write_vectored_all;
+use tokio_io_utility::{queue::MpScBytesQueue, write_vectored_all};
 use tokio_pipe::{AtomicWriteBuffer, AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
 
 #[derive(Debug)]
-pub(crate) struct Writer(RwLockAsync<PipeWrite>);
+pub(crate) struct Writer(RwLockAsync<PipeWrite>, MpScBytesQueue);
 
 type PollFn<T> = fn(Pin<&PipeWrite>, cx: &mut Context<'_>, T) -> Poll<Result<usize, io::Error>>;
 
 impl Writer {
     pub(crate) fn new(pipe_write: PipeWrite) -> Self {
-        Self(RwLockAsync::new(pipe_write))
+        Self(
+            RwLockAsync::new(pipe_write),
+            MpScBytesQueue::new(NonZeroUsize::new(100).unwrap()),
+        )
     }
 
     async fn do_atomic_write_all<T: Copy + Unpin>(
@@ -77,6 +81,12 @@ impl Writer {
     }
 
     /// * `buf` - Must not be empty
+    ///
+    /// Write to pipe without any buffering.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe, but it might cause the data to be partially written.
     pub(crate) async fn write_all(&self, buf: &[u8]) -> Result<(), io::Error> {
         if let Some(buf) = AtomicWriteBuffer::new(buf) {
             if self.atomic_write_all(buf).await?.is_some() {
@@ -97,6 +107,12 @@ impl Writer {
     }
 
     /// * `bufs` - Accmulated len of all buffers must not be `0`.
+    ///
+    /// Write to pipe without any buffering.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe, but it might cause the data to be partially written.
     pub(crate) async fn write_vectored_all(
         &self,
         bufs: &mut [io::IoSlice<'_>],
@@ -110,6 +126,67 @@ impl Writer {
         }
 
         write_vectored_all(&mut *self.0.write().await, bufs).await
+    }
+
+    async fn write_vectored(&self, bufs: &[io::IoSlice<'_>]) -> Result<usize, io::Error> {
+        if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
+            let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
+
+            if let Some(n) = self.atomic_write_vectored_all(bufs, len).await? {
+                debug_assert_eq!(n, len);
+                return Ok(n);
+            }
+        }
+
+        self.0.write().await.write_vectored(bufs).await
+    }
+
+    /// If another thread is flushing or there isn't any
+    /// data to write, then `Ok(None)` will be returned.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is perfectly cancel safe.
+    ///
+    /// While it is true that it might only partially flushed out the data,
+    /// it can be restarted by another thread.
+    pub(crate) async fn flush(&self) -> Result<Option<()>, io::Error> {
+        let mut buffers = match self.1.get_buffers() {
+            Some(buffers) => buffers,
+            None => return Ok(None),
+        };
+        loop {
+            let n = self.write_vectored(buffers.get_io_slices()).await?;
+            let n = if let Some(n) = NonZeroUsize::new(n) {
+                n
+            } else {
+                return Err(io::Error::new(io::ErrorKind::WriteZero, ""));
+            };
+
+            if !buffers.advance(n) {
+                break Ok(Some(()));
+            }
+        }
+    }
+
+    /// Push the bytes into buffer.
+    ///
+    /// It might flush the buffer if it is full.
+    ///
+    /// If flushing failed, then the buffer won't be inserted
+    /// into the buffer.
+    ///
+    /// # Cancel Safety
+    ///
+    /// The only async function it invokes is [`Writer::flush`],
+    /// so it is also cancel safe.
+    pub(crate) async fn push(&self, mut bytes: Bytes) -> Result<(), io::Error> {
+        while let Err(bytes_returned) = self.1.push(bytes) {
+            bytes = bytes_returned;
+            self.flush().await?;
+        }
+
+        Ok(())
     }
 }
 
