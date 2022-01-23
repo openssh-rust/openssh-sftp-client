@@ -3,6 +3,7 @@
 use std::cmp::max;
 use std::future::Future;
 use std::io;
+use std::io::IoSlice;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -189,6 +190,12 @@ impl WriteBuffer {
         let ret = self.0.split().freeze();
         self.0.put([0_u8, 0_u8, 0_u8, 0_u8].as_ref());
         ret
+    }
+
+    pub(crate) fn put_io_slices(&mut self, io_slices: &[IoSlice<'_>]) {
+        for io_slice in io_slices {
+            self.0.put_slice(&*io_slice);
+        }
     }
 }
 

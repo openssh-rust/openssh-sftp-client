@@ -486,6 +486,40 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`WriteEnd::flush`] to actually send the requests.
     ///
+    /// This function is only suitable for writing small data since it needs to copy the
+    /// entire `data` into buffer.
+    ///
+    /// For writing large data, it is recommended to use [`WriteEnd::send_write_request_direct`].
+    pub fn send_write_request_buffered_vectored(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        io_slices: &[IoSlice<'_>],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let len: usize = io_slices.iter().map(|io_slice| io_slice.len()).sum();
+        let len: u32 = len.try_into()?;
+
+        let buffer = Request::serialize_write_request(
+            &mut self.serializer,
+            ArenaArc::slot(&id.0),
+            handle,
+            offset,
+            len,
+        )?;
+
+        buffer.put_io_slices(io_slices);
+
+        id.0.reset(None);
+        self.shared_data.writer.push(buffer.split());
+        self.shared_data.notify_new_packet_event();
+
+        Ok(AwaitableStatus::new(id.into_inner()))
+    }
+
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`WriteEnd::flush`] to actually send the requests.
+    ///
     /// This function is zero-copy.
     pub fn send_write_request_zero_copy(
         &mut self,

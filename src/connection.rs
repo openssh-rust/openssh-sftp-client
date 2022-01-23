@@ -122,6 +122,7 @@ mod tests {
     use std::env;
     use std::fs;
     use std::io;
+    use std::io::IoSlice;
     use std::os::unix::fs::symlink;
     use std::path;
     use std::process::Stdio;
@@ -369,6 +370,21 @@ mod tests {
         test_write_impl(|write_end, id, handle, msg| {
             write_end
                 .send_write_request_buffered(id, Cow::Borrowed(&handle), 0, Cow::Borrowed(msg))
+                .unwrap()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_write_buffered_vectored() {
+        test_write_impl(|write_end, id, handle, msg| {
+            write_end
+                .send_write_request_buffered_vectored(
+                    id,
+                    Cow::Borrowed(&handle),
+                    0,
+                    &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
+                )
                 .unwrap()
         })
         .await;
