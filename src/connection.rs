@@ -234,7 +234,6 @@ mod tests {
                     file_attrs,
                 ),
             )
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -256,7 +255,6 @@ mod tests {
 
         let awaitable = write_end
             .send_close_request(id, Cow::Borrowed(&handle))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -265,7 +263,6 @@ mod tests {
         // Open it again and read from it
         let awaitable = write_end
             .send_open_file_request(id, OpenFileRequest::open(Cow::Borrowed(&filename)))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -275,7 +272,6 @@ mod tests {
 
         let awaitable = write_end
             .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -309,7 +305,6 @@ mod tests {
         // remove it
         let awaitable = write_end
             .send_remove_request(id, Cow::Borrowed(&filename))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -345,7 +340,6 @@ mod tests {
 
         let awaitable = write_end
             .send_rename_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -379,7 +373,6 @@ mod tests {
         // mkdir it
         let awaitable = write_end
             .send_mkdir_request(id, Cow::Borrowed(&dirname), FileAttrs::default())
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -412,7 +405,6 @@ mod tests {
         // rmdir it
         let awaitable = write_end
             .send_rmdir_request(id, Cow::Borrowed(&dirname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -453,7 +445,6 @@ mod tests {
         // open it
         let awaitable = write_end
             .send_opendir_request(id, Cow::Borrowed(&dirname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -462,7 +453,6 @@ mod tests {
         // read it
         let awaitable = write_end
             .send_readdir_request(id, Cow::Borrowed(&*handle))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -513,7 +503,6 @@ mod tests {
         // stat
         let awaitable = write_end
             .send_stat_request(id, Cow::Borrowed(&linkname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -549,7 +538,6 @@ mod tests {
         // lstat
         let awaitable = write_end
             .send_lstat_request(id, Cow::Borrowed(&linkname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -581,7 +569,6 @@ mod tests {
         // open
         let awaitable = write_end
             .send_open_file_request(id, OpenFileRequest::open(Cow::Borrowed(&filename)))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -590,7 +577,6 @@ mod tests {
         // fstat
         let awaitable = write_end
             .send_fstat_request(id, Cow::Borrowed(&handle))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -627,7 +613,6 @@ mod tests {
         // setstat
         let awaitable = write_end
             .send_setstat_request(id, Cow::Borrowed(&filename), fileattrs)
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -636,7 +621,6 @@ mod tests {
         // stat
         let awaitable = write_end
             .send_stat_request(id, Cow::Borrowed(&filename))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -675,7 +659,6 @@ mod tests {
                     .write(true)
                     .open(Cow::Borrowed(&filename)),
             )
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -687,7 +670,6 @@ mod tests {
 
         let awaitable = write_end
             .send_fsetstat_request(id, Cow::Borrowed(&handle), fileattrs)
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -696,7 +678,6 @@ mod tests {
         // fstat
         let awaitable = write_end
             .send_fstat_request(id, Cow::Borrowed(&handle))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -732,7 +713,6 @@ mod tests {
         // readlink
         let awaitable = write_end
             .send_readlink_request(id, Cow::Borrowed(&linkname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -767,7 +747,6 @@ mod tests {
         // readpath
         let awaitable = write_end
             .send_realpath_request(id, Cow::Borrowed(&linkname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -801,7 +780,6 @@ mod tests {
         // symlink
         let awaitable = write_end
             .send_symlink_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&linkname))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -829,7 +807,7 @@ mod tests {
         let id = write_end.create_response_id();
 
         assert!(extensions.limits);
-        let awaitable = write_end.send_limits_request(id).await.unwrap();
+        let awaitable = write_end.send_limits_request(id).unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
         let (id, limits) = awaitable.wait().await.unwrap();
@@ -859,7 +837,6 @@ mod tests {
         assert!(extensions.expand_path);
         let awaitable = write_end
             .send_expand_path_request(id, Cow::Borrowed(path::Path::new("~")))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -898,7 +875,6 @@ mod tests {
                     .write(true)
                     .open(Cow::Borrowed(&filename)),
             )
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -907,7 +883,6 @@ mod tests {
         // fsync
         let awaitable = write_end
             .send_fsync_request(id, Cow::Borrowed(&handle))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -939,7 +914,6 @@ mod tests {
 
         let awaitable = write_end
             .send_hardlink_requst(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;
@@ -979,7 +953,6 @@ mod tests {
 
         let awaitable = write_end
             .send_posix_rename_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
-            .await
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;

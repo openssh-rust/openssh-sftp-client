@@ -115,7 +115,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    async fn send_request(
+    fn send_request(
         &mut self,
         id: Id<Buffer>,
         request: RequestInner<'_>,
@@ -136,42 +136,32 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(id.into_inner())
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_open_file_request(
+    pub fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
         params: OpenFileRequest<'_>,
     ) -> Result<AwaitableHandle<Buffer>, Error> {
-        Ok(AwaitableHandle::new(
-            self.send_request(id, RequestInner::Open(params), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Open(params), None)
+            .map(AwaitableHandle::new)
     }
 
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
-    pub async fn send_close_request(
+    pub fn send_close_request(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Close(handle), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Close(handle), None)
+            .map(AwaitableStatus::new)
     }
 
     /// - `buffer` - If set to `None` or the buffer is not long enough,
     ///   then `Data::AllocatedBox` will be returned.
-    ///   Return `Data::Buffer` if not EOF, otherwise returns `Data::EOF`.
     ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_read_request(
+    /// Return `Data::Buffer` if not EOF, otherwise returns `Data::EOF`.
+    pub fn send_read_request(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
@@ -179,243 +169,165 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         len: u32,
         buffer: Option<Buffer>,
     ) -> Result<AwaitableData<Buffer>, Error> {
-        Ok(AwaitableData::new(
-            self.send_request(
-                id,
-                RequestInner::Read {
-                    handle,
-                    offset,
-                    len,
-                },
-                buffer,
-            )
-            .await?,
-        ))
+        self.send_request(
+            id,
+            RequestInner::Read {
+                handle,
+                offset,
+                len,
+            },
+            buffer,
+        )
+        .map(AwaitableData::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_remove_request(
+    pub fn send_remove_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Remove(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Remove(path), None)
+            .map(AwaitableStatus::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_rename_request(
+    pub fn send_rename_request(
         &mut self,
         id: Id<Buffer>,
         oldpath: Cow<'_, Path>,
         newpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Rename { oldpath, newpath }, None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Rename { oldpath, newpath }, None)
+            .map(AwaitableStatus::new)
     }
 
     /// * `attrs` - `attrs.get_size()` must be equal to `None`.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_mkdir_request(
+    pub fn send_mkdir_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
         attrs: FileAttrs,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Mkdir { path, attrs }, None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Mkdir { path, attrs }, None)
+            .map(AwaitableStatus::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_rmdir_request(
+    pub fn send_rmdir_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Rmdir(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Rmdir(path), None)
+            .map(AwaitableStatus::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_opendir_request(
+    pub fn send_opendir_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableHandle<Buffer>, Error> {
-        Ok(AwaitableHandle::new(
-            self.send_request(id, RequestInner::Opendir(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Opendir(path), None)
+            .map(AwaitableHandle::new)
     }
 
     /// Return all entries in the directory specified by the `handle`, including
     /// `.` and `..`.
     ///
     /// The `filename` only contains the basename.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_readdir_request(
+    pub fn send_readdir_request(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableNameEntries<Buffer>, Error> {
-        Ok(AwaitableNameEntries::new(
-            self.send_request(id, RequestInner::Readdir(handle), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Readdir(handle), None)
+            .map(AwaitableNameEntries::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_stat_request(
+    pub fn send_stat_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableAttrs<Buffer>, Error> {
-        Ok(AwaitableAttrs::new(
-            self.send_request(id, RequestInner::Stat(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Stat(path), None)
+            .map(AwaitableAttrs::new)
     }
 
     /// Does not follow symlink
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_lstat_request(
+    pub fn send_lstat_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableAttrs<Buffer>, Error> {
-        Ok(AwaitableAttrs::new(
-            self.send_request(id, RequestInner::Lstat(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Lstat(path), None)
+            .map(AwaitableAttrs::new)
     }
 
     /// * `handle` - Must be opened with `FileMode::READ`.
     ///
     /// Does not follow symlink
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_fstat_request(
+    pub fn send_fstat_request(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableAttrs<Buffer>, Error> {
-        Ok(AwaitableAttrs::new(
-            self.send_request(id, RequestInner::Fstat(handle), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Fstat(handle), None)
+            .map(AwaitableAttrs::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_setstat_request(
+    pub fn send_setstat_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
         attrs: FileAttrs,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Setstat { path, attrs }, None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Setstat { path, attrs }, None)
+            .map(AwaitableStatus::new)
     }
 
     /// * `handle` - Must be opened with `OpenOptions::write` set.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_fsetstat_request(
+    pub fn send_fsetstat_request(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
         attrs: FileAttrs,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Fsetstat { handle, attrs }, None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Fsetstat { handle, attrs }, None)
+            .map(AwaitableStatus::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_readlink_request(
+    pub fn send_readlink_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableName<Buffer>, Error> {
-        Ok(AwaitableName::new(
-            self.send_request(id, RequestInner::Readlink(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Readlink(path), None)
+            .map(AwaitableName::new)
     }
 
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_realpath_request(
+    pub fn send_realpath_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableName<Buffer>, Error> {
-        Ok(AwaitableName::new(
-            self.send_request(id, RequestInner::Realpath(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Realpath(path), None)
+            .map(AwaitableName::new)
     }
 
     /// Create symlink
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_symlink_request(
+    pub fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
         targetpath: Cow<'_, Path>,
         linkpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(
-                id,
-                RequestInner::Symlink {
-                    linkpath,
-                    targetpath,
-                },
-                None,
-            )
-            .await?,
-        ))
+        self.send_request(
+            id,
+            RequestInner::Symlink {
+                linkpath,
+                targetpath,
+            },
+            None,
+        )
+        .map(AwaitableStatus::new)
     }
 
     /// Send write requests directly, without any buffering.
@@ -459,17 +371,12 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// # Precondition
     ///
     /// Requires [`Extensions::limits`] to be true.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_limits_request(
+    pub fn send_limits_request(
         &mut self,
         id: Id<Buffer>,
     ) -> Result<AwaitableLimits<Buffer>, Error> {
-        Ok(AwaitableLimits::new(
-            self.send_request(id, RequestInner::Limits, None).await?,
-        ))
+        self.send_request(id, RequestInner::Limits, None)
+            .map(AwaitableLimits::new)
     }
 
     /// This supports canonicalisation of relative paths and those that need
@@ -481,74 +388,50 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// # Precondition
     ///
     /// Requires [`Extensions::expand_path`] to be true.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_expand_path_request(
+    pub fn send_expand_path_request(
         &mut self,
         id: Id<Buffer>,
         path: Cow<'_, Path>,
     ) -> Result<AwaitableName<Buffer>, Error> {
-        Ok(AwaitableName::new(
-            self.send_request(id, RequestInner::ExpandPath(path), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::ExpandPath(path), None)
+            .map(AwaitableName::new)
     }
 
     /// # Precondition
     ///
     /// Requires [`Extensions::fsync`] to be true.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_fsync_request(
+    pub fn send_fsync_request(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::Fsync(handle), None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::Fsync(handle), None)
+            .map(AwaitableStatus::new)
     }
 
     /// # Precondition
     ///
     /// Requires [`Extensions::hardlink`] to be true.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_hardlink_requst(
+    pub fn send_hardlink_requst(
         &mut self,
         id: Id<Buffer>,
         oldpath: Cow<'_, Path>,
         newpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::HardLink { oldpath, newpath }, None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::HardLink { oldpath, newpath }, None)
+            .map(AwaitableStatus::new)
     }
 
     /// # Precondition
     ///
     /// Requires [`Extensions::posix_rename`] to be true.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_posix_rename_request(
+    pub fn send_posix_rename_request(
         &mut self,
         id: Id<Buffer>,
         oldpath: Cow<'_, Path>,
         newpath: Cow<'_, Path>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        Ok(AwaitableStatus::new(
-            self.send_request(id, RequestInner::PosixRename { oldpath, newpath }, None)
-                .await?,
-        ))
+        self.send_request(id, RequestInner::PosixRename { oldpath, newpath }, None)
+            .map(AwaitableStatus::new)
     }
 }
