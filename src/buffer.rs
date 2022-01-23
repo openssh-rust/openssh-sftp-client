@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use bytes::BytesMut;
+
 /// Any type that can act as a buffer.
 pub trait ToBuffer {
     fn get_buffer(&mut self) -> Buffer<'_>;
@@ -9,11 +11,18 @@ pub trait ToBuffer {
 pub enum Buffer<'a> {
     Vector(&'a mut Vec<u8>),
     Slice(&'a mut [u8]),
+    Bytes(&'a mut BytesMut),
 }
 
 impl ToBuffer for Vec<u8> {
     fn get_buffer(&mut self) -> Buffer<'_> {
         Buffer::Vector(self)
+    }
+}
+
+impl ToBuffer for BytesMut {
+    fn get_buffer(&mut self) -> Buffer<'_> {
+        Buffer::Bytes(self)
     }
 }
 

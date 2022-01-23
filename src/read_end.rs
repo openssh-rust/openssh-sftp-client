@@ -16,7 +16,7 @@ use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
 use tokio::io::{copy_buf, sink, AsyncReadExt, BufReader};
-use tokio_io_utility::read_exact_to_vec;
+use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 use tokio_pipe::{PipeRead, PIPE_BUF};
 
 #[derive(Debug)]
@@ -121,6 +121,10 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
                     } else {
                         self.read_in_data_packet_fallback(len).await
                     }
+                }
+                crate::Buffer::Bytes(bytes) => {
+                    read_exact_to_bytes(&mut self.reader, bytes, len as usize).await?;
+                    Ok(Response::Buffer(buffer))
                 }
             }
         } else {
