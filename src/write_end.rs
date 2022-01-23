@@ -1,14 +1,14 @@
 #![forbid(unsafe_code)]
 
-use super::awaitable_responses::ArenaArc;
-use super::connection::SharedData;
 use crate::*;
-
-use core::fmt::Debug;
+use awaitable_responses::ArenaArc;
+use connection::SharedData;
+use writer::WriteBuffer;
 
 use std::borrow::Cow;
+use std::fmt::Debug;
+use std::io::IoSlice;
 use std::path::Path;
-
 use std::sync::Arc;
 
 use openssh_sftp_protocol::file_attrs::FileAttrs;
@@ -17,7 +17,7 @@ use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::Handle;
 
-use std::io::IoSlice;
+use bytes::Bytes;
 
 // TODO:
 //  - Support IoSlice for data in `send_write_request`
@@ -26,7 +26,7 @@ use std::io::IoSlice;
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
 pub struct WriteEnd<Buffer: ToBuffer + 'static> {
-    serializer: Serializer,
+    serializer: Serializer<WriteBuffer>,
     shared_data: Arc<SharedData<Buffer>>,
 }
 
@@ -61,20 +61,20 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .writer
-            .write_all(Self::serialize(&mut self.serializer, Hello { version })?)
+            .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
             .await?;
 
         Ok(())
     }
 
-    fn serialize<T>(serializer: &mut Serializer, value: T) -> Result<&[u8], Error>
+    fn serialize<T>(serializer: &mut Serializer<WriteBuffer>, value: T) -> Result<Bytes, Error>
     where
         T: Serialize,
     {
         serializer.reset();
         value.serialize(&mut *serializer)?;
 
-        Ok(serializer.get_output()?)
+        Ok(serializer.get_output()?.split())
     }
 
     /// Create a useable response id.
@@ -111,12 +111,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is only cancel safe if the serialized bytes of request
-    /// is less than [`tokio_pipe::PIPE_BUF`] long.
-    ///
-    /// Otherwise it is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// The only async function it invokes is [`Writer::flush`],
+    /// so it is also cancel safe.
     async fn send_request(
         &mut self,
         id: Id<Buffer>,
@@ -132,7 +128,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         )?;
 
         id.0.reset(buffer);
-        self.shared_data.writer.write_all(serialized).await?;
+        self.shared_data.writer.write_all(&*serialized).await?;
         self.shared_data.notify_new_packet_event();
 
         Ok(id.into_inner())
@@ -466,12 +462,13 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             handle,
             offset,
             data.len().try_into()?,
-        )?;
+        )?
+        .split();
 
         id.0.reset(None);
         self.shared_data
             .writer
-            .write_vectored_all(&mut [IoSlice::new(header), IoSlice::new(data)])
+            .write_vectored_all(&mut [IoSlice::new(&*header), IoSlice::new(data)])
             .await?;
 
         self.shared_data.notify_new_packet_event();
