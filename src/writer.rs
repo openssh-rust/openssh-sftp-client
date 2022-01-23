@@ -12,7 +12,8 @@ use openssh_sftp_protocol::ssh_format::SerBacker;
 
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
-use tokio_io_utility::{queue::MpScBytesQueue, write_vectored_all};
+use tokio_io_utility::queue::{MpScBytesQueue, QueuePusher};
+use tokio_io_utility::write_vectored_all;
 use tokio_pipe::{AtomicWriteBuffer, AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
@@ -172,6 +173,10 @@ impl Writer {
     /// Push the bytes into buffer.
     pub(crate) fn push(&self, bytes: Bytes) {
         self.1.push(bytes);
+    }
+
+    pub(crate) fn get_pusher(&self) -> QueuePusher<'_> {
+        self.1.get_pusher()
     }
 }
 

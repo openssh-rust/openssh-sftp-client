@@ -457,11 +457,11 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
-    /// to actually send the requests.
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`WriteEnd::flush`] to actually send the requests.
     ///
-    /// This function is only suitable for writing small data since it needs to copy the entire
-    /// `data` into buffer.
+    /// This function is only suitable for writing small data since it needs to copy the
+    /// entire `data` into buffer.
     ///
     /// For writing large data, it is recommended to use [`WriteEnd::send_write_request_direct`].
     pub fn send_write_request_buffered(
@@ -481,6 +481,41 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             None,
         )
         .map(AwaitableStatus::new)
+    }
+
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`WriteEnd::flush`] to actually send the requests.
+    ///
+    /// This function is zero-copy.
+    pub fn send_write_request_zero_copy(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data: &[Bytes],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let len: usize = data.iter().map(Bytes::len).sum();
+        let len: u32 = len.try_into()?;
+
+        let header = Request::serialize_write_request(
+            &mut self.serializer,
+            ArenaArc::slot(&id.0),
+            handle,
+            offset,
+            len,
+        )?
+        .split();
+
+        id.0.reset(None);
+        let mut queue_pusher = self.shared_data.writer.get_pusher();
+        queue_pusher.push(header);
+        for bytes in data {
+            queue_pusher.push(bytes.clone());
+        }
+
+        self.shared_data.notify_new_packet_event();
+
+        Ok(AwaitableStatus::new(id.into_inner()))
     }
 
     /// Send write requests directly, without any buffering.

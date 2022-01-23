@@ -126,11 +126,10 @@ mod tests {
     use std::path;
     use std::process::Stdio;
 
+    use bytes::Bytes;
     use once_cell::sync::OnceCell;
-
-    use tokio::process;
-
     use tempfile::{Builder, TempDir};
+    use tokio::process;
 
     fn assert_not_found(err: io::Error) {
         assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
@@ -370,6 +369,24 @@ mod tests {
         test_write_impl(|write_end, id, handle, msg| {
             write_end
                 .send_write_request_buffered(id, Cow::Borrowed(&handle), 0, Cow::Borrowed(msg))
+                .unwrap()
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_write_zero_copy() {
+        test_write_impl(|write_end, id, handle, msg| {
+            write_end
+                .send_write_request_zero_copy(
+                    id,
+                    Cow::Borrowed(&handle),
+                    0,
+                    &[
+                        Bytes::copy_from_slice(&msg[..3]),
+                        Bytes::copy_from_slice(&msg[3..]),
+                    ],
+                )
                 .unwrap()
         })
         .await;
