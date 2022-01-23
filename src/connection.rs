@@ -295,8 +295,14 @@ mod tests {
         assert!(child.wait().await.unwrap().success());
     }
 
-    #[tokio::test]
-    async fn test_write_buffered() {
+    async fn test_write_impl(
+        write: impl FnOnce(
+            &mut WriteEnd<Vec<u8>>,
+            Id<Vec<u8>>,
+            &Handle,
+            &[u8],
+        ) -> AwaitableStatus<Vec<u8>>,
+    ) {
         let (mut write_end, mut read_end, mut child) = connect().await;
 
         let id = write_end.create_response_id();
@@ -329,9 +335,7 @@ mod tests {
 
         let msg = "Hello, world!".as_bytes();
 
-        let awaitable = write_end
-            .send_write_request_buffered(id, Cow::Borrowed(&handle), 0, Cow::Borrowed(msg))
-            .unwrap();
+        let awaitable = write(&mut write_end, id, &handle, &msg);
 
         eprintln!("Waiting for write response");
 
@@ -359,6 +363,16 @@ mod tests {
         drop(read_end);
 
         assert!(child.wait().await.unwrap().success());
+    }
+
+    #[tokio::test]
+    async fn test_write_buffered() {
+        test_write_impl(|write_end, id, handle, msg| {
+            write_end
+                .send_write_request_buffered(id, Cow::Borrowed(&handle), 0, Cow::Borrowed(msg))
+                .unwrap()
+        })
+        .await;
     }
 
     #[tokio::test]
