@@ -159,6 +159,8 @@ impl Writer {
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
     pub(crate) async fn flush(&self) -> Result<Option<()>, io::Error> {
+        // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
+        // to be non-empty
         let mut buffers = match self.1.get_buffers() {
             Some(buffers) => buffers,
             None => return Ok(None),
@@ -166,10 +168,6 @@ impl Writer {
 
         if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
             let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
-
-            if len == 0 {
-                return Ok(Some(()));
-            }
 
             if self.atomic_write_vectored_all(bufs, len).await? {
                 let res = !buffers.advance(NonZeroUsize::new(len).unwrap());
