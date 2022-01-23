@@ -128,9 +128,7 @@ macro_rules! def_awaitable {
             ///
             /// It is perfectly safe to cancel the future.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                self.0
-                    .wait(|$response_name: Response<Buffer>| $post_processing)
-                    .await
+                self.0.wait(|$response_name| $post_processing).await
             }
         }
     };
