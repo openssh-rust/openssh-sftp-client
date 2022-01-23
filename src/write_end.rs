@@ -563,9 +563,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         // queue_pusher holds the mutex, so the `push` are atomic.
         let mut queue_pusher = self.shared_data.writer.get_pusher();
         queue_pusher.push(header);
-        for bytes in data {
-            queue_pusher.push(bytes.clone());
-        }
+        queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
 
         id.0.reset(None);
         self.shared_data.notify_new_packet_event();
