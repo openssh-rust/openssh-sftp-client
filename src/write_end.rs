@@ -457,6 +457,32 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
+    /// This function is only suitable for writing small data since it needs to copy the entire
+    /// `data` into buffer.
+    ///
+    /// For writing large data, it is recommended to use [`WriteEnd::send_write_request_direct`].
+    pub fn send_write_request_buffered(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data: Cow<'_, [u8]>,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        self.send_request(
+            id,
+            RequestInner::Write {
+                handle,
+                offset,
+                data,
+            },
+            None,
+        )
+        .map(AwaitableStatus::new)
+    }
+
     /// Send write requests directly, without any buffering.
     ///
     /// # Cancel Safety
