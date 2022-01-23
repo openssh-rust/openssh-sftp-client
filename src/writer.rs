@@ -15,7 +15,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
 use tokio_io_utility::queue::{MpScBytesQueue, QueuePusher};
 use tokio_io_utility::write_vectored_all;
-use tokio_pipe::{AtomicWriteBuffer, AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
+use tokio_pipe::{AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
 use arrayvec::ArrayVec;
 
@@ -23,8 +23,6 @@ const MAX_ATOMIC_ATTEMPT: u16 = 50;
 
 #[derive(Debug)]
 pub(crate) struct Writer(RwLockAsync<PipeWrite>, MpScBytesQueue);
-
-type PollFn<T> = fn(Pin<&PipeWrite>, cx: &mut Context<'_>, T) -> Poll<Result<usize, io::Error>>;
 
 impl Writer {
     pub(crate) fn new(pipe_write: PipeWrite) -> Self {
@@ -34,16 +32,15 @@ impl Writer {
         )
     }
 
-    async fn do_atomic_write_all<T: Copy + Unpin>(
+    async fn atomic_write_vectored_all(
         &self,
-        input: T,
+        bufs: AtomicWriteIoSlices<'_, '_>,
         len: usize,
-        f: PollFn<T>,
     ) -> Result<Option<usize>, io::Error> {
         #[must_use = "futures do nothing unless you `.await` or poll them"]
-        struct AtomicWrite<'a, T>(&'a PipeWrite, T, u16, u16, PollFn<T>);
+        struct AtomicWrite<'a>(&'a PipeWrite, AtomicWriteIoSlices<'a, 'a>, u16, u16);
 
-        impl<T: Copy + Unpin> Future for AtomicWrite<'_, T> {
+        impl Future for AtomicWrite<'_> {
             type Output = Option<Result<usize, io::Error>>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -56,13 +53,13 @@ impl Writer {
                 let writer = Pin::new(self.0);
                 let input = self.1;
 
-                self.4(writer, cx, input).map(Some)
+                writer.poll_write_vectored_atomic(cx, input).map(Some)
             }
         }
 
         AtomicWrite(
             &*self.0.read().await,
-            input,
+            bufs,
             0,
             max(
                 // PIPE_BUF is 4096, less than u16::MAX,
@@ -70,7 +67,6 @@ impl Writer {
                 (PIPE_BUF / len) as u16,
                 MAX_ATOMIC_ATTEMPT,
             ),
-            f,
         )
         .await
         .transpose()
@@ -85,15 +81,6 @@ impl Writer {
     /// This function is cancel safe, but it might cause the data to be partially written.
     pub(crate) async fn write_all(&mut self, buf: &[u8]) -> Result<(), io::Error> {
         self.0.get_mut().write_all(buf).await
-    }
-
-    async fn atomic_write_vectored_all(
-        &self,
-        bufs: AtomicWriteIoSlices<'_, '_>,
-        len: usize,
-    ) -> Result<Option<usize>, io::Error> {
-        self.do_atomic_write_all(bufs, len, PipeWrite::poll_write_vectored_atomic)
-            .await
     }
 
     /// * `bufs` - Accmulated len of all buffers must not be `0`.
