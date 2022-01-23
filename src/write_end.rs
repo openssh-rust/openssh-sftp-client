@@ -130,7 +130,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         )?;
 
         id.0.reset(buffer);
-        self.shared_data.writer.push(serialized).await?;
+        self.shared_data.writer.push(serialized);
         self.shared_data.notify_new_packet_event();
 
         Ok(id.into_inner())

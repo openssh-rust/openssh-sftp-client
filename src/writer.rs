@@ -170,23 +170,8 @@ impl Writer {
     }
 
     /// Push the bytes into buffer.
-    ///
-    /// It might flush the buffer if it is full.
-    ///
-    /// If flushing failed, then the buffer won't be inserted
-    /// into the buffer.
-    ///
-    /// # Cancel Safety
-    ///
-    /// The only async function it invokes is [`Writer::flush`],
-    /// so it is also cancel safe.
-    pub(crate) async fn push(&self, mut bytes: Bytes) -> Result<(), io::Error> {
-        while let Err(bytes_returned) = self.1.push(bytes) {
-            bytes = bytes_returned;
-            self.flush().await?;
-        }
-
-        Ok(())
+    pub(crate) fn push(&self, bytes: Bytes) {
+        self.1.push(bytes);
     }
 }
 
