@@ -90,9 +90,12 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         }
     }
 
-    async fn read_in_data_packet_fallback(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
+    async fn read_in_data_packet_fallback(
+        &mut self,
+        len: usize,
+    ) -> Result<Response<Buffer>, Error> {
         let mut vec = Vec::new();
-        read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
+        read_exact_to_vec(&mut self.reader, &mut vec, len).await?;
 
         Ok(Response::AllocatedBox(vec.into_boxed_slice()))
     }
@@ -106,16 +109,16 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         // Since the data is sent as a string, we need to consume the 4-byte length first.
         self.reader.read_exact(&mut [0; 4]).await?;
 
-        let len = len - 4;
+        let len = (len - 4) as usize;
 
         if let Some(mut buffer) = buffer {
             match buffer.get_buffer() {
                 crate::Buffer::Vector(vec) => {
-                    read_exact_to_vec(&mut self.reader, vec, len as usize).await?;
+                    read_exact_to_vec(&mut self.reader, vec, len).await?;
                     Ok(Response::Buffer(buffer))
                 }
                 crate::Buffer::Slice(slice) => {
-                    if slice.len() >= len as usize {
+                    if slice.len() >= len {
                         self.reader.read_exact(slice).await?;
                         Ok(Response::Buffer(buffer))
                     } else {
@@ -123,7 +126,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
                     }
                 }
                 crate::Buffer::Bytes(bytes) => {
-                    read_exact_to_bytes(&mut self.reader, bytes, len as usize).await?;
+                    read_exact_to_bytes(&mut self.reader, bytes, len).await?;
                     Ok(Response::Buffer(buffer))
                 }
             }
