@@ -92,6 +92,21 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         self.shared_data.responses.reserve(new_id_cnt);
     }
 
+    /// Flush the write buffer.
+    ///
+    /// If another thread is flushing or there isn't any
+    /// data to write, then `Ok(None)` will be returned.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is perfectly cancel safe.
+    ///
+    /// While it is true that it might only partially flushed out the data,
+    /// it can be restarted by another thread.
+    pub async fn flush(&self) -> Result<Option<()>, Error> {
+        Ok(self.shared_data.writer.flush().await?)
+    }
+
     /// Send requests.
     ///
     /// # Cancel Safety
