@@ -57,7 +57,7 @@ impl Writer {
             }
         }
 
-        AtomicWrite(
+        let ret = AtomicWrite(
             &*self.0.read().await,
             bufs,
             0,
@@ -69,7 +69,17 @@ impl Writer {
             ),
         )
         .await
-        .transpose()
+        .transpose()?;
+
+        if len == 0 {
+            return Ok(ret);
+        }
+
+        if let Some(0) = ret {
+            Err(io::Error::new(io::ErrorKind::WriteZero, ""))
+        } else {
+            Ok(ret)
+        }
     }
 
     /// * `buf` - Must not be empty
