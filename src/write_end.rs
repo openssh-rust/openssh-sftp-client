@@ -102,10 +102,16 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is perfectly cancel safe.
+    /// This function is only cancel safe if [`WriteEnd::send_write_request_direct`] or
+    /// [`WriteEnd::send_write_request_direct_vectored`] is not called when this
+    /// future is cancelled.
     ///
-    /// While it is true that it might only partially flushed out the data,
-    /// it can be restarted by another thread.
+    /// Upon cancel, it might only partially flushed out the data, which can be
+    /// restarted by another thread.
+    ///
+    /// However, if [`WriteEnd::send_write_request_direct`] or
+    /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
+    /// will be interleaved and thus produce undefined behavior.
     pub async fn flush(&self) -> Result<Option<()>, Error> {
         Ok(self.shared_data.writer.flush().await?)
     }
