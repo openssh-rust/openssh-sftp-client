@@ -142,19 +142,6 @@ impl Writer {
         }
     }
 
-    async fn write_vectored(&self, bufs: &[io::IoSlice<'_>]) -> Result<usize, io::Error> {
-        if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
-            let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
-
-            if let Some(n) = self.atomic_write_vectored_all(bufs, len).await? {
-                debug_assert_eq!(n, len);
-                return Ok(n);
-            }
-        }
-
-        self.0.write().await.write_vectored(bufs).await
-    }
-
     /// If another thread is flushing or there isn't any
     /// data to write, then `Ok(None)` will be returned.
     ///
@@ -169,8 +156,28 @@ impl Writer {
             Some(buffers) => buffers,
             None => return Ok(None),
         };
+
+        if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
+            let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
+
+            if len == 0 {
+                return Ok(Some(()));
+            }
+
+            if let Some(n) = self.atomic_write_vectored_all(bufs, len).await? {
+                debug_assert_eq!(n, len);
+
+                let res = !buffers.advance(NonZeroUsize::new(n).unwrap());
+                debug_assert!(res);
+
+                return Ok(Some(()));
+            }
+        }
+
+        let mut guard = self.0.write().await;
+
         loop {
-            let n = self.write_vectored(buffers.get_io_slices()).await?;
+            let n = guard.write_vectored(buffers.get_io_slices()).await?;
             let n = if let Some(n) = NonZeroUsize::new(n) {
                 n
             } else {
