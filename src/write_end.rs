@@ -373,42 +373,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         .map(AwaitableStatus::new)
     }
 
-    /// Send write requests directly, without any buffering.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is only cancel safe if the `data` is no more than `1024` long.
-    ///
-    /// Otherwise it is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
-    pub async fn send_write_request_direct(
-        &mut self,
-        id: Id<Buffer>,
-        handle: Cow<'_, Handle>,
-        offset: u64,
-        data: &[u8],
-    ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let header = Request::serialize_write_request(
-            &mut self.serializer,
-            ArenaArc::slot(&id.0),
-            handle,
-            offset,
-            data.len().try_into()?,
-        )?
-        .split();
-
-        id.0.reset(None);
-        self.shared_data
-            .writer
-            .write_vectored_all(&mut [IoSlice::new(&*header), IoSlice::new(data)])
-            .await?;
-
-        self.shared_data.notify_new_packet_event();
-
-        Ok(AwaitableStatus::new(id.into_inner()))
-    }
-
     /// Return limits of the server
     ///
     /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
@@ -491,5 +455,41 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         self.send_request(id, RequestInner::PosixRename { oldpath, newpath }, None)
             .map(AwaitableStatus::new)
+    }
+
+    /// Send write requests directly, without any buffering.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is only cancel safe if the `data` is no more than `1024` long.
+    ///
+    /// Otherwise it is not cancel safe, dropping the future returned
+    /// might cause the data to paritaly written, and thus the sftp-server
+    /// might demonstrate undefined behavior.
+    pub async fn send_write_request_direct(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let header = Request::serialize_write_request(
+            &mut self.serializer,
+            ArenaArc::slot(&id.0),
+            handle,
+            offset,
+            data.len().try_into()?,
+        )?
+        .split();
+
+        id.0.reset(None);
+        self.shared_data
+            .writer
+            .write_vectored_all(&mut [IoSlice::new(&*header), IoSlice::new(data)])
+            .await?;
+
+        self.shared_data.notify_new_packet_event();
+
+        Ok(AwaitableStatus::new(id.into_inner()))
     }
 }
