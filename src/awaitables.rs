@@ -47,7 +47,10 @@ pub enum Data<Buffer: ToBuffer> {
 struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
-    async fn wait(&self) {
+    async fn wait<T>(
+        self,
+        post_processing: fn(Response<Buffer>) -> Result<T, Error>,
+    ) -> Result<(Id<Buffer>, T), Error> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
@@ -73,10 +76,25 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
         }
 
         WaitFuture(Some(&self.0)).await;
-    }
 
-    fn into_inner(self) -> ArenaArc<Buffer> {
-        self.destructure().0
+        let response = self
+            .0
+            .take_output()
+            .expect("The request should be done by now");
+
+        // Reconstruct Id here so that it will be automatically
+        // released on error.
+        let id = Id::new(self.destructure().0);
+
+        // Propagate failure
+        match response {
+            Response::Header(ResponseInner::Status {
+                status_code: StatusCode::Failure(err_code),
+                err_msg,
+            }) => Err(Error::SftpError(err_code, err_msg)),
+
+            response => Ok((id, post_processing(response)?)),
+        }
     }
 }
 
@@ -110,33 +128,9 @@ macro_rules! def_awaitable {
             ///
             /// It is perfectly safe to cancel the future.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                let post_processing = |$response_name: Response<Buffer>| $post_processing;
-
-                self.0.wait().await;
-
-                let response = self
-                    .0
-                     .0
-                    .take_output()
-                    .expect("The request should be done by now");
-
-                // Reconstruct Id here so that it will be automatically
-                // released on error.
-                let id = Id::new(self.0.into_inner());
-
-                // Propagate failure
-                let response = match response {
-                    Response::Header(ResponseInner::Status {
-                        status_code: StatusCode::Failure(err_code),
-                        err_msg,
-                    }) => return Err(Error::SftpError(err_code, err_msg)),
-
-                    response => response,
-                };
-
-                let res = post_processing(response)?;
-
-                Ok((id, res))
+                self.0
+                    .wait(|$response_name: Response<Buffer>| $post_processing)
+                    .await
             }
         }
     };
