@@ -26,7 +26,7 @@ concurrent_arena = "0.1.2"
 
 derive_destructure2 = "0.0.1"
 
-openssh-sftp-protocol = "0.19.0"
+openssh-sftp-protocol = "0.20.0"
 
 # Since concurrent_arena uses dependency parking_lot anyway,
 # enabling feature parking_lot on tokio does not pull in any new dependency.

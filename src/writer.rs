@@ -225,7 +225,7 @@ impl SerBacker for WriteBuffer {
         self.0.put_u8(byte);
     }
 
-    fn truncate(&mut self, len: usize) {
-        self.0.truncate(len);
+    fn reset(&mut self) {
+        self.0.resize(4, 0);
     }
 }
