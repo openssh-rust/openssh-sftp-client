@@ -111,8 +111,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// The only async function it invokes is [`Writer::flush`],
-    /// so it is also cancel safe.
+    /// This function is perfectly cancel safe.
+    ///
+    /// While it is true that it might only partially flushed out the data,
+    /// it can be restarted by another thread.
     async fn send_request(
         &mut self,
         id: Id<Buffer>,
@@ -136,9 +138,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
@@ -195,9 +195,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_remove_request(
         &mut self,
         id: Id<Buffer>,
@@ -211,9 +209,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_rename_request(
         &mut self,
         id: Id<Buffer>,
@@ -230,9 +226,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_mkdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -247,9 +241,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_rmdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -263,9 +255,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_opendir_request(
         &mut self,
         id: Id<Buffer>,
@@ -298,9 +288,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_stat_request(
         &mut self,
         id: Id<Buffer>,
@@ -316,9 +304,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_lstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -350,9 +336,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_setstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -384,9 +368,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_readlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -400,9 +382,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_realpath_request(
         &mut self,
         id: Id<Buffer>,
@@ -418,9 +398,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -506,9 +484,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_expand_path_request(
         &mut self,
         id: Id<Buffer>,
@@ -544,9 +520,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_hardlink_requst(
         &mut self,
         id: Id<Buffer>,
@@ -565,9 +539,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///
     /// # Cancel Safety
     ///
-    /// This function is not cancel safe, dropping the future returned
-    /// might cause the data to paritaly written, and thus the sftp-server
-    /// might demonstrate undefined behavior.
+    /// This function is cancel safe.
     pub async fn send_posix_rename_request(
         &mut self,
         id: Id<Buffer>,
