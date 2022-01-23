@@ -216,9 +216,7 @@ pub(crate) struct WriteBuffer(BytesMut);
 impl WriteBuffer {
     /// split out one buffer
     pub(crate) fn split(&mut self) -> Bytes {
-        let ret = self.0.split().freeze();
-        self.0.put([0_u8, 0_u8, 0_u8, 0_u8].as_ref());
-        ret
+        self.0.split().freeze()
     }
 
     pub(crate) fn put_io_slices(&mut self, io_slices: &[IoSlice<'_>]) {
