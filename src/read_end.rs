@@ -233,4 +233,17 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     pub async fn wait_for_new_request(&self) -> u32 {
         self.shared_data.wait_for_new_request().await
     }
+
+    /// If another thread is flushing or there isn't any
+    /// data to write, then `Ok(None)` will be returned.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is perfectly cancel safe.
+    ///
+    /// While it is true that it might only partially flushed out the data,
+    /// it can be restarted by another thread.
+    pub async fn flush_write_end_buffer(&self) -> Result<Option<()>, Error> {
+        Ok(self.shared_data.writer.flush().await?)
+    }
 }
