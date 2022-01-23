@@ -418,7 +418,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         ))
     }
 
-    /// Send write requests
+    /// Send write requests directly, without any buffering.
     ///
     /// # Cancel Safety
     ///
@@ -427,7 +427,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// Otherwise it is not cancel safe, dropping the future returned
     /// might cause the data to paritaly written, and thus the sftp-server
     /// might demonstrate undefined behavior.
-    pub async fn send_write_request(
+    pub async fn send_write_request_direct(
         &mut self,
         id: Id<Buffer>,
         handle: Cow<'_, Handle>,

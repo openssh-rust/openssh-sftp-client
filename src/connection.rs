@@ -245,7 +245,7 @@ mod tests {
         let msg = "Hello, world!".as_bytes();
 
         let awaitable = write_end
-            .send_write_request(id, Cow::Borrowed(&handle), 0, msg)
+            .send_write_request_direct(id, Cow::Borrowed(&handle), 0, msg)
             .await
             .unwrap();
 
