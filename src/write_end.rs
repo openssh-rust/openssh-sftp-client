@@ -660,7 +660,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id.0.reset(None);
         self.shared_data
             .writer
-            .write_vectored_all_slices(&IoSlice::new(&*header), data)
+            .write_vectored_all_with_header(&IoSlice::new(&*header), data)
             .await?;
 
         self.shared_data.notify_new_packet_event();

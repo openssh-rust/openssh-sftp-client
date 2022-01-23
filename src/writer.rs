@@ -139,7 +139,7 @@ impl Writer {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_vectored_all_slices(
+    pub(crate) async fn write_vectored_all_with_header(
         &self,
         header: &io::IoSlice<'_>,
         bufs: &[io::IoSlice<'_>],
