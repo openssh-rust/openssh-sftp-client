@@ -109,6 +109,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// Send requests.
     ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Cancel Safety
     ///
     /// This function is perfectly cancel safe.
@@ -136,6 +139,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(id.into_inner())
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
@@ -145,6 +150,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableHandle::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
@@ -161,6 +169,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ///   then `Data::AllocatedBox` will be returned.
     ///
     /// Return `Data::Buffer` if not EOF, otherwise returns `Data::EOF`.
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_read_request(
         &mut self,
         id: Id<Buffer>,
@@ -181,6 +192,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         .map(AwaitableData::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_remove_request(
         &mut self,
         id: Id<Buffer>,
@@ -190,6 +203,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_rename_request(
         &mut self,
         id: Id<Buffer>,
@@ -201,6 +216,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// * `attrs` - `attrs.get_size()` must be equal to `None`.
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_mkdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -211,6 +229,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_rmdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -220,6 +240,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_opendir_request(
         &mut self,
         id: Id<Buffer>,
@@ -233,6 +255,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// `.` and `..`.
     ///
     /// The `filename` only contains the basename.
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_readdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -242,6 +267,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableNameEntries::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_stat_request(
         &mut self,
         id: Id<Buffer>,
@@ -252,6 +279,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Does not follow symlink
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_lstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -263,7 +293,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// * `handle` - Must be opened with `FileMode::READ`.
     ///
-    /// Does not follow symlink
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_fstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -273,6 +304,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableAttrs::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_setstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -284,6 +317,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// * `handle` - Must be opened with `OpenOptions::write` set.
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_fsetstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -294,6 +330,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_readlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -303,6 +341,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableName::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_realpath_request(
         &mut self,
         id: Id<Buffer>,
@@ -313,6 +353,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Create symlink
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
     pub fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -368,6 +411,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// Return limits of the server
     ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::limits`] to be true.
@@ -385,6 +431,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// These paths are expanded using shell-lilke rules and the resultant path
     /// is canonicalised similarly to [`WriteEnd::send_realpath_request`].
     ///
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::expand_path`] to be true.
@@ -397,6 +446,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableName::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::fsync`] to be true.
@@ -409,6 +461,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::hardlink`] to be true.
@@ -422,6 +477,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
+    /// to actually send the requests.
+    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::posix_rename`] to be true.
