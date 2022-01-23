@@ -199,7 +199,9 @@ mod tests {
             .unwrap()
     }
 
-    async fn read_one_packet(read_end: &mut ReadEnd<Vec<u8>>) {
+    async fn read_one_packet(write_end: &mut WriteEnd<Vec<u8>>, read_end: &mut ReadEnd<Vec<u8>>) {
+        write_end.flush().await.unwrap();
+
         eprintln!("Wait for new request");
         assert_eq!(read_end.wait_for_new_request().await, 1);
 
@@ -235,7 +237,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, handle) = awaitable.wait().await.unwrap();
 
         eprintln!("handle = {:#?}", handle);
@@ -249,7 +251,7 @@ mod tests {
 
         eprintln!("Waiting for write response");
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         let awaitable = write_end
@@ -257,7 +259,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Open it again and read from it
@@ -266,7 +268,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, handle) = awaitable.wait().await.unwrap();
 
         eprintln!("handle = {:#?}", handle);
@@ -276,7 +278,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, data) = awaitable.wait().await.unwrap();
 
         match data {
@@ -310,7 +312,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Try open it again
@@ -346,7 +348,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Open it again
@@ -380,7 +382,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Open it
@@ -413,7 +415,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Try open it
@@ -454,7 +456,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, handle) = awaitable.wait().await.unwrap();
 
         // read it
@@ -463,7 +465,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, entries) = awaitable.wait().await.unwrap();
 
         for entry in entries.iter() {
@@ -514,7 +516,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, attrs) = awaitable.wait().await.unwrap();
 
         assert_eq!(attrs.get_size().unwrap(), 2000);
@@ -550,7 +552,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, attrs) = awaitable.wait().await.unwrap();
 
         assert_eq!(attrs.get_filetype().unwrap(), FileType::Symlink);
@@ -582,7 +584,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, handle) = awaitable.wait().await.unwrap();
 
         // fstat
@@ -591,7 +593,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, attrs) = awaitable.wait().await.unwrap();
 
         assert_eq!(attrs.get_size().unwrap(), 2000);
@@ -628,7 +630,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // stat
@@ -637,7 +639,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, attrs) = awaitable.wait().await.unwrap();
 
         assert_eq!(attrs.get_size().unwrap(), 10000);
@@ -676,7 +678,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, handle) = awaitable.wait().await.unwrap();
 
         // fsetstat
@@ -688,8 +690,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Error here
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // fstat
@@ -698,7 +699,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, attrs) = awaitable.wait().await.unwrap();
 
         assert_eq!(attrs.get_size().unwrap(), 10000);
@@ -734,7 +735,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, path) = awaitable.wait().await.unwrap();
 
         assert_eq!(&*path, &*filename);
@@ -769,7 +770,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, path) = awaitable.wait().await.unwrap();
 
         assert_eq!(&*path, &*fs::canonicalize(&filename).unwrap());
@@ -803,7 +804,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         assert_eq!(
@@ -830,7 +831,7 @@ mod tests {
         assert!(extensions.limits);
         let awaitable = write_end.send_limits_request(id).await.unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, limits) = awaitable.wait().await.unwrap();
 
         eprintln!("{:#?}", limits);
@@ -861,7 +862,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, expanded_path) = awaitable.wait().await.unwrap();
 
         assert_eq!(&*expanded_path, &*home);
@@ -900,7 +901,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let (id, handle) = awaitable.wait().await.unwrap();
 
         // fsync
@@ -909,7 +910,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         drop(id);
@@ -941,7 +942,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Open the new name and old name again
@@ -981,7 +982,7 @@ mod tests {
             .await
             .unwrap();
 
-        read_one_packet(&mut read_end).await;
+        read_one_packet(&mut write_end, &mut read_end).await;
         let id = awaitable.wait().await.unwrap().0;
 
         // Open again
