@@ -506,13 +506,14 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         )?
         .split();
 
-        id.0.reset(None);
+        // queue_pusher holds the mutex, so the `push` are atomic.
         let mut queue_pusher = self.shared_data.writer.get_pusher();
         queue_pusher.push(header);
         for bytes in data {
             queue_pusher.push(bytes.clone());
         }
 
+        id.0.reset(None);
         self.shared_data.notify_new_packet_event();
 
         Ok(AwaitableStatus::new(id.into_inner()))
