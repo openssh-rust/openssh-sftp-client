@@ -76,14 +76,6 @@ impl Writer {
         .transpose()
     }
 
-    async fn atomic_write_all(
-        &self,
-        buf: AtomicWriteBuffer<'_>,
-    ) -> Result<Option<usize>, io::Error> {
-        self.do_atomic_write_all(buf, buf.into_inner().len(), PipeWrite::poll_write_atomic)
-            .await
-    }
-
     /// * `buf` - Must not be empty
     ///
     /// Write to pipe without any buffering.
