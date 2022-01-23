@@ -19,9 +19,6 @@ use openssh_sftp_protocol::Handle;
 
 use bytes::Bytes;
 
-// TODO:
-//  - Support IoSlice for data in `send_write_request`
-
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
