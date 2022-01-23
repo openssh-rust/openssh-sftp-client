@@ -17,6 +17,8 @@ use tokio_io_utility::queue::{MpScBytesQueue, QueuePusher};
 use tokio_io_utility::write_vectored_all;
 use tokio_pipe::{AtomicWriteBuffer, AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
+use arrayvec::ArrayVec;
+
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
 
 #[derive(Debug)]
@@ -128,6 +130,33 @@ impl Writer {
         }
 
         write_vectored_all(&mut *self.0.write().await, bufs).await
+    }
+
+    /// * `bufs` - Accmulated len of all buffers must not be `0`.
+    ///
+    /// Write to pipe without any buffering.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe, but it might cause the data to be partially written.
+    pub(crate) async fn write_vectored_all_slices(
+        &self,
+        header: &io::IoSlice<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Result<(), io::Error> {
+        if bufs.len() <= 29 {
+            let mut vec = ArrayVec::<_, 30>::new();
+            vec.push(*header);
+            vec.try_extend_from_slice(bufs).unwrap();
+
+            self.write_vectored_all(&mut vec).await
+        } else {
+            let mut vec = Vec::with_capacity(1 + bufs.len());
+            vec.push(*header);
+            vec.extend_from_slice(bufs);
+
+            self.write_vectored_all(&mut vec).await
+        }
     }
 
     async fn write_vectored(&self, bufs: &[io::IoSlice<'_>]) -> Result<usize, io::Error> {

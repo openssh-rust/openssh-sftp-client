@@ -588,4 +588,43 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
+
+    /// Send vectored write requests directly, without any buffering.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is only cancel safe if the `data` is no more than `1024` long.
+    ///
+    /// Otherwise it is not cancel safe, dropping the future returned
+    /// might cause the data to paritaly written, and thus the sftp-server
+    /// might demonstrate undefined behavior.
+    pub async fn send_write_request_direct_vectored(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data: &[IoSlice<'_>],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let len: usize = data.iter().map(|io_slice| io_slice.len()).sum();
+        let len: u32 = len.try_into()?;
+
+        let header = Request::serialize_write_request(
+            &mut self.serializer,
+            ArenaArc::slot(&id.0),
+            handle,
+            offset,
+            len,
+        )?
+        .split();
+
+        id.0.reset(None);
+        self.shared_data
+            .writer
+            .write_vectored_all_slices(&IoSlice::new(&*header), data)
+            .await?;
+
+        self.shared_data.notify_new_packet_event();
+
+        Ok(AwaitableStatus::new(id.into_inner()))
+    }
 }

@@ -366,6 +366,78 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_write_direct_vectored() {
+        let (mut write_end, mut read_end, mut child) = connect().await;
+
+        let id = write_end.create_response_id();
+
+        let tempdir = create_tmpdir();
+
+        let filename = tempdir.path().join("file");
+
+        // Create one file and write to it
+        let mut file_attrs = FileAttrs::new();
+        file_attrs.set_size(2000);
+        file_attrs.set_permissions(Permissions::READ_BY_OWNER | Permissions::WRITE_BY_OWNER);
+        let file_attrs = file_attrs;
+
+        let awaitable = write_end
+            .send_open_file_request(
+                id,
+                OpenOptions::new().read(true).write(true).create(
+                    Cow::Borrowed(&filename),
+                    CreateFlags::Excl,
+                    file_attrs,
+                ),
+            )
+            .unwrap();
+
+        read_one_packet(&mut write_end, &mut read_end).await;
+        let (id, handle) = awaitable.wait().await.unwrap();
+
+        eprintln!("handle = {:#?}", handle);
+
+        let msg = "Hello, world!".as_bytes();
+
+        let awaitable = write_end
+            .send_write_request_direct_vectored(
+                id,
+                Cow::Borrowed(&handle),
+                0,
+                &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
+            )
+            .await
+            .unwrap();
+
+        eprintln!("Waiting for write response");
+
+        read_one_packet(&mut write_end, &mut read_end).await;
+        let id = awaitable.wait().await.unwrap().0;
+
+        // Read from it
+        let awaitable = write_end
+            .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
+            .unwrap();
+
+        read_one_packet(&mut write_end, &mut read_end).await;
+        let (id, data) = awaitable.wait().await.unwrap();
+
+        match data {
+            Data::AllocatedBox(data) => assert_eq!(&*data, msg),
+            _ => panic!("Unexpected data"),
+        };
+
+        drop(id);
+        drop(write_end);
+
+        assert_eq!(read_end.wait_for_new_request().await, 0);
+
+        drop(read_end);
+
+        assert!(child.wait().await.unwrap().success());
+    }
+
+    #[tokio::test]
     async fn test_write_buffered() {
         test_write_impl(|write_end, id, handle, msg| {
             write_end
