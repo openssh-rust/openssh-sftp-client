@@ -100,13 +100,14 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
         is_conn_closed: AtomicBool::new(false),
     });
 
-    let mut read_end = ReadEnd::new(reader, shared_data.clone());
-    let mut write_end = WriteEnd::new(shared_data);
-
-    // negotiate
+    // Send hello message
     let version = SSH2_FILEXFER_VERSION;
 
+    let mut write_end = WriteEnd::new(shared_data);
     write_end.send_hello(version).await?;
+
+    // Receive version and extensions
+    let mut read_end = ReadEnd::new(reader, write_end.get_shared_data().clone());
     let extensions = read_end.receive_server_version(version).await?;
 
     Ok((write_end, read_end, extensions))

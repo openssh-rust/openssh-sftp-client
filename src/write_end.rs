@@ -56,12 +56,18 @@ impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
 
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
-        self.shared_data
+        Arc::get_mut(&mut self.shared_data)
+            .unwrap()
             .writer
             .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
             .await?;
 
         Ok(())
+    }
+
+    /// This is for [`crate::connect`] to obtain `Arc<SharedData>`.
+    pub(crate) fn get_shared_data(&self) -> &Arc<SharedData<Buffer>> {
+        &self.shared_data
     }
 
     fn serialize<T>(serializer: &mut Serializer<WriteBuffer>, value: T) -> Result<Bytes, Error>

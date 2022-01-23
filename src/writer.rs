@@ -91,14 +91,8 @@ impl Writer {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_all(&self, buf: &[u8]) -> Result<(), io::Error> {
-        if let Some(buf) = AtomicWriteBuffer::new(buf) {
-            if self.atomic_write_all(buf).await?.is_some() {
-                return Ok(());
-            }
-        }
-
-        self.0.write().await.write_all(buf).await
+    pub(crate) async fn write_all(&mut self, buf: &[u8]) -> Result<(), io::Error> {
+        self.0.get_mut().write_all(buf).await
     }
 
     async fn atomic_write_vectored_all(
