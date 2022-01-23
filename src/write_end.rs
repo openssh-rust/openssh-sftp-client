@@ -453,6 +453,15 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`WriteEnd::flush`] to actually send the requests.
     ///
@@ -479,6 +488,15 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         .map(AwaitableStatus::new)
     }
 
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`WriteEnd::flush`] to actually send the requests.
     ///
@@ -513,6 +531,15 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(AwaitableStatus::new(id.into_inner()))
     }
 
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`WriteEnd::flush`] to actually send the requests.
     ///
@@ -549,7 +576,17 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(AwaitableStatus::new(id.into_inner()))
     }
 
-    /// Send write requests directly, without any buffering.
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// This function sends write requests directly, without any buffering, thus it is
+    /// not cancel safe.
     ///
     /// # Cancel Safety
     ///
@@ -585,7 +622,17 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(AwaitableStatus::new(id.into_inner()))
     }
 
-    /// Send vectored write requests directly, without any buffering.
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// This function sends vectored write requests directly, without any buffering,
+    /// thus it is not cancel safe.
     ///
     /// # Cancel Safety
     ///
