@@ -32,11 +32,13 @@ impl Writer {
         )
     }
 
+    /// Return `Ok(true)` is atomic write succeeds, `Ok(false)` if non-atomic
+    /// write is required.
     async fn atomic_write_vectored_all(
         &self,
         bufs: AtomicWriteIoSlices<'_, '_>,
         len: usize,
-    ) -> Result<Option<usize>, io::Error> {
+    ) -> Result<bool, io::Error> {
         #[must_use = "futures do nothing unless you `.await` or poll them"]
         struct AtomicWrite<'a>(&'a PipeWrite, AtomicWriteIoSlices<'a, 'a>, u16, u16);
 
@@ -57,6 +59,10 @@ impl Writer {
             }
         }
 
+        if len == 0 {
+            return Ok(true);
+        }
+
         let ret = AtomicWrite(
             &*self.0.read().await,
             bufs,
@@ -71,14 +77,15 @@ impl Writer {
         .await
         .transpose()?;
 
-        if len == 0 {
-            return Ok(ret);
-        }
-
-        if let Some(0) = ret {
-            Err(io::Error::new(io::ErrorKind::WriteZero, ""))
+        if let Some(n) = ret {
+            if n == 0 {
+                Err(io::Error::new(io::ErrorKind::WriteZero, ""))
+            } else {
+                debug_assert_eq!(n, len);
+                Ok(true)
+            }
         } else {
-            Ok(ret)
+            Ok(false)
         }
     }
 
@@ -107,7 +114,7 @@ impl Writer {
         if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
             let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
 
-            if self.atomic_write_vectored_all(bufs, len).await?.is_some() {
+            if self.atomic_write_vectored_all(bufs, len).await? {
                 return Ok(());
             }
         }
@@ -164,10 +171,8 @@ impl Writer {
                 return Ok(Some(()));
             }
 
-            if let Some(n) = self.atomic_write_vectored_all(bufs, len).await? {
-                debug_assert_eq!(n, len);
-
-                let res = !buffers.advance(NonZeroUsize::new(n).unwrap());
+            if self.atomic_write_vectored_all(bufs, len).await? {
+                let res = !buffers.advance(NonZeroUsize::new(len).unwrap());
                 debug_assert!(res);
 
                 return Ok(Some(()));
