@@ -498,16 +498,16 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         io_slices: &[IoSlice<'_>],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         let len: usize = io_slices.iter().map(|io_slice| io_slice.len()).sum();
-        let len: u32 = len.try_into()?;
 
         let buffer = Request::serialize_write_request(
             &mut self.serializer,
             ArenaArc::slot(&id.0),
             handle,
             offset,
-            len,
+            len.try_into()?,
         )?;
 
+        buffer.reserve(len);
         buffer.put_io_slices(io_slices);
 
         id.0.reset(None);
