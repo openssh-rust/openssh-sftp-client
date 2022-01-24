@@ -102,7 +102,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// Flush the write buffer.
     ///
     /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(None)` will be returned.
+    /// data to write, then `Ok(false)` will be returned.
     ///
     /// # Cancel Safety
     ///
@@ -116,7 +116,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// However, if [`WriteEnd::send_write_request_direct`] or
     /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
     /// will be interleaved and thus produce undefined behavior.
-    pub async fn flush(&self) -> Result<Option<()>, Error> {
+    pub async fn flush(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer.flush().await?)
     }
 

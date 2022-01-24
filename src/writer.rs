@@ -150,7 +150,7 @@ impl Writer {
     }
 
     /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(None)` will be returned.
+    /// data to write, then `Ok(false)` will be returned.
     ///
     /// # Cancel Safety
     ///
@@ -158,12 +158,12 @@ impl Writer {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    pub(crate) async fn flush(&self) -> Result<Option<()>, io::Error> {
+    pub(crate) async fn flush(&self) -> Result<bool, io::Error> {
         // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
         // to be non-empty
         let mut buffers = match self.1.get_buffers() {
             Some(buffers) => buffers,
-            None => return Ok(None),
+            None => return Ok(false),
         };
 
         if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
@@ -173,7 +173,7 @@ impl Writer {
                 let res = !buffers.advance(NonZeroUsize::new(len).unwrap());
                 debug_assert!(res);
 
-                return Ok(Some(()));
+                return Ok(true);
             }
         }
 
@@ -193,7 +193,7 @@ impl Writer {
             };
 
             if !buffers.advance(n) {
-                break Ok(Some(()));
+                break Ok(true);
             }
         }
     }

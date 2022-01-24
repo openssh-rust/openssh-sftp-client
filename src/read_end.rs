@@ -253,7 +253,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     }
 
     /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(None)` will be returned.
+    /// data to write, then `Ok(false)` will be returned.
     ///
     /// # Cancel Safety
     ///
@@ -261,7 +261,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    pub async fn flush_write_end_buffer(&self) -> Result<Option<()>, Error> {
+    pub async fn flush_write_end_buffer(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer.flush().await?)
     }
 }
