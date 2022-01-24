@@ -567,7 +567,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         )?
         .split();
 
-        // queue_pusher holds the mutex, so the `push` are atomic.
+        // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
         let mut queue_pusher = self.shared_data.writer.get_pusher();
         queue_pusher.push(header);
         queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
