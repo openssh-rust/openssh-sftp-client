@@ -95,6 +95,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         self.shared_data.responses.reserve(new_id_cnt);
     }
 
+    pub fn reserve_buffer(&mut self, additional: usize) {
+        self.serializer.reserve(additional);
+    }
+
     /// Flush the write buffer.
     ///
     /// If another thread is flushing or there isn't any
