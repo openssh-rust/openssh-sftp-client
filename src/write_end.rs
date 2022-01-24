@@ -168,9 +168,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// - `buffer` - If set to `None` or the buffer is not long enough,
-    ///   then `Data::AllocatedBox` will be returned.
+    ///   then [`crate::Data::AllocatedBox`] will be returned.
     ///
-    /// Return `Data::Buffer` if not EOF, otherwise returns `Data::EOF`.
+    /// Return [`crate::Data::Buffer`] or [`crate::Data::AllocatedBox`] if not EOF,
+    /// otherwise returns [`crate::Data::EOF`].
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`WriteEnd::flush`] to actually send the requests.
@@ -217,7 +218,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .map(AwaitableStatus::new)
     }
 
-    /// * `attrs` - `attrs.get_size()` must be equal to `None`.
+    /// * `attrs` - [`FileAttrs::get_size`] must be equal to `None`.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`WriteEnd::flush`] to actually send the requests.
