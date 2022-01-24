@@ -33,8 +33,8 @@ pub enum Error {
     #[error("sftp-server run on remote server failed: {0}.")]
     SftpServerFailure(ExitStatus),
 
-    /// IO Error (Excluding `EWOULDBLOCK`): {0}.
-    #[error("IO Error (Excluding `EWOULDBLOCK`): {0}.")]
+    /// IO Error (Excluding [`io::ErrorKind::WouldBlock`]): {0}.
+    #[error("IO Error (Excluding `io::ErrorKind::WouldBlock`): {0}.")]
     IOError(#[from] io::Error),
 
     /// Failed to serialize/deserialize the message: {0}.
@@ -55,7 +55,7 @@ pub enum Error {
     #[error("The response id {response_id} is invalid.")]
     InvalidResponseId { response_id: u32 },
 
-    /// (OriginalError, RecursiveError): {0:#?}.
+    /// (OriginalError, RecursiveError)
     #[error("(OriginalError, RecursiveError): {0:#?}.")]
     RecursiveErrors(Box<(Error, Error)>),
 
