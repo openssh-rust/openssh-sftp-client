@@ -118,15 +118,8 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
     /// Send requests.
     ///
-    /// NOTE that this merely add the request to the buffer, you need to call [`WriteEnd::flush`]
-    /// to actually send the requests.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is perfectly cancel safe.
-    ///
-    /// While it is true that it might only partially flushed out the data,
-    /// it can be restarted by another thread.
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`WriteEnd::flush`] to actually send the requests.
     fn send_request(
         &mut self,
         id: Id<Buffer>,
