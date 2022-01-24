@@ -230,7 +230,9 @@ impl WriteBuffer {
 
 impl SerBacker for WriteBuffer {
     fn new() -> Self {
-        let mut bytes = BytesMut::with_capacity(4);
+        // Since `BytesMut` v1.1.0 does not reuse the underlying `Vec` that is shared
+        // with other `BytesMut`/`Bytes` if it is too small.
+        let mut bytes = BytesMut::with_capacity(1000);
         bytes.put([0_u8, 0_u8, 0_u8, 0_u8].as_ref());
         Self(bytes)
     }
