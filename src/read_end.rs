@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
-use super::awaitable_responses::ArenaArc;
-use super::awaitable_responses::Response;
-use super::connection::SharedData;
-use super::Error;
-use super::Extensions;
-use super::ToBuffer;
+use crate::awaitable_responses::ArenaArc;
+use crate::awaitable_responses::Response;
+use crate::connection::SharedData;
+use crate::Error;
+use crate::Extensions;
+use crate::ToBuffer;
 
 use core::fmt::Debug;
 
@@ -252,15 +252,24 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         self.shared_data.wait_for_new_request().await
     }
 
+    /// Flush the write buffer.
+    ///
     /// If another thread is flushing or there isn't any
     /// data to write, then `Ok(false)` will be returned.
     ///
     /// # Cancel Safety
     ///
-    /// This function is perfectly cancel safe.
+    /// This function is only cancel safe if
+    /// [`crate::WriteEnd::send_write_request_direct`] or
+    /// [`crate::WriteEnd::send_write_request_direct_vectored`] is not called when this
+    /// future is cancelled.
     ///
-    /// While it is true that it might only partially flushed out the data,
-    /// it can be restarted by another thread.
+    /// Upon cancel, it might only partially flushed out the data, which can be
+    /// restarted by another thread.
+    ///
+    /// However, if [`crate::WriteEnd::send_write_request_direct`] or
+    /// [`crate::WriteEnd::send_write_request_direct_vectored`] is called, then the
+    /// write data will be interleaved and thus produce undefined behavior.
     pub async fn flush_write_end_buffer(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer.flush().await?)
     }
