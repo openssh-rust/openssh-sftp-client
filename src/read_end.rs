@@ -158,6 +158,14 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
     /// Precondition: `self.wait_for_new_request()` must not be 0.
     ///
+    /// # Restart on Error
+    ///
+    /// Only when the returned error is [`Error::InvalidResponseId`] or
+    /// [`Error::AwaitableError`], can the function be restarted.
+    ///
+    /// Upon other errors [`Error::IOError`], [`Error::FormatError`] and
+    /// [`Error::RecursiveErrors`], the sftp session has to be discarded.
+    ///
     /// # Example
     ///
     /// ```rust,ignore
