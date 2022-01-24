@@ -256,4 +256,8 @@ impl SerBacker for WriteBuffer {
     fn reset(&mut self) {
         self.0.resize(4, 0);
     }
+
+    fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional);
+    }
 }
