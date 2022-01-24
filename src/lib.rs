@@ -2,8 +2,8 @@
 //! the sftp protocol and is implemented in pure Rust.
 //!
 //! It supports sending multiple requests concurrently using [`WriteEnd`]
-//! (it can be `clone`d), however receiving responses have to be done sequentially
-//! using [`ReadEnd::read_in_one_packet`].
+//! (it can be [`WriteEnd::clone`]d), however receiving responses have to be done
+//! sequentially using [`ReadEnd::read_in_one_packet`].
 //!
 //! To create [`WriteEnd`] and [`ReadEnd`], simply pass the `stdin` and `stdout` of
 //! the `sftp-server` launched at remote to [`connect`].
