@@ -159,7 +159,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
             .map(Response::ExtendedReply)
     }
 
-    /// Precondition: `self.wait_for_new_request()` must not be 0.
+    /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
     ///
     /// # Restart on Error
     ///
@@ -242,7 +242,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     /// **Read 0 if the connection is closed.**
     ///
     /// You must call this function in a loop, break if this function returns
-    /// 0, otherwise call `read_in_one_packet` for `n` times where `n` in the
+    /// 0, otherwise call [`ReadEnd::read_in_one_packet`] for `n` times where `n` in the
     /// return value of this function, then repeat.
     ///
     /// # Cancel Safety
