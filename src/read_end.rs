@@ -41,7 +41,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     ) -> Result<Extensions, Error> {
         // Receive server version
         let len: u32 = self.read_and_deserialize(4).await?;
-        if (len as usize) > PIPE_BUF {
+        if (len as usize) > 4096 {
             return Err(Error::SftpServerHelloMsgTooLong { len });
         }
 
