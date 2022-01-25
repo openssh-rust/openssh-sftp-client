@@ -28,7 +28,7 @@ impl Writer {
     pub(crate) fn new(pipe_write: PipeWrite) -> Self {
         Self(
             RwLockAsync::new(pipe_write),
-            MpScBytesQueue::new(NonZeroUsize::new(100).unwrap()),
+            MpScBytesQueue::new(NonZeroUsize::new(128).unwrap()),
         )
     }
 
