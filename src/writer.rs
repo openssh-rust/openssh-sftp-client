@@ -37,7 +37,6 @@ impl Writer {
     async fn atomic_write_vectored_all(
         &self,
         bufs: AtomicWriteIoSlices<'_, '_>,
-        len: usize,
     ) -> Result<bool, io::Error> {
         #[must_use = "futures do nothing unless you `.await` or poll them"]
         struct AtomicWrite<'a>(&'a PipeWrite, AtomicWriteIoSlices<'a, 'a>, u16, u16);
@@ -58,6 +57,8 @@ impl Writer {
                 writer.poll_write_vectored_atomic(cx, input).map(Some)
             }
         }
+
+        let len = bufs.get_total_len();
 
         if len == 0 {
             return Ok(true);
@@ -112,9 +113,7 @@ impl Writer {
         bufs: &mut [io::IoSlice<'_>],
     ) -> Result<(), io::Error> {
         if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
-            let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
-
-            if self.atomic_write_vectored_all(bufs, len).await? {
+            if self.atomic_write_vectored_all(bufs).await? {
                 return Ok(());
             }
         }
@@ -167,9 +166,9 @@ impl Writer {
         };
 
         if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
-            let len: usize = bufs.into_inner().iter().map(|slice| slice.len()).sum();
+            let len = bufs.get_total_len();
 
-            if self.atomic_write_vectored_all(bufs, len).await? {
+            if self.atomic_write_vectored_all(bufs).await? {
                 let res = !buffers.advance(NonZeroUsize::new(len).unwrap());
                 debug_assert!(res);
 
