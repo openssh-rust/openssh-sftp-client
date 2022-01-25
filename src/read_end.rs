@@ -30,7 +30,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     pub(crate) fn new(reader: PipeRead, shared_data: Arc<SharedData<Buffer>>) -> Self {
         Self {
             reader: BufReader::with_capacity(PIPE_BUF, reader),
-            buffer: Vec::new(),
+            buffer: Vec::with_capacity(64),
             shared_data,
         }
     }
