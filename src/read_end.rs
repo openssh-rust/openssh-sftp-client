@@ -238,7 +238,8 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
         Ok(res?)
     }
 
-    /// Return number of requests sent and number of responses to read in.
+    /// Return number of requests sent (including requests that are still in the write
+    /// buffer and not yet flushed) and number of responses to read in.
     /// **Read 0 if the connection is closed.**
     ///
     /// You must call this function in a loop, break if this function returns
