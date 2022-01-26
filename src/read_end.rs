@@ -7,15 +7,15 @@ use crate::Error;
 use crate::Extensions;
 use crate::ToBuffer;
 
-use core::fmt::Debug;
-
+use std::fmt::Debug;
+use std::io;
 use std::sync::Arc;
 
 use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy_buf, sink, AsyncReadExt, BufReader};
+use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 use tokio_pipe::{PipeRead, PIPE_BUF};
 
@@ -273,5 +273,26 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     /// write data will be interleaved and thus produce undefined behavior.
     pub async fn flush_write_end_buffer(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer.flush().await?)
+    }
+
+    /// Wait for next packet to be readable.
+    ///
+    /// Return `Ok(())` if next packet is ready and readable, `Error::IOError(io_error)`
+    /// where `io_error.kind() == ErrorKind::UnexpectedEof` if `EOF` is met.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe and thus can be used with `tokio::select!`
+    /// to implement [`ReadEnd::flush_write_end_buffer`] on timeout.
+    pub async fn ready_for_read(&mut self) -> Result<(), Error> {
+        if self.reader.fill_buf().await?.is_empty() {
+            // Empty buffer means EOF
+            Err(Error::IOError(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "",
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
