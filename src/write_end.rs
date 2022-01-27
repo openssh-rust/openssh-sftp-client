@@ -120,6 +120,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// However, if [`WriteEnd::send_write_request_direct`] or
     /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
     /// will be interleaved and thus produce undefined behavior.
+    #[inline]
     pub async fn flush(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer.flush().await?)
     }
