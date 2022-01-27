@@ -226,6 +226,16 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
         let res = callback.done(response);
 
+        // If counter == 2, then it must be one of the following situation:
+        //  - `ReadEnd` is the only holder other than the `Arena` itself;
+        //  - `ReadEnd` and the `AwaitableInner` is the holder and `AwaitableInner::drop`
+        //    has already `ArenaArc::remove`d it.
+        //
+        // In case 1, since there is no `AwaitableInner` holding reference to it,
+        // it can be removed safely.
+        //
+        // In case 2, since it is already removed, remove it again is a no-op.
+        //
         // NOTE that if the arc is dropped after this call while having the
         // `Awaitable*::drop` executed before `callback.done`, then the callback
         // would not be removed.
