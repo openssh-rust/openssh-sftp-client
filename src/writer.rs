@@ -108,10 +108,7 @@ impl Writer {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_vectored_all(
-        &self,
-        bufs: &mut [io::IoSlice<'_>],
-    ) -> Result<(), io::Error> {
+    async fn write_vectored_all(&self, bufs: &mut [io::IoSlice<'_>]) -> Result<(), io::Error> {
         if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
             if self.atomic_write_vectored_all(bufs).await? {
                 return Ok(());
@@ -128,7 +125,21 @@ impl Writer {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_vectored_all_with_header(
+    pub(crate) async fn write_vectored_all_direct(
+        &self,
+        bufs: &mut [io::IoSlice<'_>],
+    ) -> Result<(), io::Error> {
+        self.write_vectored_all(bufs).await
+    }
+
+    /// * `bufs` - Accmulated len of all buffers must not be `0`.
+    ///
+    /// Write to pipe without any buffering.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe, but it might cause the data to be partially written.
+    pub(crate) async fn write_vectored_all_direct_with_header(
         &self,
         header: &io::IoSlice<'_>,
         bufs: &[io::IoSlice<'_>],
@@ -138,13 +149,13 @@ impl Writer {
             vec.push(*header);
             vec.try_extend_from_slice(bufs).unwrap();
 
-            self.write_vectored_all(&mut vec).await
+            self.write_vectored_all_direct(&mut vec).await
         } else {
             let mut vec = Vec::with_capacity(1 + bufs.len());
             vec.push(*header);
             vec.extend_from_slice(bufs);
 
-            self.write_vectored_all(&mut vec).await
+            self.write_vectored_all_direct(&mut vec).await
         }
     }
 

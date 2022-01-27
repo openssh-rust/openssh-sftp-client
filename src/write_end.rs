@@ -626,7 +626,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id.0.reset(None);
         self.shared_data
             .writer
-            .write_vectored_all(&mut [IoSlice::new(&*header), IoSlice::new(data)])
+            .write_vectored_all_direct(&mut [IoSlice::new(&*header), IoSlice::new(data)])
             .await?;
 
         self.shared_data.notify_new_packet_event();
@@ -675,7 +675,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         id.0.reset(None);
         self.shared_data
             .writer
-            .write_vectored_all_with_header(&IoSlice::new(&*header), data)
+            .write_vectored_all_direct_with_header(&IoSlice::new(&*header), data)
             .await?;
 
         self.shared_data.notify_new_packet_event();
