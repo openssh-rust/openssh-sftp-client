@@ -34,6 +34,7 @@ pub(crate) struct SharedData<Buffer: ToBuffer + 'static> {
 }
 
 impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
+    #[inline(always)]
     fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
         self.notify.notify_one();
