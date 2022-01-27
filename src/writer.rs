@@ -198,10 +198,12 @@ impl Writer {
     }
 
     /// Push the bytes into buffer.
+    #[inline(always)]
     pub(crate) fn push(&self, bytes: Bytes) {
         self.1.push(bytes);
     }
 
+    #[inline(always)]
     pub(crate) fn get_pusher(&self) -> QueuePusher<'_> {
         self.1.get_pusher()
     }
