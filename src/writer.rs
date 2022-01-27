@@ -239,6 +239,7 @@ impl SerBacker for WriteBuffer {
         Self(bytes)
     }
 
+    #[inline(always)]
     fn len(&self) -> usize {
         self.0.len()
     }
@@ -247,18 +248,22 @@ impl SerBacker for WriteBuffer {
         (&mut (*self.0)[..4]).try_into().unwrap()
     }
 
+    #[inline(always)]
     fn extend_from_slice(&mut self, other: &[u8]) {
         self.0.extend_from_slice(other);
     }
 
+    #[inline(always)]
     fn push(&mut self, byte: u8) {
         self.0.put_u8(byte);
     }
 
+    #[inline(always)]
     fn reset(&mut self) {
         self.0.resize(4, 0);
     }
 
+    #[inline(always)]
     fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional);
     }
