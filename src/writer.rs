@@ -224,6 +224,7 @@ impl WriteBuffer {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn reserve(&mut self, len: usize) {
         self.0.reserve(len);
     }
