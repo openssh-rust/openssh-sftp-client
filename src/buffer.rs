@@ -15,24 +15,28 @@ pub enum Buffer<'a> {
 }
 
 impl ToBuffer for Vec<u8> {
+    #[inline(always)]
     fn get_buffer(&mut self) -> Buffer<'_> {
         Buffer::Vector(self)
     }
 }
 
 impl ToBuffer for BytesMut {
+    #[inline(always)]
     fn get_buffer(&mut self) -> Buffer<'_> {
         Buffer::Bytes(self)
     }
 }
 
 impl ToBuffer for Box<[u8]> {
+    #[inline(always)]
     fn get_buffer(&mut self) -> Buffer<'_> {
         Buffer::Slice(&mut *self)
     }
 }
 
 impl<const LEN: usize> ToBuffer for [u8; LEN] {
+    #[inline(always)]
     fn get_buffer(&mut self) -> Buffer<'_> {
         Buffer::Slice(self)
     }
