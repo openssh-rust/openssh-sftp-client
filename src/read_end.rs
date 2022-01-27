@@ -249,6 +249,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     /// # Cancel Safety
     ///
     /// It is perfectly safe to cancel this future.
+    #[inline(always)]
     pub async fn wait_for_new_request(&self) -> u32 {
         self.shared_data.wait_for_new_request().await
     }
