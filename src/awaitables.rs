@@ -111,6 +111,7 @@ macro_rules! def_awaitable {
         pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(AwaitableInner<Buffer>);
 
         impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
+            #[inline(always)]
             pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
                 Self(AwaitableInner(arc))
             }
