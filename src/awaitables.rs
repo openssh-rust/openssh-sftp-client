@@ -91,15 +91,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
             response => Ok((id, response)),
         }
     }
-
-    async fn wait<T>(
-        self,
-        post_processing: fn(Response<Buffer>) -> Result<T, Error>,
-    ) -> Result<(Id<Buffer>, T), Error> {
-        self.wait_impl()
-            .await
-            .and_then(|(id, response)| Ok((id, post_processing(response)?)))
-    }
 }
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
@@ -132,7 +123,12 @@ macro_rules! def_awaitable {
             ///
             /// It is perfectly safe to cancel the future.
             pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                self.0.wait(|$response_name| $post_processing).await
+                let post_processing = |$response_name: Response<Buffer>| $post_processing;
+
+                self.0
+                    .wait_impl()
+                    .await
+                    .and_then(|(id, response)| Ok((id, post_processing(response)?)))
             }
         }
     };
