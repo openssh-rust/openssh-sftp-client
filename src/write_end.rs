@@ -87,15 +87,18 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Return true if reserve succeeds, false otherwise.
+    #[inline(always)]
     pub fn try_reserve_id(&self, new_id_cnt: u32) -> bool {
         self.shared_data.responses.try_reserve(new_id_cnt)
     }
 
     /// Return true if reserve succeeds, false otherwise.
+    #[inline(always)]
     pub fn reserve_id(&self, new_id_cnt: u32) {
         self.shared_data.responses.reserve(new_id_cnt);
     }
 
+    #[inline(always)]
     pub fn reserve_buffer(&mut self, additional: usize) {
         self.serializer.reserve(additional);
     }
