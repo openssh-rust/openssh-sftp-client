@@ -47,10 +47,7 @@ pub enum Data<Buffer: ToBuffer> {
 struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
-    async fn wait<T>(
-        self,
-        post_processing: fn(Response<Buffer>) -> Result<T, Error>,
-    ) -> Result<(Id<Buffer>, T), Error> {
+    async fn wait_impl(self) -> Result<(Id<Buffer>, Response<Buffer>), Error> {
         struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
 
         impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
@@ -93,8 +90,17 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
                 err_msg,
             }) => Err(Error::SftpError(err_code, err_msg)),
 
-            response => Ok((id, post_processing(response)?)),
+            response => Ok((id, response)),
         }
+    }
+
+    async fn wait<T>(
+        self,
+        post_processing: fn(Response<Buffer>) -> Result<T, Error>,
+    ) -> Result<(Id<Buffer>, T), Error> {
+        self.wait_impl()
+            .await
+            .and_then(|(id, response)| Ok((id, post_processing(response)?)))
     }
 }
 
