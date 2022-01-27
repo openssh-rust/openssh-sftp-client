@@ -81,6 +81,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// Create a useable response id.
+    #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
         self.shared_data.responses.insert()
     }
