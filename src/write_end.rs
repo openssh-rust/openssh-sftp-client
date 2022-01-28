@@ -526,6 +526,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         io_slices: &[IoSlice<'_>],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         let len: usize = io_slices.iter().map(|io_slice| io_slice.len()).sum();
+        let len: u32 = len.try_into()?;
 
         self.serializer.reserve(
             // 9 bytes for the 4-byte len of packet, 1-byte packet type and
@@ -537,7 +538,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             // 4 bytes for the lenght of the data to be sent
             4 +
             // len of the data
-            len,
+            len as usize,
         );
 
         let buffer = Request::serialize_write_request(
@@ -545,7 +546,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             ArenaArc::slot(&id.0),
             handle,
             offset,
-            len.try_into()?,
+            len,
         )?;
 
         buffer.put_io_slices(io_slices);
