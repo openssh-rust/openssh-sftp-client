@@ -185,11 +185,8 @@ impl Writer {
             // Since `MpScBytesQueue::get_buffers` guarantees that every `IoSlice`
             // returned must be non-empty, having `0` bytes written is an error
             // likely caused by the close of the read end.
-            let n = if let Some(n) = NonZeroUsize::new(n) {
-                n
-            } else {
-                return Err(io::Error::new(io::ErrorKind::WriteZero, ""));
-            };
+            let n =
+                NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
 
             if !buffers.advance(n) {
                 break Ok(true);
