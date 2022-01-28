@@ -282,6 +282,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     /// However, if [`crate::WriteEnd::send_write_request_direct`] or
     /// [`crate::WriteEnd::send_write_request_direct_vectored`] is called, then the
     /// write data will be interleaved and thus produce undefined behavior.
+    #[inline]
     pub async fn flush_write_end_buffer(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer.flush().await?)
     }
