@@ -108,7 +108,10 @@ impl Writer {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    async fn write_vectored_all(&self, bufs: &mut [io::IoSlice<'_>]) -> Result<(), io::Error> {
+    pub(crate) async fn write_vectored_all_direct(
+        &self,
+        bufs: &mut [io::IoSlice<'_>],
+    ) -> Result<(), io::Error> {
         if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
             if self.atomic_write_vectored_all(bufs).await? {
                 return Ok(());
@@ -116,20 +119,6 @@ impl Writer {
         }
 
         write_vectored_all(&mut *self.0.write().await, bufs).await
-    }
-
-    /// * `bufs` - Accmulated len of all buffers must not be `0`.
-    ///
-    /// Write to pipe without any buffering.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_vectored_all_direct(
-        &self,
-        bufs: &mut [io::IoSlice<'_>],
-    ) -> Result<(), io::Error> {
-        self.write_vectored_all(bufs).await
     }
 
     /// * `bufs` - Accmulated len of all buffers must not be `0`.
