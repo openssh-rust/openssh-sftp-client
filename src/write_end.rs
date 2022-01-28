@@ -489,6 +489,21 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         offset: u64,
         data: Cow<'_, [u8]>,
     ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let len: u32 = data.len().try_into()?;
+
+        self.serializer.reserve(
+            // 9 bytes for the 4-byte len of packet, 1-byte packet type and
+            // 4-byte request id
+            9 +
+            handle.into_inner().len() +
+            // 8 bytes for the offset
+            8 +
+            // 4 bytes for the lenght of the data to be sent
+            4 +
+            // len of the data
+            len as usize,
+        );
+
         self.send_request(
             id,
             RequestInner::Write {
