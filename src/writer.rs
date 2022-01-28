@@ -220,11 +220,6 @@ impl WriteBuffer {
             self.0.put_slice(&*io_slice);
         }
     }
-
-    #[inline(always)]
-    pub(crate) fn reserve(&mut self, len: usize) {
-        self.0.reserve(len);
-    }
 }
 
 impl SerBacker for WriteBuffer {

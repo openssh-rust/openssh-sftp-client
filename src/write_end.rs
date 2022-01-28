@@ -527,6 +527,19 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         let len: usize = io_slices.iter().map(|io_slice| io_slice.len()).sum();
 
+        self.serializer.reserve(
+            // 9 bytes for the 4-byte len of packet, 1-byte packet type and
+            // 4-byte request id
+            9 +
+            handle.into_inner().len() +
+            // 8 bytes for the offset
+            8 +
+            // 4 bytes for the lenght of the data to be sent
+            4 +
+            // len of the data
+            len,
+        );
+
         let buffer = Request::serialize_write_request(
             &mut self.serializer,
             ArenaArc::slot(&id.0),
@@ -535,7 +548,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             len.try_into()?,
         )?;
 
-        buffer.reserve(len);
         buffer.put_io_slices(io_slices);
 
         id.0.reset(None);
