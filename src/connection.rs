@@ -115,7 +115,7 @@ impl<Buffer> SharedData<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> SharedData<Buffer> {
+impl<Buffer: Send + Sync> SharedData<Buffer> {
     /// Create a useable response id.
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
@@ -165,7 +165,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> SharedData<Buffer> {
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
+pub async fn connect<Buffer: ToBuffer + Send + Sync + 'static>(
     reader: PipeRead,
     writer: PipeWrite,
 ) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>, Extensions), Error> {

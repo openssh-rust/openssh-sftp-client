@@ -25,7 +25,7 @@ pub struct ReadEnd<Buffer> {
     shared_data: SharedData<Buffer>,
 }
 
-impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
+impl<Buffer: ToBuffer + 'static + Send + Sync> ReadEnd<Buffer> {
     pub(crate) fn new(reader: PipeRead, shared_data: SharedData<Buffer>) -> Self {
         Self {
             reader: BufReader::with_capacity(PIPE_BUF, reader),

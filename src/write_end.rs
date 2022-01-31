@@ -40,6 +40,10 @@ impl<Buffer> WriteEnd<Buffer> {
             shared_data,
         }
     }
+
+    pub fn into_shared_data(self) -> SharedData<Buffer> {
+        self.shared_data
+    }
 }
 
 impl<Buffer> Deref for WriteEnd<Buffer> {
@@ -50,7 +54,7 @@ impl<Buffer> Deref for WriteEnd<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
+impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .get_mut_writer()
@@ -59,10 +63,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .await?;
 
         Ok(())
-    }
-
-    pub fn into_shared_data(self) -> SharedData<Buffer> {
-        self.shared_data
     }
 
     fn serialize<T>(serializer: &mut Serializer<WriteBuffer>, value: T) -> Result<Bytes, Error>
@@ -414,7 +414,9 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         self.send_request(id, RequestInner::PosixRename { oldpath, newpath }, None)
             .map(AwaitableStatus::new)
     }
+}
 
+impl<Buffer: ToBuffer + Send + Sync + 'static> WriteEnd<Buffer> {
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics

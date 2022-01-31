@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 use super::Error;
-use super::ToBuffer;
 
 use core::fmt::Debug;
 
@@ -41,7 +40,7 @@ pub(crate) type ArenaArc<Buffer> = concurrent_arena::ArenaArc<Awaitable<Buffer>,
 #[derive(Debug)]
 pub(crate) struct AwaitableResponses<Buffer>(Arena<Awaitable<Buffer>, BITARRAY_LEN, LEN>);
 
-impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
+impl<Buffer: Send + Sync> AwaitableResponses<Buffer> {
     #[inline(always)]
     pub(crate) fn new() -> Self {
         Self(Arena::with_capacity(3))
@@ -73,7 +72,7 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 #[derive(Debug, destructure)]
 pub struct Id<Buffer: Send + Sync>(pub(crate) ArenaArc<Buffer>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
+impl<Buffer: Send + Sync> Id<Buffer> {
     #[inline(always)]
     pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
         Id(arc)

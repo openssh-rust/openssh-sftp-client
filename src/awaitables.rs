@@ -42,13 +42,13 @@ pub enum Data<Buffer> {
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
 /// over removal of `ArenaArc`.
 #[derive(Debug, destructure)]
-struct AwaitableInner<Buffer: Debug + Send + Sync>(ArenaArc<Buffer>);
+struct AwaitableInner<Buffer: Send + Sync>(ArenaArc<Buffer>);
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
+impl<Buffer: Send + Sync> AwaitableInner<Buffer> {
     async fn wait_impl(self) -> Result<(Id<Buffer>, Response<Buffer>), Error> {
-        struct WaitFuture<'a, Buffer: ToBuffer>(Option<&'a Awaitable<Buffer>>);
+        struct WaitFuture<'a, Buffer>(Option<&'a Awaitable<Buffer>>);
 
-        impl<Buffer: ToBuffer + Debug> Future for WaitFuture<'_, Buffer> {
+        impl<Buffer> Future for WaitFuture<'_, Buffer> {
             type Output = ();
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -93,7 +93,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
     }
 }
 
-impl<Buffer: Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
+impl<Buffer: Send + Sync> Drop for AwaitableInner<Buffer> {
     fn drop(&mut self) {
         // Remove ArenaArc only if the `AwaitableResponse` is done.
         //
@@ -108,9 +108,9 @@ impl<Buffer: Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
 macro_rules! def_awaitable {
     ($name:ident, $res:ty, | $response_name:ident | $post_processing:block) => {
         #[derive(Debug)]
-        pub struct $name<Buffer: ToBuffer + Debug + Send + Sync>(AwaitableInner<Buffer>);
+        pub struct $name<Buffer: Send + Sync>(AwaitableInner<Buffer>);
 
-        impl<Buffer: ToBuffer + Debug + Send + Sync> $name<Buffer> {
+        impl<Buffer: Send + Sync> $name<Buffer> {
             #[inline(always)]
             pub(crate) fn new(arc: ArenaArc<Buffer>) -> Self {
                 Self(AwaitableInner(arc))
