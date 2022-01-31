@@ -306,4 +306,10 @@ impl<Buffer: ToBuffer + 'static + Send + Sync> ReadEnd<Buffer> {
             Ok(())
         }
     }
+
+    /// Forward to [`SharedData::strong_count`].
+    #[inline(always)]
+    pub fn shared_data_strong_count(&self) -> usize {
+        self.shared_data.strong_count()
+    }
 }
