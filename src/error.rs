@@ -27,11 +27,18 @@ pub enum Error {
     SftpServerHelloMsgTooLong { len: u32 },
 
     /// This error is meant to be a dummy error created by user of this crate
-    /// to signal that the sftp-server run on remote server failed.
+    /// to indicate that the sftp-server run on remote server failed.
     ///
     /// openssh-sftp-client would never return this error.
     #[error("sftp-server run on remote server failed: {0}.")]
     SftpServerFailure(ExitStatus),
+
+    /// This error is meant to be a dummy error created by user of this crate
+    /// to indicate that the extension is not supported.
+    ///
+    /// openssh-sftp-client would never return this error.
+    #[error("Unsupported extension {0}.")]
+    UnsupportedExtension(&'static &'static str),
 
     /// IO Error (Excluding [`io::ErrorKind::WouldBlock`]): {0}.
     #[error("IO Error (Excluding `io::ErrorKind::WouldBlock`): {0}.")]
