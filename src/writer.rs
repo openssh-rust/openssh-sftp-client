@@ -148,8 +148,7 @@ impl Writer {
         }
     }
 
-    /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(false)` will be returned.
+    /// If another thread is flushing, then `Ok(false)` will be returned.
     ///
     /// # Cancel Safety
     ///
@@ -164,6 +163,10 @@ impl Writer {
             Some(buffers) => buffers,
             None => return Ok(false),
         };
+
+        if buffers.is_empty() {
+            return Ok(true);
+        }
 
         if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
             let len = bufs.get_total_len();

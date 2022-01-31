@@ -136,8 +136,7 @@ impl<Buffer: Send + Sync> SharedData<Buffer> {
 
     /// Flush the write buffer.
     ///
-    /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(false)` will be returned.
+    /// If another thread is flushing, then `Ok(false)` will be returned.
     ///
     /// # Cancel Safety
     ///

@@ -263,24 +263,7 @@ impl<Buffer: ToBuffer + 'static + Send + Sync> ReadEnd<Buffer> {
         self.shared_data.wait_for_new_request().await
     }
 
-    /// Flush the write buffer.
-    ///
-    /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(false)` will be returned.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is only cancel safe if
-    /// [`crate::WriteEnd::send_write_request_direct`] or
-    /// [`crate::WriteEnd::send_write_request_direct_vectored`] is not called when this
-    /// future is cancelled.
-    ///
-    /// Upon cancel, it might only partially flushed out the data, which can be
-    /// restarted by another thread.
-    ///
-    /// However, if [`crate::WriteEnd::send_write_request_direct`] or
-    /// [`crate::WriteEnd::send_write_request_direct_vectored`] is called, then the
-    /// write data will be interleaved and thus produce undefined behavior.
+    /// Forward function call to [`SharedData::flush`].
     #[inline]
     pub async fn flush_write_end_buffer(&self) -> Result<bool, Error> {
         Ok(self.shared_data.writer().flush().await?)
