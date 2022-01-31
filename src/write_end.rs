@@ -9,7 +9,6 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use std::io::IoSlice;
 use std::path::Path;
-use std::sync::Arc;
 
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::request::*;
@@ -24,7 +23,7 @@ use bytes::Bytes;
 #[derive(Debug)]
 pub struct WriteEnd<Buffer: ToBuffer + 'static> {
     serializer: Serializer<WriteBuffer>,
-    shared_data: Arc<SharedData<Buffer>>,
+    shared_data: SharedData<Buffer>,
 }
 
 impl<Buffer: ToBuffer + 'static> Clone for WriteEnd<Buffer> {
@@ -39,14 +38,14 @@ impl<Buffer: ToBuffer + 'static> Drop for WriteEnd<Buffer> {
 
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
-        if Arc::strong_count(shared_data) == 2 {
+        if shared_data.strong_count() == 2 {
             shared_data.notify_conn_closed();
         }
     }
 }
 
 impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
-    pub fn new(shared_data: Arc<SharedData<Buffer>>) -> Self {
+    pub fn new(shared_data: SharedData<Buffer>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
@@ -56,9 +55,9 @@ impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
 
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
-        Arc::get_mut(&mut self.shared_data)
+        self.shared_data
+            .get_mut_writer()
             .unwrap()
-            .writer
             .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
             .await?;
 
@@ -66,7 +65,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     }
 
     /// This is for [`crate::connect`] to obtain `Arc<SharedData>`.
-    pub(crate) fn get_shared_data(&self) -> &Arc<SharedData<Buffer>> {
+    pub(crate) fn get_shared_data(&self) -> &SharedData<Buffer> {
         &self.shared_data
     }
 
@@ -83,19 +82,19 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// Create a useable response id.
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
-        self.shared_data.responses.insert()
+        self.shared_data.responses().insert()
     }
 
     /// Return true if reserve succeeds, false otherwise.
     #[inline(always)]
     pub fn try_reserve_id(&self, new_id_cnt: u32) -> bool {
-        self.shared_data.responses.try_reserve(new_id_cnt)
+        self.shared_data.responses().try_reserve(new_id_cnt)
     }
 
     /// Return true if reserve succeeds, false otherwise.
     #[inline(always)]
     pub fn reserve_id(&self, new_id_cnt: u32) {
-        self.shared_data.responses.reserve(new_id_cnt);
+        self.shared_data.responses().reserve(new_id_cnt);
     }
 
     #[inline(always)]
@@ -122,7 +121,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     /// will be interleaved and thus produce undefined behavior.
     #[inline]
     pub async fn flush(&self) -> Result<bool, Error> {
-        Ok(self.shared_data.writer.flush().await?)
+        Ok(self.shared_data.writer().flush().await?)
     }
 
     /// Send requests.
@@ -144,7 +143,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         )?;
 
         id.0.reset(buffer);
-        self.shared_data.writer.push(serialized);
+        self.shared_data.writer().push(serialized);
         self.shared_data.notify_new_packet_event();
 
         Ok(id.into_inner())
@@ -567,7 +566,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         buffer.put_io_slices(io_slices);
 
         id.0.reset(None);
-        self.shared_data.writer.push(buffer.split());
+        self.shared_data.writer().push(buffer.split());
         self.shared_data.notify_new_packet_event();
 
         Ok(AwaitableStatus::new(id.into_inner()))
@@ -606,7 +605,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         .split();
 
         // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
-        let mut queue_pusher = self.shared_data.writer.get_pusher();
+        let mut queue_pusher = self.shared_data.writer().get_pusher();
         queue_pusher.push(header);
         queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
 
@@ -653,7 +652,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         id.0.reset(None);
         self.shared_data
-            .writer
+            .writer()
             .write_vectored_all_direct(&mut [IoSlice::new(&*header), IoSlice::new(data)])
             .await?;
 
@@ -702,7 +701,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
 
         id.0.reset(None);
         self.shared_data
-            .writer
+            .writer()
             .write_vectored_all_direct_with_header(&IoSlice::new(&*header), data)
             .await?;
 

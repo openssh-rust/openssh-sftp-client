@@ -17,15 +17,10 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 // TODO:
 //  - Support for zero copy API
 
-/// SharedData contains both the writer and the responses because:
-///  - The overhead of `Arc` and a separate allocation;
-///  - If the write end of a connection is closed, then openssh implementation
-///    of sftp-server would close the read end right away, discarding
-///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<Buffer: ToBuffer + 'static> {
-    pub(crate) writer: Writer,
-    pub(crate) responses: AwaitableResponses<Buffer>,
+struct SharedDataInner<Buffer: ToBuffer + 'static> {
+    writer: Writer,
+    responses: AwaitableResponses<Buffer>,
 
     notify: Notify,
     requests_sent: AtomicU32,
@@ -33,15 +28,45 @@ pub struct SharedData<Buffer: ToBuffer + 'static> {
     is_conn_closed: AtomicBool,
 }
 
+/// SharedData contains both the writer and the responses because:
+///  - The overhead of `Arc` and a separate allocation;
+///  - If the write end of a connection is closed, then openssh implementation
+///    of sftp-server would close the read end right away, discarding
+///    any unsent but processed or unprocessed responses.
+#[derive(Debug)]
+pub struct SharedData<Buffer: ToBuffer + 'static>(Arc<SharedDataInner<Buffer>>);
+
+impl<Buffer: ToBuffer + 'static> Clone for SharedData<Buffer> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
+    pub(crate) fn writer(&self) -> &Writer {
+        &self.0.writer
+    }
+
+    pub(crate) fn responses(&self) -> &AwaitableResponses<Buffer> {
+        &self.0.responses
+    }
+
+    pub(crate) fn get_mut_writer(&mut self) -> Option<&mut Writer> {
+        Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.writer)
+    }
+
+    pub fn strong_count(&self) -> usize {
+        Arc::strong_count(&self.0)
+    }
+
     #[inline(always)]
     fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
-        self.notify.notify_one();
+        self.0.notify.notify_one();
     }
 
     pub(crate) fn notify_new_packet_event(&self) {
-        let prev_requests_sent = self.requests_sent.fetch_add(1, Ordering::Relaxed);
+        let prev_requests_sent = self.0.requests_sent.fetch_add(1, Ordering::Relaxed);
 
         debug_assert_ne!(prev_requests_sent, u32::MAX);
 
@@ -53,16 +78,16 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
     /// **Return 0 if the connection is closed.**
     pub(crate) async fn wait_for_new_request(&self) -> u32 {
         loop {
-            let cnt = self.requests_sent.swap(0, Ordering::Relaxed);
+            let cnt = self.0.requests_sent.swap(0, Ordering::Relaxed);
             if cnt > 0 {
                 break cnt;
             }
 
-            if self.is_conn_closed.load(Ordering::Relaxed) {
+            if self.0.is_conn_closed.load(Ordering::Relaxed) {
                 break 0;
             }
 
-            self.notify.notified().await;
+            self.0.notify.notified().await;
         }
     }
 
@@ -70,11 +95,11 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
     pub(crate) fn notify_conn_closed(&self) {
         #[cfg(debug_assertions)]
         {
-            assert!(!self.is_conn_closed.swap(true, Ordering::Relaxed));
+            assert!(!self.0.is_conn_closed.swap(true, Ordering::Relaxed));
         }
         #[cfg(not(debug_assertions))]
         {
-            self.is_conn_closed.store(true, Ordering::Relaxed);
+            self.0.is_conn_closed.store(true, Ordering::Relaxed);
         }
 
         self.notify_read_end();
@@ -93,13 +118,13 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     reader: PipeRead,
     writer: PipeWrite,
 ) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>, Extensions), Error> {
-    let shared_data = Arc::new(SharedData {
+    let shared_data = SharedData(Arc::new(SharedDataInner {
         writer: Writer::new(writer),
         responses: AwaitableResponses::new(),
         notify: Notify::new(),
         requests_sent: AtomicU32::new(0),
         is_conn_closed: AtomicBool::new(false),
-    });
+    }));
 
     // Send hello message
     let version = SSH2_FILEXFER_VERSION;

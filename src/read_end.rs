@@ -9,7 +9,6 @@ use crate::ToBuffer;
 
 use std::fmt::Debug;
 use std::io;
-use std::sync::Arc;
 
 use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
@@ -23,11 +22,11 @@ use tokio_pipe::{PipeRead, PIPE_BUF};
 pub struct ReadEnd<Buffer: ToBuffer + 'static> {
     reader: BufReader<PipeRead>,
     buffer: Vec<u8>,
-    shared_data: Arc<SharedData<Buffer>>,
+    shared_data: SharedData<Buffer>,
 }
 
 impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
-    pub(crate) fn new(reader: PipeRead, shared_data: Arc<SharedData<Buffer>>) -> Self {
+    pub(crate) fn new(reader: PipeRead, shared_data: SharedData<Buffer>) -> Self {
         Self {
             reader: BufReader::with_capacity(PIPE_BUF, reader),
             buffer: Vec::with_capacity(64),
@@ -197,7 +196,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
 
         let len = len - 5;
 
-        let callback = match self.shared_data.responses.get(response_id) {
+        let callback = match self.shared_data.responses().get(response_id) {
             Ok(callback) => callback,
 
             // Invalid response_id
@@ -284,7 +283,7 @@ impl<Buffer: ToBuffer + Debug + 'static + Send + Sync> ReadEnd<Buffer> {
     /// write data will be interleaved and thus produce undefined behavior.
     #[inline]
     pub async fn flush_write_end_buffer(&self) -> Result<bool, Error> {
-        Ok(self.shared_data.writer.flush().await?)
+        Ok(self.shared_data.writer().flush().await?)
     }
 
     /// Wait for next packet to be readable.
