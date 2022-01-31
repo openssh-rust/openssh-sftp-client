@@ -8,6 +8,7 @@ use writer::WriteBuffer;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::io::IoSlice;
+use std::ops::Deref;
 use std::path::Path;
 
 use openssh_sftp_protocol::file_attrs::FileAttrs;
@@ -41,6 +42,14 @@ impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
     }
 }
 
+impl<Buffer: ToBuffer + 'static> Deref for WriteEnd<Buffer> {
+    type Target = SharedData<Buffer>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.shared_data
+    }
+}
+
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
@@ -50,11 +59,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
             .await?;
 
         Ok(())
-    }
-
-    /// This is for [`crate::connect`] to obtain `Arc<SharedData>`.
-    pub(crate) fn get_shared_data(&self) -> &SharedData<Buffer> {
-        &self.shared_data
     }
 
     pub fn into_shared_data(self) -> SharedData<Buffer> {
@@ -75,45 +79,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
         self.shared_data.responses().insert()
-    }
-
-    /// Return true if reserve succeeds, false otherwise.
-    #[inline(always)]
-    pub fn try_reserve_id(&self, new_id_cnt: u32) -> bool {
-        self.shared_data.responses().try_reserve(new_id_cnt)
-    }
-
-    /// Return true if reserve succeeds, false otherwise.
-    #[inline(always)]
-    pub fn reserve_id(&self, new_id_cnt: u32) {
-        self.shared_data.responses().reserve(new_id_cnt);
-    }
-
-    #[inline(always)]
-    pub fn reserve_buffer(&mut self, additional: usize) {
-        self.serializer.reserve(additional);
-    }
-
-    /// Flush the write buffer.
-    ///
-    /// If another thread is flushing or there isn't any
-    /// data to write, then `Ok(false)` will be returned.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is only cancel safe if [`WriteEnd::send_write_request_direct`] or
-    /// [`WriteEnd::send_write_request_direct_vectored`] is not called when this
-    /// future is cancelled.
-    ///
-    /// Upon cancel, it might only partially flushed out the data, which can be
-    /// restarted by another thread.
-    ///
-    /// However, if [`WriteEnd::send_write_request_direct`] or
-    /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
-    /// will be interleaved and thus produce undefined behavior.
-    #[inline]
-    pub async fn flush(&self) -> Result<bool, Error> {
-        Ok(self.shared_data.writer().flush().await?)
     }
 
     /// Send requests.

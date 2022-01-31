@@ -129,7 +129,23 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> SharedData<Buffer> {
         self.responses().reserve(new_id_cnt);
     }
 
-    /// Same as doc of [`WriteEnd::flush`]
+    /// Flush the write buffer.
+    ///
+    /// If another thread is flushing or there isn't any
+    /// data to write, then `Ok(false)` will be returned.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is only cancel safe if [`WriteEnd::send_write_request_direct`] or
+    /// [`WriteEnd::send_write_request_direct_vectored`] is not called when this
+    /// future is cancelled.
+    ///
+    /// Upon cancel, it might only partially flushed out the data, which can be
+    /// restarted by another thread.
+    ///
+    /// However, if [`WriteEnd::send_write_request_direct`] or
+    /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
+    /// will be interleaved and thus produce undefined behavior.
     #[inline]
     pub async fn flush(&self) -> Result<bool, Error> {
         Ok(self.writer().flush().await?)
@@ -163,7 +179,7 @@ pub async fn connect<Buffer: ToBuffer + Debug + Send + Sync + 'static>(
     write_end.send_hello(version).await?;
 
     // Receive version and extensions
-    let mut read_end = ReadEnd::new(reader, write_end.get_shared_data().clone());
+    let mut read_end = ReadEnd::new(reader, (*write_end).clone());
     let extensions = read_end.receive_server_version(version).await?;
 
     Ok((write_end, read_end, extensions))
