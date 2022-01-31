@@ -32,18 +32,6 @@ impl<Buffer: ToBuffer + 'static> Clone for WriteEnd<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + 'static> Drop for WriteEnd<Buffer> {
-    fn drop(&mut self) {
-        let shared_data = &self.shared_data;
-
-        // If this is the last reference, except for `ReadEnd`, to the SharedData,
-        // then the connection is closed.
-        if shared_data.strong_count() == 2 {
-            shared_data.notify_conn_closed();
-        }
-    }
-}
-
 impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
     pub fn new(shared_data: SharedData<Buffer>) -> Self {
         Self {

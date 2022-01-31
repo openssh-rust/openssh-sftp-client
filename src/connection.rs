@@ -42,6 +42,16 @@ impl<Buffer: ToBuffer + 'static> Clone for SharedData<Buffer> {
     }
 }
 
+impl<Buffer: ToBuffer + 'static> Drop for SharedData<Buffer> {
+    fn drop(&mut self) {
+        // If this is the last reference, except for `ReadEnd`, to the SharedData,
+        // then the connection is closed.
+        if self.strong_count() == 2 {
+            self.notify_conn_closed();
+        }
+    }
+}
+
 impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
     pub(crate) fn writer(&self) -> &Writer {
         &self.0.writer
