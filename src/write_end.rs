@@ -75,12 +75,6 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         Ok(serializer.get_output()?.split())
     }
 
-    /// Create a useable response id.
-    #[inline(always)]
-    pub fn create_response_id(&self) -> Id<Buffer> {
-        self.shared_data.responses().insert()
-    }
-
     /// Send requests.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
