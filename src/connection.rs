@@ -23,7 +23,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub(crate) struct SharedData<Buffer: ToBuffer + 'static> {
+pub struct SharedData<Buffer: ToBuffer + 'static> {
     pub(crate) writer: Writer,
     pub(crate) responses: AwaitableResponses<Buffer>,
 
