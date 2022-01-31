@@ -8,6 +8,7 @@ pub trait ToBuffer {
 }
 
 /// Buffer that can be used to write data into.
+#[derive(Debug)]
 pub enum Buffer<'a> {
     Vector(&'a mut Vec<u8>),
     Slice(&'a mut [u8]),
