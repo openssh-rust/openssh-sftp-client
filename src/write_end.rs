@@ -57,6 +57,10 @@ impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> WriteEnd<Buffer> {
         &self.shared_data
     }
 
+    pub fn into_shared_data(self) -> SharedData<Buffer> {
+        self.shared_data
+    }
+
     fn serialize<T>(serializer: &mut Serializer<WriteBuffer>, value: T) -> Result<Bytes, Error>
     where
         T: Serialize,
