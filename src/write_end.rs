@@ -46,7 +46,7 @@ impl<Buffer: ToBuffer + 'static> Drop for WriteEnd<Buffer> {
 }
 
 impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
-    pub(crate) fn new(shared_data: Arc<SharedData<Buffer>>) -> Self {
+    pub fn new(shared_data: Arc<SharedData<Buffer>>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
