@@ -65,6 +65,7 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
         Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.writer)
     }
 
+    #[inline(always)]
     pub fn strong_count(&self) -> usize {
         Arc::strong_count(&self.0)
     }
