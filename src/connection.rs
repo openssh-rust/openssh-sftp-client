@@ -65,6 +65,9 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
         Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.writer)
     }
 
+    /// `SharedData` is a newtype wrapper for `Arc<SharedDataInner>`,
+    /// so this function returns how many `Arc` there are that referred
+    /// to the shared data.
     #[inline(always)]
     pub fn strong_count(&self) -> usize {
         Arc::strong_count(&self.0)
