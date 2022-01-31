@@ -22,18 +22,18 @@ use bytes::Bytes;
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
-pub struct WriteEnd<Buffer: ToBuffer + 'static> {
+pub struct WriteEnd<Buffer> {
     serializer: Serializer<WriteBuffer>,
     shared_data: SharedData<Buffer>,
 }
 
-impl<Buffer: ToBuffer + 'static> Clone for WriteEnd<Buffer> {
+impl<Buffer> Clone for WriteEnd<Buffer> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
+impl<Buffer> WriteEnd<Buffer> {
     pub fn new(shared_data: SharedData<Buffer>) -> Self {
         Self {
             serializer: Serializer::new(),
@@ -42,7 +42,7 @@ impl<Buffer: ToBuffer + 'static> WriteEnd<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + 'static> Deref for WriteEnd<Buffer> {
+impl<Buffer> Deref for WriteEnd<Buffer> {
     type Target = SharedData<Buffer>;
 
     fn deref(&self) -> &Self::Target {

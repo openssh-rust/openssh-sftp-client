@@ -19,7 +19,7 @@ use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 use tokio_pipe::{PipeRead, PIPE_BUF};
 
 #[derive(Debug)]
-pub struct ReadEnd<Buffer: ToBuffer + 'static> {
+pub struct ReadEnd<Buffer> {
     reader: BufReader<PipeRead>,
     buffer: Vec<u8>,
     shared_data: SharedData<Buffer>,

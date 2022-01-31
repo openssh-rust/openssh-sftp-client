@@ -18,7 +18,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 //  - Support for zero copy API
 
 #[derive(Debug)]
-struct SharedDataInner<Buffer: ToBuffer + 'static> {
+struct SharedDataInner<Buffer> {
     writer: Writer,
     responses: AwaitableResponses<Buffer>,
 
@@ -34,15 +34,15 @@ struct SharedDataInner<Buffer: ToBuffer + 'static> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<Buffer: ToBuffer + 'static>(Arc<SharedDataInner<Buffer>>);
+pub struct SharedData<Buffer>(Arc<SharedDataInner<Buffer>>);
 
-impl<Buffer: ToBuffer + 'static> Clone for SharedData<Buffer> {
+impl<Buffer> Clone for SharedData<Buffer> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<Buffer: ToBuffer + 'static> Drop for SharedData<Buffer> {
+impl<Buffer> Drop for SharedData<Buffer> {
     fn drop(&mut self) {
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
@@ -61,7 +61,7 @@ impl<Buffer: ToBuffer + 'static> Drop for SharedData<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
+impl<Buffer> SharedData<Buffer> {
     pub(crate) fn writer(&self) -> &Writer {
         &self.0.writer
     }

@@ -12,7 +12,7 @@ use openssh_sftp_protocol::response::ResponseInner;
 use derive_destructure2::destructure;
 
 #[derive(Debug)]
-pub(crate) enum Response<Buffer: ToBuffer> {
+pub(crate) enum Response<Buffer> {
     Header(ResponseInner),
 
     /// The buffer that stores the response of Read.
@@ -39,9 +39,7 @@ pub(crate) type ArenaArc<Buffer> = concurrent_arena::ArenaArc<Awaitable<Buffer>,
 
 /// Check `concurrent_arena::Arena` for `BITARRAY_LEN` and `LEN`.
 #[derive(Debug)]
-pub(crate) struct AwaitableResponses<Buffer: ToBuffer + 'static>(
-    Arena<Awaitable<Buffer>, BITARRAY_LEN, LEN>,
-);
+pub(crate) struct AwaitableResponses<Buffer>(Arena<Awaitable<Buffer>, BITARRAY_LEN, LEN>);
 
 impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
     #[inline(always)]
@@ -73,7 +71,7 @@ impl<Buffer: Debug + ToBuffer + Send + Sync> AwaitableResponses<Buffer> {
 }
 
 #[derive(Debug, destructure)]
-pub struct Id<Buffer: ToBuffer + Send + Sync>(pub(crate) ArenaArc<Buffer>);
+pub struct Id<Buffer: Send + Sync>(pub(crate) ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
     #[inline(always)]
@@ -86,7 +84,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> Id<Buffer> {
         self.destructure().0
     }
 }
-impl<Buffer: ToBuffer + Send + Sync> Drop for Id<Buffer> {
+impl<Buffer: Send + Sync> Drop for Id<Buffer> {
     #[inline(always)]
     fn drop(&mut self) {
         ArenaArc::remove(&self.0);

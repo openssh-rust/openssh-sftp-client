@@ -22,7 +22,7 @@ use openssh_sftp_protocol::HandleOwned;
 use derive_destructure2::destructure;
 
 #[derive(Debug, Clone)]
-pub enum Data<Buffer: ToBuffer> {
+pub enum Data<Buffer> {
     /// The buffer that stores the response of Read.
     ///
     /// It will be returned if you provided a buffer to
@@ -42,7 +42,7 @@ pub enum Data<Buffer: ToBuffer> {
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
 /// over removal of `ArenaArc`.
 #[derive(Debug, destructure)]
-struct AwaitableInner<Buffer: ToBuffer + Debug + Send + Sync>(ArenaArc<Buffer>);
+struct AwaitableInner<Buffer: Debug + Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
     async fn wait_impl(self) -> Result<(Id<Buffer>, Response<Buffer>), Error> {
@@ -93,7 +93,7 @@ impl<Buffer: ToBuffer + Debug + Send + Sync> AwaitableInner<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
+impl<Buffer: Debug + Send + Sync> Drop for AwaitableInner<Buffer> {
     fn drop(&mut self) {
         // Remove ArenaArc only if the `AwaitableResponse` is done.
         //
