@@ -10,8 +10,6 @@ use thiserror::Error;
 
 use openssh_sftp_protocol::ssh_format;
 
-pub use openssh_sftp_protocol::response::ResponseInner;
-
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
