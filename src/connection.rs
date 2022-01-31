@@ -116,6 +116,26 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
     }
 }
 
+impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> SharedData<Buffer> {
+    /// Return true if reserve succeeds, false otherwise.
+    #[inline(always)]
+    pub fn try_reserve_id(&self, new_id_cnt: u32) -> bool {
+        self.responses().try_reserve(new_id_cnt)
+    }
+
+    /// Return true if reserve succeeds, false otherwise.
+    #[inline(always)]
+    pub fn reserve_id(&self, new_id_cnt: u32) {
+        self.responses().reserve(new_id_cnt);
+    }
+
+    /// Same as doc of [`WriteEnd::flush`]
+    #[inline]
+    pub async fn flush(&self) -> Result<bool, Error> {
+        Ok(self.writer().flush().await?)
+    }
+}
+
 /// Initialize connection to remote sftp server and
 /// negotiate the sftp version.
 ///
