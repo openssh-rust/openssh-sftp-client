@@ -47,7 +47,16 @@ impl<Buffer: ToBuffer + 'static> Drop for SharedData<Buffer> {
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
         if self.strong_count() == 2 {
-            self.notify_conn_closed();
+            #[cfg(debug_assertions)]
+            {
+                assert!(!self.0.is_conn_closed.swap(true, Ordering::Relaxed));
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                self.0.is_conn_closed.store(true, Ordering::Relaxed);
+            }
+
+            self.notify_read_end();
         }
     }
 }
@@ -103,20 +112,6 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
 
             self.0.notify.notified().await;
         }
-    }
-
-    /// Notify conn closed should only be called once.
-    pub(crate) fn notify_conn_closed(&self) {
-        #[cfg(debug_assertions)]
-        {
-            assert!(!self.0.is_conn_closed.swap(true, Ordering::Relaxed));
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            self.0.is_conn_closed.store(true, Ordering::Relaxed);
-        }
-
-        self.notify_read_end();
     }
 }
 
