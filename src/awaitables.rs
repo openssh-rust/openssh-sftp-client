@@ -2,7 +2,6 @@
 
 use crate::*;
 use awaitable_responses::ArenaArc;
-use awaitable_responses::Awaitable;
 use awaitable_responses::Response;
 
 use core::fmt::Debug;
