@@ -63,6 +63,8 @@ pub use read_end::ReadEnd;
 pub use write_end::WriteEnd;
 
 pub use awaitables::{
-    AwaitableAttrs, AwaitableData, AwaitableHandle, AwaitableLimits, AwaitableName,
-    AwaitableNameEntries, AwaitableStatus, Data,
+    AwaitableAttrs, AwaitableAttrsFuture, AwaitableData, AwaitableDataFuture, AwaitableHandle,
+    AwaitableHandleFuture, AwaitableLimits, AwaitableLimitsFuture, AwaitableName,
+    AwaitableNameEntries, AwaitableNameEntriesFuture, AwaitableNameFuture, AwaitableStatus,
+    AwaitableStatusFuture, Data,
 };

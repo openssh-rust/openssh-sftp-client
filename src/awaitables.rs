@@ -37,61 +37,66 @@ pub enum Data<Buffer> {
     Eof,
 }
 
-/// Provides drop impl
-///
-/// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
-/// over removal of `ArenaArc`.
-#[derive(Debug, destructure)]
-struct AwaitableInner<Buffer: Send + Sync>(ArenaArc<Buffer>);
+type AwaitableInnerRes<Buffer> = (Id<Buffer>, Response<Buffer>);
 
-impl<Buffer: Send + Sync> AwaitableInner<Buffer> {
-    async fn wait_impl(self) -> Result<(Id<Buffer>, Response<Buffer>), Error> {
-        struct WaitFuture<'a, Buffer>(Option<&'a Awaitable<Buffer>>);
+#[derive(Debug)]
+struct AwaitableInnerFuture<Buffer: Send + Sync>(Option<AwaitableInner<Buffer>>, bool);
 
-        impl<Buffer> Future for WaitFuture<'_, Buffer> {
-            type Output = ();
+impl<Buffer: Send + Sync> AwaitableInnerFuture<Buffer> {
+    fn new(awaitable_inner: AwaitableInner<Buffer>) -> Self {
+        Self(Some(awaitable_inner), false)
+    }
 
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                if let Some(value) = self.0.take() {
-                    let waker = cx.waker().clone();
+    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Result<AwaitableInnerRes<Buffer>, Error>> {
+        let errmsg = "AwaitableInnerFuture::poll is called after completed";
 
-                    let res = value
-                        .install_waker(waker)
-                        .expect("AwaitableResponse should either in state Ongoing or Done");
+        // `Awaitable` guarantees that there is no spurious wakeup
+        if !self.1 {
+            let waker = cx.waker().clone();
 
-                    if res {
-                        Poll::Ready(())
-                    } else {
-                        Poll::Pending
-                    }
-                } else {
-                    Poll::Ready(())
-                }
+            let res = self
+                .0
+                .as_ref()
+                .expect(errmsg)
+                .0
+                .install_waker(waker)
+                .expect("AwaitableResponse should either in state Ongoing or Done");
+
+            if !res {
+                self.1 = true;
+                return Poll::Pending;
             }
         }
 
-        WaitFuture(Some(&self.0)).await;
+        let awaitable = self.0.take().expect(errmsg);
 
-        let response = self
+        let response = awaitable
             .0
             .take_output()
             .expect("The request should be done by now");
 
         // Reconstruct Id here so that it will be automatically
         // released on error.
-        let id = Id::new(self.destructure().0);
+        let id = Id::new(awaitable.destructure().0);
 
         // Propagate failure
-        match response {
+        Poll::Ready(match response {
             Response::Header(ResponseInner::Status {
                 status_code: StatusCode::Failure(err_code),
                 err_msg,
             }) => Err(Error::SftpError(err_code, err_msg)),
 
             response => Ok((id, response)),
-        }
+        })
     }
 }
+
+/// Provides drop impl
+///
+/// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
+/// over removal of `ArenaArc`.
+#[derive(Debug, destructure)]
+struct AwaitableInner<Buffer: Send + Sync>(ArenaArc<Buffer>);
 
 impl<Buffer: Send + Sync> Drop for AwaitableInner<Buffer> {
     fn drop(&mut self) {
@@ -106,7 +111,30 @@ impl<Buffer: Send + Sync> Drop for AwaitableInner<Buffer> {
 }
 
 macro_rules! def_awaitable {
-    ($name:ident, $res:ty, | $response_name:ident | $post_processing:block) => {
+    ($name:ident, $future_name:ident, $res:ty, | $response_name:ident | $post_processing:block) => {
+        /// Return (id, res).
+        ///
+        /// id can be reused in the next request.
+        ///
+        /// # Cancel Safety
+        ///
+        /// It is perfectly safe to cancel the future.
+        #[derive(Debug)]
+        pub struct $future_name<Buffer: Send + Sync>(AwaitableInnerFuture<Buffer>);
+
+        impl<Buffer: Send + Sync> Future for $future_name<Buffer> {
+            type Output = Result<(Id<Buffer>, $res), Error>;
+
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let post_processing = |$response_name: Response<Buffer>| $post_processing;
+
+                self.0.poll(cx).map(|res| {
+                    let (id, response) = res?;
+                    Ok((id, post_processing(response)?))
+                })
+            }
+        }
+
         #[derive(Debug)]
         pub struct $name<Buffer: Send + Sync>(AwaitableInner<Buffer>);
 
@@ -123,19 +151,14 @@ macro_rules! def_awaitable {
             /// # Cancel Safety
             ///
             /// It is perfectly safe to cancel the future.
-            pub async fn wait(self) -> Result<(Id<Buffer>, $res), Error> {
-                let post_processing = |$response_name: Response<Buffer>| $post_processing;
-
-                self.0
-                    .wait_impl()
-                    .await
-                    .and_then(|(id, response)| Ok((id, post_processing(response)?)))
+            pub fn wait(self) -> $future_name<Buffer> {
+                $future_name(AwaitableInnerFuture::new(self.0))
             }
         }
     };
 }
 
-def_awaitable!(AwaitableStatus, (), |response| {
+def_awaitable!(AwaitableStatus, AwaitableStatusFuture, (), |response| {
     match response {
         Response::Header(ResponseInner::Status {
             status_code: StatusCode::Success,
@@ -145,64 +168,84 @@ def_awaitable!(AwaitableStatus, (), |response| {
     }
 });
 
-def_awaitable!(AwaitableHandle, HandleOwned, |response| {
-    match response {
-        Response::Header(ResponseInner::Handle(handle)) => {
-            if handle.into_inner().len() > 256 {
-                Err(Error::HandleTooLong)
-            } else {
-                Ok(handle)
+def_awaitable!(
+    AwaitableHandle,
+    AwaitableHandleFuture,
+    HandleOwned,
+    |response| {
+        match response {
+            Response::Header(ResponseInner::Handle(handle)) => {
+                if handle.into_inner().len() > 256 {
+                    Err(Error::HandleTooLong)
+                } else {
+                    Ok(handle)
+                }
             }
+            _ => Err(Error::InvalidResponse(
+                &"Expected Handle or err Status response",
+            )),
         }
-        _ => Err(Error::InvalidResponse(
-            &"Expected Handle or err Status response",
-        )),
     }
-});
+);
 
-def_awaitable!(AwaitableData, Data<Buffer>, |response| {
-    match response {
-        Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
-        Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
-        Response::Header(ResponseInner::Status {
-            status_code: StatusCode::Eof,
-            ..
-        }) => Ok(Data::Eof),
-        _ => Err(Error::InvalidResponse(
-            &"Expected Buffer/AllocatedBox response",
-        )),
-    }
-});
-
-def_awaitable!(AwaitableNameEntries, Box<[NameEntry]>, |response| {
-    match response {
-        Response::Header(response_inner) => match response_inner {
-            ResponseInner::Name(name) => Ok(name),
-            ResponseInner::Status {
+def_awaitable!(
+    AwaitableData,
+    AwaitableDataFuture,
+    Data<Buffer>,
+    |response| {
+        match response {
+            Response::Buffer(buffer) => Ok(Data::Buffer(buffer)),
+            Response::AllocatedBox(allocated_box) => Ok(Data::AllocatedBox(allocated_box)),
+            Response::Header(ResponseInner::Status {
                 status_code: StatusCode::Eof,
                 ..
-            } => Ok(Vec::new().into_boxed_slice()),
+            }) => Ok(Data::Eof),
+            _ => Err(Error::InvalidResponse(
+                &"Expected Buffer/AllocatedBox response",
+            )),
+        }
+    }
+);
 
+def_awaitable!(
+    AwaitableNameEntries,
+    AwaitableNameEntriesFuture,
+    Box<[NameEntry]>,
+    |response| {
+        match response {
+            Response::Header(response_inner) => match response_inner {
+                ResponseInner::Name(name) => Ok(name),
+                ResponseInner::Status {
+                    status_code: StatusCode::Eof,
+                    ..
+                } => Ok(Vec::new().into_boxed_slice()),
+
+                _ => Err(Error::InvalidResponse(
+                    &"Expected Name or err Status response",
+                )),
+            },
             _ => Err(Error::InvalidResponse(
                 &"Expected Name or err Status response",
             )),
-        },
-        _ => Err(Error::InvalidResponse(
-            &"Expected Name or err Status response",
-        )),
+        }
     }
-});
+);
 
-def_awaitable!(AwaitableAttrs, FileAttrs, |response| {
-    match response {
-        Response::Header(ResponseInner::Attrs(attrs)) => Ok(*attrs),
-        _ => Err(Error::InvalidResponse(
-            &"Expected Attrs or err Status response",
-        )),
+def_awaitable!(
+    AwaitableAttrs,
+    AwaitableAttrsFuture,
+    FileAttrs,
+    |response| {
+        match response {
+            Response::Header(ResponseInner::Attrs(attrs)) => Ok(*attrs),
+            _ => Err(Error::InvalidResponse(
+                &"Expected Attrs or err Status response",
+            )),
+        }
     }
-});
+);
 
-def_awaitable!(AwaitableName, Box<Path>, |response| {
+def_awaitable!(AwaitableName, AwaitableNameFuture, Box<Path>, |response| {
     match response {
         Response::Header(ResponseInner::Name(mut names)) => {
             if names.len() != 1 {
@@ -222,7 +265,7 @@ def_awaitable!(AwaitableName, Box<Path>, |response| {
     }
 });
 
-def_awaitable!(AwaitableLimits, Limits, |response| {
+def_awaitable!(AwaitableLimits, AwaitableLimitsFuture, Limits, |response| {
     match response {
         Response::ExtendedReply(boxed) => Ok(ssh_format::from_bytes(&boxed)?.0),
         _ => Err(Error::InvalidResponse(&"Expected extended reply response")),
