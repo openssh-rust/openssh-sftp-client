@@ -117,6 +117,12 @@ impl<Buffer: ToBuffer + 'static> SharedData<Buffer> {
 }
 
 impl<Buffer: ToBuffer + Debug + Send + Sync + 'static> SharedData<Buffer> {
+    /// Create a useable response id.
+    #[inline(always)]
+    pub fn create_response_id(&self) -> Id<Buffer> {
+        self.responses().insert()
+    }
+
     /// Return true if reserve succeeds, false otherwise.
     #[inline(always)]
     pub fn try_reserve_id(&self, new_id_cnt: u32) -> bool {
