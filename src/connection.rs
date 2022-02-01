@@ -6,6 +6,7 @@ use super::*;
 
 use core::fmt::Debug;
 
+use std::io;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -150,9 +151,9 @@ impl<Buffer: Send + Sync> SharedData<Buffer> {
     /// However, if [`WriteEnd::send_write_request_direct`] or
     /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
     /// will be interleaved and thus produce undefined behavior.
-    #[inline]
-    pub async fn flush(&self) -> Result<bool, Error> {
-        Ok(self.writer().flush().await?)
+    #[inline(always)]
+    pub async fn flush(&self) -> Result<bool, io::Error> {
+        self.writer().flush().await
     }
 }
 
