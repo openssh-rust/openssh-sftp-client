@@ -541,6 +541,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_write_buffered_vectored2() {
+        test_write_impl(|write_end, id, handle, msg| {
+            write_end
+                .send_write_request_buffered_vectored2(
+                    id,
+                    Cow::Borrowed(&handle),
+                    0,
+                    &[
+                        [IoSlice::new(&msg[..3])].as_slice(),
+                        [IoSlice::new(&msg[3..])].as_slice(),
+                    ],
+                )
+                .unwrap()
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn test_write_zero_copy() {
         test_write_impl(|write_end, id, handle, msg| {
             write_end
