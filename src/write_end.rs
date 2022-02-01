@@ -537,6 +537,70 @@ impl<Buffer: ToBuffer + Send + Sync + 'static> WriteEnd<Buffer> {
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`SharedData::flush`] to actually send the requests.
     ///
+    /// This function is only suitable for writing small data since it needs to copy the
+    /// entire `data` into buffer.
+    ///
+    /// For writing large data, it is recommended to use
+    /// [`WriteEnd::send_write_request_direct`].
+    pub fn send_write_request_buffered_vectored2(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        bufs: &[&[IoSlice<'_>]],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let len: usize = bufs
+            .iter()
+            .map(Deref::deref)
+            .flatten()
+            .map(|io_slice| io_slice.len())
+            .sum();
+        let len: u32 = len.try_into()?;
+
+        self.serializer.reserve(
+            // 9 bytes for the 4-byte len of packet, 1-byte packet type and
+            // 4-byte request id
+            9 +
+            handle.into_inner().len() +
+            // 8 bytes for the offset
+            8 +
+            // 4 bytes for the lenght of the data to be sent
+            4 +
+            // len of the data
+            len as usize,
+        );
+
+        let buffer = Request::serialize_write_request(
+            &mut self.serializer,
+            ArenaArc::slot(&id.0),
+            handle,
+            offset,
+            len,
+        )?;
+
+        for io_slices in bufs {
+            buffer.put_io_slices(io_slices);
+        }
+
+        id.0.reset(None);
+        self.shared_data.writer().push(buffer.split());
+        self.shared_data.notify_new_packet_event();
+
+        Ok(AwaitableStatus::new(id.into_inner()))
+    }
+
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`SharedData::flush`] to actually send the requests.
+    ///
     /// This function is zero-copy.
     pub fn send_write_request_zero_copy(
         &mut self,
