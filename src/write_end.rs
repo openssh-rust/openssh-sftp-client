@@ -78,7 +78,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// Send requests.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     fn send_request(
         &mut self,
         id: Id<Buffer>,
@@ -101,7 +101,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
@@ -112,7 +112,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_close_request(
         &mut self,
         id: Id<Buffer>,
@@ -129,7 +129,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// otherwise returns [`crate::Data::EOF`].
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_read_request(
         &mut self,
         id: Id<Buffer>,
@@ -151,7 +151,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_remove_request(
         &mut self,
         id: Id<Buffer>,
@@ -162,7 +162,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_rename_request(
         &mut self,
         id: Id<Buffer>,
@@ -176,7 +176,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// * `attrs` - [`FileAttrs::get_size`] must be equal to `None`.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_mkdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -188,7 +188,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_rmdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -199,7 +199,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_opendir_request(
         &mut self,
         id: Id<Buffer>,
@@ -215,7 +215,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// The `filename` only contains the basename.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_readdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -226,7 +226,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_stat_request(
         &mut self,
         id: Id<Buffer>,
@@ -239,7 +239,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// Does not follow symlink
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_lstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -252,7 +252,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// * `handle` - Must be opened with `FileMode::READ`.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_fstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -263,7 +263,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_setstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -277,7 +277,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// * `handle` - Must be opened with `OpenOptions::write` set.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_fsetstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -289,7 +289,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_readlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -300,7 +300,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_realpath_request(
         &mut self,
         id: Id<Buffer>,
@@ -313,7 +313,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// Create symlink
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -334,7 +334,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// Return limits of the server
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// # Precondition
     ///
@@ -354,7 +354,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     /// is canonicalised similarly to [`WriteEnd::send_realpath_request`].
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// # Precondition
     ///
@@ -369,7 +369,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// # Precondition
     ///
@@ -384,7 +384,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// # Precondition
     ///
@@ -400,7 +400,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// # Precondition
     ///
@@ -427,7 +427,7 @@ impl<Buffer: ToBuffer + Send + Sync + 'static> WriteEnd<Buffer> {
     /// instead leave "holes" in the file.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
@@ -478,7 +478,7 @@ impl<Buffer: ToBuffer + Send + Sync + 'static> WriteEnd<Buffer> {
     /// instead leave "holes" in the file.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
@@ -535,7 +535,7 @@ impl<Buffer: ToBuffer + Send + Sync + 'static> WriteEnd<Buffer> {
     /// instead leave "holes" in the file.
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`WriteEnd::flush`] to actually send the requests.
+    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is zero-copy.
     pub fn send_write_request_zero_copy(
