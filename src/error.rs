@@ -32,6 +32,13 @@ pub enum Error {
     SftpServerFailure(ExitStatus),
 
     /// This error is meant to be a dummy error created by user of this crate
+    /// to indicate that the sftp-server run on remote server failed.
+    ///
+    /// openssh-sftp-client would never return this error.
+    #[error("Background task failed: {0}.")]
+    BackgroundTaskFailure(&'static &'static str),
+
+    /// This error is meant to be a dummy error created by user of this crate
     /// to indicate that the extension is not supported.
     ///
     /// openssh-sftp-client would never return this error.
