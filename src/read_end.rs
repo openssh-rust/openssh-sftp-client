@@ -287,6 +287,10 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
         }
     }
 
+    pub fn get_shared_data(&self) -> &SharedData<Buffer, Auxiliary> {
+        &self.shared_data
+    }
+
     /// Forward to [`SharedData::strong_count`].
     #[inline(always)]
     pub fn shared_data_strong_count(&self) -> usize {
