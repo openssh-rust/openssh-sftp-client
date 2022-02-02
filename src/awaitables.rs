@@ -38,6 +38,7 @@ pub enum Data<Buffer> {
 
 type AwaitableInnerRes<Buffer> = (Id<Buffer>, Response<Buffer>);
 
+#[repr(transparent)]
 #[derive(Debug)]
 struct AwaitableInnerFuture<Buffer: Send + Sync>(Option<AwaitableInner<Buffer>>);
 
@@ -90,6 +91,7 @@ impl<Buffer: Send + Sync> AwaitableInnerFuture<Buffer> {
 ///
 /// Store `ArenaArc` instead of `Id` or `IdInner` to have more control
 /// over removal of `ArenaArc`.
+#[repr(transparent)]
 #[derive(Debug, destructure)]
 struct AwaitableInner<Buffer: Send + Sync>(ArenaArc<Buffer>);
 
@@ -114,6 +116,7 @@ macro_rules! def_awaitable {
         /// # Cancel Safety
         ///
         /// It is perfectly safe to cancel the future.
+        #[repr(transparent)]
         #[derive(Debug)]
         pub struct $future_name<Buffer: Send + Sync>(AwaitableInnerFuture<Buffer>);
 
@@ -130,6 +133,7 @@ macro_rules! def_awaitable {
             }
         }
 
+        #[repr(transparent)]
         #[derive(Debug)]
         pub struct $name<Buffer: Send + Sync>(AwaitableInner<Buffer>);
 
