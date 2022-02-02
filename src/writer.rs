@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 use std::cmp::max;
+use std::convert::TryInto;
 use std::future::Future;
 use std::io;
 use std::io::IoSlice;

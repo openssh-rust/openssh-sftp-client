@@ -6,6 +6,7 @@ use connection::SharedData;
 use writer::WriteBuffer;
 
 use std::borrow::Cow;
+use std::convert::TryInto;
 use std::fmt::Debug;
 use std::io::IoSlice;
 use std::ops::Deref;
