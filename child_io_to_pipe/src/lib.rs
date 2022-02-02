@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::io::Error;
 use std::os::unix::io::{AsRawFd, RawFd};
 
