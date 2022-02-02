@@ -89,6 +89,10 @@ impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
         &self.0.auxiliary
     }
 
+    pub fn get_auxiliary_mut(&mut self) -> Option<&mut Auxiliary> {
+        Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.auxiliary)
+    }
+
     #[inline(always)]
     fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
