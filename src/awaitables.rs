@@ -39,32 +39,28 @@ pub enum Data<Buffer> {
 type AwaitableInnerRes<Buffer> = (Id<Buffer>, Response<Buffer>);
 
 #[derive(Debug)]
-struct AwaitableInnerFuture<Buffer: Send + Sync>(Option<AwaitableInner<Buffer>>, bool);
+struct AwaitableInnerFuture<Buffer: Send + Sync>(Option<AwaitableInner<Buffer>>);
 
 impl<Buffer: Send + Sync> AwaitableInnerFuture<Buffer> {
     fn new(awaitable_inner: AwaitableInner<Buffer>) -> Self {
-        Self(Some(awaitable_inner), false)
+        Self(Some(awaitable_inner))
     }
 
     fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Result<AwaitableInnerRes<Buffer>, Error>> {
         let errmsg = "AwaitableInnerFuture::poll is called after completed";
 
-        // `Awaitable` guarantees that there is no spurious wakeup
-        if !self.1 {
-            let waker = cx.waker().clone();
+        let waker = cx.waker().clone();
 
-            let res = self
-                .0
-                .as_ref()
-                .expect(errmsg)
-                .0
-                .install_waker(waker)
-                .expect("AwaitableResponse should either in state Ongoing or Done");
+        let res = self
+            .0
+            .as_ref()
+            .expect(errmsg)
+            .0
+            .install_waker(waker)
+            .expect("AwaitableResponse should either in state Ongoing or Done");
 
-            if !res {
-                self.1 = true;
-                return Poll::Pending;
-            }
+        if !res {
+            return Poll::Pending;
         }
 
         let awaitable = self.0.take().expect(errmsg);
