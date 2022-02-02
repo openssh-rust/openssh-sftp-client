@@ -38,6 +38,7 @@ pub(crate) type ArenaArc<Buffer> = concurrent_arena::ArenaArc<Awaitable<Buffer>,
 
 /// Check `concurrent_arena::Arena` for `BITARRAY_LEN` and `LEN`.
 #[derive(Debug)]
+#[repr(transparent)]
 pub(crate) struct AwaitableResponses<Buffer>(Arena<Awaitable<Buffer>, BITARRAY_LEN, LEN>);
 
 impl<Buffer: Send + Sync> AwaitableResponses<Buffer> {
@@ -69,6 +70,7 @@ impl<Buffer: Send + Sync> AwaitableResponses<Buffer> {
     }
 }
 
+#[repr(transparent)]
 #[derive(Debug, destructure)]
 pub struct Id<Buffer: Send + Sync>(pub(crate) ArenaArc<Buffer>);
 
