@@ -210,6 +210,7 @@ impl Writer {
     }
 }
 
+#[repr(transparent)]
 #[derive(Debug)]
 pub(crate) struct WriteBuffer(BytesMut);
 
