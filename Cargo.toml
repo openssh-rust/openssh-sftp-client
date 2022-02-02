@@ -24,7 +24,6 @@ thiserror = "1.0.29"
 awaitable = "0.3.2"
 concurrent_arena = "0.1.4"
 derive_destructure2 = "0.0.1"
-arrayvec = "0.7.2"
 
 openssh-sftp-protocol = "0.21.3"
 

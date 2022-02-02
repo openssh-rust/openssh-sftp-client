@@ -18,8 +18,6 @@ use tokio_io_utility::queue::{MpScBytesQueue, QueuePusher};
 use tokio_io_utility::write_vectored_all;
 use tokio_pipe::{AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
-use arrayvec::ArrayVec;
-
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
 
 #[derive(Debug)]
@@ -135,11 +133,15 @@ impl Writer {
         bufs: &[io::IoSlice<'_>],
     ) -> Result<(), io::Error> {
         if bufs.len() <= 29 {
-            let mut vec = ArrayVec::<_, 30>::new();
-            vec.push(*header);
-            vec.try_extend_from_slice(bufs).unwrap();
+            let mut io_slices = [IoSlice::new(&[]); 30];
 
-            self.write_vectored_all_direct(&mut vec).await
+            io_slices[0] = *header;
+            io_slices[1..].iter_mut().zip(bufs).for_each(|(dst, src)| {
+                *dst = *src;
+            });
+
+            self.write_vectored_all_direct(&mut io_slices[..bufs.len() + 1])
+                .await
         } else {
             let mut vec = Vec::with_capacity(1 + bufs.len());
             vec.push(*header);
