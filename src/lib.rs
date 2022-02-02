@@ -57,7 +57,7 @@ pub use openssh_sftp_protocol::response::{
 };
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
-pub use connection::{connect, SharedData};
+pub use connection::{connect, connect_with_auxiliary, SharedData};
 pub use error::Error;
 pub use read_end::ReadEnd;
 pub use write_end::WriteEnd;

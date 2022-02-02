@@ -175,6 +175,29 @@ pub async fn connect<Buffer: ToBuffer + Send + Sync + 'static>(
     reader: PipeRead,
     writer: PipeWrite,
 ) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>, Extensions), Error> {
+    connect_with_auxiliary(reader, writer, ()).await
+}
+
+/// Initialize connection to remote sftp server and
+/// negotiate the sftp version.
+///
+/// # Cancel Safety
+///
+/// This function is not cancel safe.
+///
+/// After dropping the future, the connection would be in a undefined state.
+pub async fn connect_with_auxiliary<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>(
+    reader: PipeRead,
+    writer: PipeWrite,
+    auxiliary: Auxiliary,
+) -> Result<
+    (
+        WriteEnd<Buffer, Auxiliary>,
+        ReadEnd<Buffer, Auxiliary>,
+        Extensions,
+    ),
+    Error,
+> {
     let shared_data = SharedData(Arc::new(SharedDataInner {
         writer: Writer::new(writer),
         responses: AwaitableResponses::new(),
@@ -182,7 +205,7 @@ pub async fn connect<Buffer: ToBuffer + Send + Sync + 'static>(
         requests_sent: AtomicU32::new(0),
         is_conn_closed: AtomicBool::new(false),
 
-        auxiliary: (),
+        auxiliary,
     }));
 
     // Send hello message
