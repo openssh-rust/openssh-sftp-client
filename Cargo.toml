@@ -27,8 +27,9 @@ derive_destructure2 = "0.0.1"
 
 openssh-sftp-protocol = "0.21.3"
 
-# Since concurrent_arena uses dependency parking_lot anyway,
-# enabling feature parking_lot on tokio does not pull in any new dependency.
+# Since concurrent_arena, awaitable and tokio-io-utility uses
+# dependency parking_lot anyway, enabling feature parking_lot
+# on tokio does not pull in any new dependency.
 tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync"] }
 
 bytes = "1"
