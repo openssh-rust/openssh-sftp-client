@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::io::IoSlice;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 use openssh_sftp_protocol::file_attrs::FileAttrs;
@@ -52,6 +52,12 @@ impl<Buffer, Auxiliary> Deref for WriteEnd<Buffer, Auxiliary> {
 
     fn deref(&self) -> &Self::Target {
         &self.shared_data
+    }
+}
+
+impl<Buffer, Auxiliary> DerefMut for WriteEnd<Buffer, Auxiliary> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.shared_data
     }
 }
 
