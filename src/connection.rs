@@ -19,7 +19,7 @@ use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 //  - Support for zero copy API
 
 #[derive(Debug)]
-struct SharedDataInner<Buffer> {
+struct SharedDataInner<Buffer, Auxiliary> {
     writer: Writer,
     responses: AwaitableResponses<Buffer>,
 
@@ -27,6 +27,8 @@ struct SharedDataInner<Buffer> {
     requests_sent: AtomicU32,
 
     is_conn_closed: AtomicBool,
+
+    auxiliary: Auxiliary,
 }
 
 /// SharedData contains both the writer and the responses because:
@@ -35,15 +37,15 @@ struct SharedDataInner<Buffer> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<Buffer>(Arc<SharedDataInner<Buffer>>);
+pub struct SharedData<Buffer, Auxiliary = ()>(Arc<SharedDataInner<Buffer, Auxiliary>>);
 
-impl<Buffer> Clone for SharedData<Buffer> {
+impl<Buffer, Auxiliary> Clone for SharedData<Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<Buffer> Drop for SharedData<Buffer> {
+impl<Buffer, Auxiliary> Drop for SharedData<Buffer, Auxiliary> {
     fn drop(&mut self) {
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
@@ -62,7 +64,7 @@ impl<Buffer> Drop for SharedData<Buffer> {
     }
 }
 
-impl<Buffer> SharedData<Buffer> {
+impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
     pub(crate) fn writer(&self) -> &Writer {
         &self.0.writer
     }
@@ -81,6 +83,10 @@ impl<Buffer> SharedData<Buffer> {
     #[inline(always)]
     pub fn strong_count(&self) -> usize {
         Arc::strong_count(&self.0)
+    }
+
+    pub fn get_auxiliary(&self) -> &Auxiliary {
+        &self.0.auxiliary
     }
 
     #[inline(always)]
@@ -116,7 +122,7 @@ impl<Buffer> SharedData<Buffer> {
     }
 }
 
-impl<Buffer: Send + Sync> SharedData<Buffer> {
+impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
     /// Create a useable response id.
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
@@ -175,6 +181,8 @@ pub async fn connect<Buffer: ToBuffer + Send + Sync + 'static>(
         notify: Notify::new(),
         requests_sent: AtomicU32::new(0),
         is_conn_closed: AtomicBool::new(false),
+
+        auxiliary: (),
     }));
 
     // Send hello message

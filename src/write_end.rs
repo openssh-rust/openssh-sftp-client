@@ -23,39 +23,39 @@ use bytes::Bytes;
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
-pub struct WriteEnd<Buffer> {
+pub struct WriteEnd<Buffer, Auxiliary = ()> {
     serializer: Serializer<WriteBuffer>,
-    shared_data: SharedData<Buffer>,
+    shared_data: SharedData<Buffer, Auxiliary>,
 }
 
-impl<Buffer> Clone for WriteEnd<Buffer> {
+impl<Buffer, Auxiliary> Clone for WriteEnd<Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<Buffer> WriteEnd<Buffer> {
-    pub fn new(shared_data: SharedData<Buffer>) -> Self {
+impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+    pub fn new(shared_data: SharedData<Buffer, Auxiliary>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
         }
     }
 
-    pub fn into_shared_data(self) -> SharedData<Buffer> {
+    pub fn into_shared_data(self) -> SharedData<Buffer, Auxiliary> {
         self.shared_data
     }
 }
 
-impl<Buffer> Deref for WriteEnd<Buffer> {
-    type Target = SharedData<Buffer>;
+impl<Buffer, Auxiliary> Deref for WriteEnd<Buffer, Auxiliary> {
+    type Target = SharedData<Buffer, Auxiliary>;
 
     fn deref(&self) -> &Self::Target {
         &self.shared_data
     }
 }
 
-impl<Buffer: Send + Sync> WriteEnd<Buffer> {
+impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .get_mut_writer()
@@ -417,7 +417,7 @@ impl<Buffer: Send + Sync> WriteEnd<Buffer> {
     }
 }
 
-impl<Buffer: ToBuffer + Send + Sync + 'static> WriteEnd<Buffer> {
+impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics

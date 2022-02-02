@@ -19,14 +19,14 @@ use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 use tokio_pipe::{PipeRead, PIPE_BUF};
 
 #[derive(Debug)]
-pub struct ReadEnd<Buffer> {
+pub struct ReadEnd<Buffer, Auxiliary = ()> {
     reader: BufReader<PipeRead>,
     buffer: Vec<u8>,
-    shared_data: SharedData<Buffer>,
+    shared_data: SharedData<Buffer, Auxiliary>,
 }
 
-impl<Buffer: ToBuffer + 'static + Send + Sync> ReadEnd<Buffer> {
-    pub(crate) fn new(reader: PipeRead, shared_data: SharedData<Buffer>) -> Self {
+impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxiliary> {
+    pub(crate) fn new(reader: PipeRead, shared_data: SharedData<Buffer, Auxiliary>) -> Self {
         Self {
             reader: BufReader::with_capacity(PIPE_BUF, reader),
             buffer: Vec::with_capacity(64),
