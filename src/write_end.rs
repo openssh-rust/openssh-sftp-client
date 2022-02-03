@@ -133,7 +133,7 @@ impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     ///   then [`crate::Data::AllocatedBox`] will be returned.
     ///
     /// Return [`crate::Data::Buffer`] or [`crate::Data::AllocatedBox`] if not EOF,
-    /// otherwise returns [`crate::Data::EOF`].
+    /// otherwise returns [`crate::Data::Eof`].
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`SharedData::flush`] to actually send the requests.
