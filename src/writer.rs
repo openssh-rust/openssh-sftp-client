@@ -14,7 +14,7 @@ use openssh_sftp_protocol::ssh_format::SerBacker;
 
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
-use tokio_io_utility::queue::{MpScBytesQueue, QueuePusher};
+use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
 use tokio_io_utility::write_vectored_all;
 use tokio_pipe::{AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
@@ -151,24 +151,9 @@ impl Writer {
         }
     }
 
-    /// If another thread is flushing, then `Ok(false)` will be returned.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is perfectly cancel safe.
-    ///
-    /// While it is true that it might only partially flushed out the data,
-    /// it can be restarted by another thread.
-    pub(crate) async fn flush(&self) -> Result<bool, io::Error> {
-        // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
-        // to be non-empty
-        let mut buffers = match self.1.get_buffers() {
-            Some(buffers) => buffers,
-            None => return Ok(false),
-        };
-
+    async fn flush_impl(&self, mut buffers: Buffers<'_>) -> Result<(), io::Error> {
         if buffers.is_empty() {
-            return Ok(true);
+            return Ok(());
         }
 
         if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
@@ -178,7 +163,7 @@ impl Writer {
                 let res = !buffers.advance(NonZeroUsize::new(len).unwrap());
                 debug_assert!(res);
 
-                return Ok(true);
+                return Ok(());
             }
         }
 
@@ -195,8 +180,25 @@ impl Writer {
                 NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
 
             if !buffers.advance(n) {
-                break Ok(true);
+                break Ok(());
             }
+        }
+    }
+
+    /// If another thread is flushing, then `Ok(false)` will be returned.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is perfectly cancel safe.
+    ///
+    /// While it is true that it might only partially flushed out the data,
+    /// it can be restarted by another thread.
+    pub(crate) async fn flush(&self) -> Result<bool, io::Error> {
+        // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
+        // to be non-empty
+        match self.1.get_buffers() {
+            Some(buffers) => self.flush_impl(buffers).await.map(|_| true),
+            None => Ok(false),
         }
     }
 
