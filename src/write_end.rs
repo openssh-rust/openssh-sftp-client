@@ -357,7 +357,7 @@ impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// This supports canonicalisation of relative paths and those that need
     /// tilde-expansion, i.e. "~", "~/..." and "~user/...".
     ///
-    /// These paths are expanded using shell-lilke rules and the resultant path
+    /// These paths are expanded using shell-like rules and the resultant path
     /// is canonicalised similarly to [`WriteEnd::send_realpath_request`].
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
