@@ -586,7 +586,35 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         offset: u64,
         data: &[Bytes],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let len: usize = data.iter().map(Bytes::len).sum();
+        self.send_write_request_zero_copy2(id, handle, offset, &[data])
+    }
+
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`SharedData::flush`] to actually send the requests.
+    ///
+    /// This function is zero-copy.
+    pub fn send_write_request_zero_copy2(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data_slice: &[&[Bytes]],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let len: usize = data_slice
+            .iter()
+            .map(Deref::deref)
+            .flatten()
+            .map(Bytes::len)
+            .sum();
         let len: u32 = len.try_into()?;
 
         let header = Request::serialize_write_request(
@@ -601,7 +629,9 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
         let mut queue_pusher = self.shared_data.writer().get_pusher();
         queue_pusher.push(header);
-        queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
+        for data in data_slice {
+            queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
+        }
 
         id.0.reset(None);
         self.shared_data.notify_new_packet_event();
