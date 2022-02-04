@@ -1272,7 +1272,7 @@ mod tests {
         let new_filename = tempdir.path().join("file2");
 
         let awaitable = write_end
-            .send_hardlink_requst(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
+            .send_hardlink_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
             .unwrap();
 
         read_one_packet(&mut write_end, &mut read_end).await;

@@ -396,7 +396,7 @@ impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// # Precondition
     ///
     /// Requires [`Extensions::hardlink`] to be true.
-    pub fn send_hardlink_requst(
+    pub fn send_hardlink_request(
         &mut self,
         id: Id<Buffer>,
         oldpath: Cow<'_, Path>,
