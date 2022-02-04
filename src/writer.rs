@@ -202,6 +202,21 @@ impl Writer {
         }
     }
 
+    /// If another thread is flushing, then this function would wait until
+    /// the other thread is done.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is perfectly cancel safe.
+    ///
+    /// While it is true that it might only partially flushed out the data,
+    /// it can be restarted by another thread.
+    pub(crate) async fn flush_blocked(&self) -> Result<(), io::Error> {
+        // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
+        // to be non-empty
+        self.flush_impl(self.1.get_buffers_blocked()).await
+    }
+
     /// Push the bytes into buffer.
     #[inline(always)]
     pub(crate) fn push(&self, bytes: Bytes) {

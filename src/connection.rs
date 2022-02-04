@@ -165,6 +165,28 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
     pub async fn flush(&self) -> Result<bool, io::Error> {
         self.writer().flush().await
     }
+
+    /// Flush the write buffer.
+    ///
+    /// If another thread is flushing, then this function would wait until
+    /// the other thread is done.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is only cancel safe if [`WriteEnd::send_write_request_direct`] or
+    /// [`WriteEnd::send_write_request_direct_vectored`] is not called when this
+    /// future is cancelled.
+    ///
+    /// Upon cancel, it might only partially flushed out the data, which can be
+    /// restarted by another thread.
+    ///
+    /// However, if [`WriteEnd::send_write_request_direct`] or
+    /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
+    /// will be interleaved and thus produce undefined behavior.
+    #[inline(always)]
+    pub async fn flush_blocked(&self) -> Result<(), io::Error> {
+        self.writer().flush_blocked().await
+    }
 }
 
 /// Initialize connection to remote sftp server and
