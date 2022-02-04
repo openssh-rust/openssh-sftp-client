@@ -634,6 +634,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_write_zero_copy2() {
+        test_write_impl(|write_end, id, handle, msg| {
+            write_end
+                .send_write_request_zero_copy2(
+                    id,
+                    Cow::Borrowed(&handle),
+                    0,
+                    &[
+                        [Bytes::copy_from_slice(&msg[..3])].as_slice(),
+                        [Bytes::copy_from_slice(&msg[3..])].as_slice(),
+                    ],
+                )
+                .unwrap()
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn test_file_remove() {
         let (mut write_end, mut read_end, mut child) = connect().await;
 
