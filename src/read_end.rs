@@ -269,6 +269,12 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
         self.shared_data.try_flush().await
     }
 
+    /// Forward function call to [`SharedData::flush`].
+    #[inline]
+    pub async fn flush_write_end_buffer(&self) -> Result<(), io::Error> {
+        self.shared_data.flush().await
+    }
+
     /// Wait for next packet to be readable.
     ///
     /// Return `Ok(())` if next packet is ready and readable, `Error::IOError(io_error)`
