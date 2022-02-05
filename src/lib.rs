@@ -13,7 +13,7 @@
 //!  - [`WriteEnd::send_limits_request`]
 //!  - [`WriteEnd::send_expand_path_request`]
 //!  - [`WriteEnd::send_fsync_request`]
-//!  - [`WriteEnd::send_hardlink_requst`]
+//!  - [`WriteEnd::send_hardlink_request`]
 //!  - [`WriteEnd::send_posix_rename_request`]
 
 mod awaitable_responses;
