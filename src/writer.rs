@@ -193,10 +193,10 @@ impl Writer {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    pub(crate) async fn flush(&self) -> Result<bool, io::Error> {
+    pub(crate) async fn try_flush(&self) -> Result<bool, io::Error> {
         // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
         // to be non-empty
-        match self.1.get_buffers() {
+        match self.1.try_get_buffers() {
             Some(buffers) => self.flush_impl(buffers).await.map(|_| true),
             None => Ok(false),
         }
@@ -211,10 +211,10 @@ impl Writer {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    pub(crate) async fn flush_blocked(&self) -> Result<(), io::Error> {
+    pub(crate) async fn flush(&self) -> Result<(), io::Error> {
         // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
         // to be non-empty
-        self.flush_impl(self.1.get_buffers_blocked()).await
+        self.flush_impl(self.1.get_buffers_blocked().await).await
     }
 
     /// Push the bytes into buffer.

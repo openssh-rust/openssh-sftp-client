@@ -263,10 +263,10 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
         self.shared_data.wait_for_new_request().await
     }
 
-    /// Forward function call to [`SharedData::flush`].
+    /// Forward function call to [`SharedData::try_flush`].
     #[inline]
-    pub async fn flush_write_end_buffer(&self) -> Result<bool, io::Error> {
-        self.shared_data.flush().await
+    pub async fn try_flush_write_end_buffer(&self) -> Result<bool, io::Error> {
+        self.shared_data.try_flush().await
     }
 
     /// Wait for next packet to be readable.

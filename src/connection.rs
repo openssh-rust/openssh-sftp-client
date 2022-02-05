@@ -162,8 +162,8 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
     /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
     /// will be interleaved and thus produce undefined behavior.
     #[inline(always)]
-    pub async fn flush(&self) -> Result<bool, io::Error> {
-        self.writer().flush().await
+    pub async fn try_flush(&self) -> Result<bool, io::Error> {
+        self.writer().try_flush().await
     }
 
     /// Flush the write buffer.
@@ -184,8 +184,8 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
     /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
     /// will be interleaved and thus produce undefined behavior.
     #[inline(always)]
-    pub async fn flush_blocked(&self) -> Result<(), io::Error> {
-        self.writer().flush_blocked().await
+    pub async fn flush(&self) -> Result<(), io::Error> {
+        self.writer().flush().await
     }
 }
 
