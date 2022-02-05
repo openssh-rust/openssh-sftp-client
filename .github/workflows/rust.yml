@@ -37,6 +37,7 @@ jobs:
         cargo check --all
         cargo fmt --all -- --check
         cargo clippy --all
+        cargo doc
   build:
     runs-on: ubuntu-latest
 
