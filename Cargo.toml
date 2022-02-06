@@ -25,7 +25,7 @@ awaitable = "0.3.2"
 concurrent_arena = "0.1.4"
 derive_destructure2 = "0.0.1"
 
-openssh-sftp-protocol = "0.21.3"
+openssh-sftp-protocol = "0.21.4"
 
 # Since concurrent_arena, awaitable and tokio-io-utility uses
 # dependency parking_lot anyway, enabling feature parking_lot
