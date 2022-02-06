@@ -16,7 +16,7 @@ use tokio_pipe::{PipeRead, PipeWrite};
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
 // TODO:
-//  - Support for zero copy API
+//  - Support for zero copy syscalls
 
 #[derive(Debug)]
 struct SharedDataInner<Buffer, Auxiliary> {
