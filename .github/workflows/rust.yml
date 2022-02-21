@@ -36,7 +36,9 @@ jobs:
       run: |
         cargo check --all
         cargo fmt --all -- --check
+        cargo +nightly fmt --all -- --check
         cargo clippy --all
+        cargo +nightly clippy --all
         cargo doc
   build:
     runs-on: ubuntu-latest
