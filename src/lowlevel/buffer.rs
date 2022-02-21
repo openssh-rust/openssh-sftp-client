@@ -4,14 +4,20 @@ use bytes::BytesMut;
 
 /// Any type that can act as a buffer.
 pub trait ToBuffer {
+    /// Returned the buffer.
     fn get_buffer(&mut self) -> Buffer<'_>;
 }
 
 /// Buffer that can be used to write data into.
 #[derive(Debug)]
 pub enum Buffer<'a> {
+    /// A `Vec<u8>` acts as a buffer.
     Vector(&'a mut Vec<u8>),
+
+    /// A byte slice acts as a buffer.
     Slice(&'a mut [u8]),
+
+    /// A `BytesMut` acts as a buffer.
     Bytes(&'a mut BytesMut),
 }
 
