@@ -261,7 +261,8 @@ impl SerBacker for WriteBuffer {
     }
 
     fn get_first_4byte_slice(&mut self) -> &mut [u8; 4] {
-        (&mut (*self.0)[..4]).try_into().unwrap()
+        let slice = &mut self.0[..4];
+        slice.try_into().unwrap()
     }
 
     #[inline(always)]

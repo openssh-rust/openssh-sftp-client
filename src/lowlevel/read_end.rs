@@ -77,9 +77,8 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
     }
 
     async fn consume_packet(&mut self, len: u32, err: Error) -> Result<(), Error> {
-        if let Err(consumption_err) =
-            copy_buf(&mut (&mut self.reader).take(len as u64), &mut sink()).await
-        {
+        let reader = &mut self.reader;
+        if let Err(consumption_err) = copy_buf(&mut reader.take(len as u64), &mut sink()).await {
             Err(Error::RecursiveErrors(Box::new((
                 err,
                 consumption_err.into(),
