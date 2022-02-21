@@ -6,7 +6,7 @@ use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
 async fn flush(shared_data: &SharedData) -> Result<(), Error> {
-    Ok(shared_data.flush().await.map_err(Error::from)?)
+    shared_data.flush().await.map_err(Error::from)
 }
 
 pub(super) fn create_flush_task(

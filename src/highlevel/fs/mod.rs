@@ -157,7 +157,7 @@ impl<'s> Fs<'s> {
 
     async fn hard_link_impl(&mut self, src: &Path, dst: &Path) -> Result<(), Error> {
         if !self.get_auxiliary().extensions().hardlink {
-            return Err(Error::UnsupportedExtension(&"hardlink").into());
+            return Err(Error::UnsupportedExtension(&"hardlink"));
         }
 
         self.linking_impl(src, dst, WriteEnd::send_hardlink_request)

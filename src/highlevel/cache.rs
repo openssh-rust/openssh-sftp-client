@@ -78,7 +78,7 @@ impl<'s> WriteEndWithCachedId<'s> {
         F: Future<Output = Result<R, E>>,
         E: Into<Error>,
     {
-        let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error().into());
+        let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
         let auxiliary = self.sftp.auxiliary();
 
         if auxiliary.cancel_token.is_cancelled() {

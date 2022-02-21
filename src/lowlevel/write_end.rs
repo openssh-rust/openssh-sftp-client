@@ -527,8 +527,7 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         let len: usize = bufs
             .iter()
-            .map(Deref::deref)
-            .flatten()
+            .flat_map(Deref::deref)
             .map(|io_slice| io_slice.len())
             .sum();
         let len: u32 = len.try_into()?;
@@ -610,8 +609,7 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
     ) -> Result<AwaitableStatus<Buffer>, Error> {
         let len: usize = data_slice
             .iter()
-            .map(Deref::deref)
-            .flatten()
+            .flat_map(Deref::deref)
             .map(Bytes::len)
             .sum();
         let len: u32 = len.try_into()?;
