@@ -1,7 +1,6 @@
 mod common;
 use common::*;
 
-use child_io_to_pipe::*;
 use openssh_sftp_client::highlevel::*;
 
 use std::cmp::{max, min};
@@ -21,9 +20,6 @@ use pretty_assertions::assert_eq;
 
 async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
     let (child, stdin, stdout) = launch_sftp().await;
-
-    let stdout = child_stdout_to_pipewrite(stdout).unwrap();
-    let stdin = child_stdin_to_pipewrite(stdin).unwrap();
 
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
 }

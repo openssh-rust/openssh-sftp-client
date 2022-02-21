@@ -1,9 +1,11 @@
 use once_cell::sync::OnceCell;
-
 use std::env;
 use std::path;
 use std::process::Stdio;
 use tokio::process;
+use tokio_pipe::{PipeRead, PipeWrite};
+
+use child_io_to_pipe::*;
 
 pub fn get_sftp_path() -> &'static path::Path {
     static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
@@ -19,7 +21,7 @@ pub fn get_sftp_path() -> &'static path::Path {
     })
 }
 
-pub async fn launch_sftp() -> (process::Child, process::ChildStdin, process::ChildStdout) {
+pub async fn launch_sftp() -> (process::Child, PipeWrite, PipeRead) {
     let mut child = process::Command::new(get_sftp_path())
         .args(&["-e", "-l", "DEBUG"])
         .stdin(Stdio::piped())
@@ -29,8 +31,8 @@ pub async fn launch_sftp() -> (process::Child, process::ChildStdin, process::Chi
         .spawn()
         .unwrap();
 
-    let stdin = child.stdin.take().unwrap();
-    let stdout = child.stdout.take().unwrap();
+    let stdin = child_stdin_to_pipewrite(child.stdin.take().unwrap()).unwrap();
+    let stdout = child_stdout_to_pipewrite(child.stdout.take().unwrap()).unwrap();
 
     (child, stdin, stdout)
 }

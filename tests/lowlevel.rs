@@ -4,8 +4,6 @@ use common::*;
 use lowlevel::*;
 use openssh_sftp_client::lowlevel;
 
-use child_io_to_pipe::*;
-
 use std::borrow::Cow;
 use std::env;
 use std::fs;
@@ -30,9 +28,6 @@ async fn connect_with_extensions() -> (
     Extensions,
 ) {
     let (child, stdin, stdout) = launch_sftp().await;
-
-    let stdout = child_stdout_to_pipewrite(stdout).unwrap();
-    let stdin = child_stdin_to_pipewrite(stdin).unwrap();
 
     let (write_end, read_end, extensions) = lowlevel::connect(stdout, stdin).await.unwrap();
     (write_end, read_end, child, extensions)
