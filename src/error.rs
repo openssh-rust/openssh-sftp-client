@@ -10,6 +10,7 @@ use thiserror::Error;
 
 use openssh_sftp_protocol::ssh_format;
 
+/// Error returned by [`crate::lowlevel`] and [`crate::highlevel`].
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
@@ -22,7 +23,10 @@ pub enum Error {
 
     /// Server returned a hello message that is too long.
     #[error("sftp server returned hello message of length {len}, which is longer than 4096.")]
-    SftpServerHelloMsgTooLong { len: u32 },
+    SftpServerHelloMsgTooLong {
+        /// The length of the hello mesage
+        len: u32,
+    },
 
     /// This error is meant to be a dummy error created by user of this crate
     /// to indicate that the sftp-server run on remote server failed.
@@ -65,7 +69,10 @@ pub enum Error {
     ///
     /// The user can choose to log this error and continue operation.
     #[error("The response id {response_id} is invalid.")]
-    InvalidResponseId { response_id: u32 },
+    InvalidResponseId {
+        /// The invalid response id
+        response_id: u32,
+    },
 
     /// (OriginalError, RecursiveError)
     #[error("(OriginalError, RecursiveError): {0:#?}.")]
