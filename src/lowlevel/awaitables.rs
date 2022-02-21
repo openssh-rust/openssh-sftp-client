@@ -17,6 +17,7 @@ use openssh_sftp_protocol::response::{NameEntry, ResponseInner, StatusCode};
 use openssh_sftp_protocol::ssh_format;
 use openssh_sftp_protocol::HandleOwned;
 
+/// The data returned by [`WriteEnd::send_read_request`].
 #[derive(Debug, Clone)]
 pub enum Data<Buffer> {
     /// The buffer that stores the response of Read.
@@ -130,6 +131,7 @@ macro_rules! def_awaitable {
             }
         }
 
+        /// Awaitable
         #[repr(transparent)]
         #[derive(Debug)]
         pub struct $name<Buffer: Send + Sync>(AwaitableInner<Buffer>);
