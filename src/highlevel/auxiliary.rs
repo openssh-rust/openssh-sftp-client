@@ -1,4 +1,4 @@
-use super::Extensions;
+use super::lowlevel::Extensions;
 
 use once_cell::sync::OnceCell;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};

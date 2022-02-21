@@ -79,7 +79,7 @@ impl<'s> WriteEndWithCachedId<'s> {
         E: Into<Error>,
     {
         let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error().into());
-        let auxiliary = self.sftp.shared_data.get_auxiliary();
+        let auxiliary = self.sftp.auxiliary();
 
         if auxiliary.cancel_token.is_cancelled() {
             return cancel_err();
@@ -113,7 +113,7 @@ impl<'s> WriteEndWithCachedId<'s> {
     }
 
     pub(super) fn get_auxiliary(&self) -> &'s Auxiliary {
-        self.sftp.shared_data.get_auxiliary()
+        self.sftp.auxiliary()
     }
 
     pub(super) fn sftp(&self) -> &'s Sftp {

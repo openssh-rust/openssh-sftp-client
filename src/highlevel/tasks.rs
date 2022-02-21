@@ -1,9 +1,13 @@
-use super::{flush, Error, ReadEnd, SharedData};
+use super::{Error, ReadEnd, SharedData};
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
+
+async fn flush(shared_data: &SharedData) -> Result<(), Error> {
+    Ok(shared_data.flush().await.map_err(Error::from)?)
+}
 
 pub(super) fn create_flush_task(
     shared_data: SharedData,
