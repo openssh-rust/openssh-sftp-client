@@ -28,7 +28,7 @@ jobs:
       with:
           toolchain: nightly
           override: true
-          components: rustfmt
+          components: rustfmt, clippy
     - uses: actions/cache@v2
       with:
         path: |
