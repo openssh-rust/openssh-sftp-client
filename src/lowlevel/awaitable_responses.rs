@@ -67,6 +67,7 @@ impl<Buffer: Send + Sync> AwaitableResponses<Buffer> {
     }
 }
 
+/// Request Id
 #[repr(transparent)]
 #[derive(Debug, destructure)]
 pub struct Id<Buffer: Send + Sync>(pub(crate) ArenaArc<Buffer>);
