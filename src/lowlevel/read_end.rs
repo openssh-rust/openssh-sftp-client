@@ -270,8 +270,7 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
     ///
     /// # Cancel Safety
     ///
-    /// This function is cancel safe and thus can be used with `tokio::select!`
-    /// to implement [`ReadEnd::flush_write_end_buffer`] on timeout.
+    /// This function is cancel safe.
     pub async fn ready_for_read(&mut self) -> Result<(), io::Error> {
         if self.reader.fill_buf().await?.is_empty() {
             // Empty buffer means EOF

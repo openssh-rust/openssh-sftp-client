@@ -1,3 +1,5 @@
+//! Highlevle API of sftp client
+
 use super::{lowlevel, Error};
 
 pub use lowlevel::{UnixTimeStamp, UnixTimeStampError};
