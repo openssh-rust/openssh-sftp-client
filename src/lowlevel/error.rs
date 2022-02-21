@@ -85,4 +85,8 @@ pub enum Error {
     /// Handle returned by server is longer than the limit 256 bytes specified in sftp v3.
     #[error("Handle returned by server is longer than the limit 256 bytes specified in sftp v3")]
     HandleTooLong,
+
+    /// tokio join error
+    #[error("Failed to join tokio task")]
+    TaskJoinError(#[from] tokio::task::JoinError),
 }

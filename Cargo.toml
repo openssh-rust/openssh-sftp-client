@@ -24,22 +24,25 @@ thiserror = "1.0.29"
 awaitable = "0.3.2"
 concurrent_arena = "0.1.4"
 derive_destructure2 = "0.0.1"
+once_cell = { version = "1.8.0", features = ["parking_lot"] }
 
 openssh-sftp-protocol = "0.21.4"
 
 # Since concurrent_arena, awaitable and tokio-io-utility uses
 # dependency parking_lot anyway, enabling feature parking_lot
 # on tokio does not pull in any new dependency.
-tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync"] }
+tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync", "time", "rt"] }
 
 bytes = "1"
-tokio-io-utility = { version = "0.6.0", features = ["mpsc", "read-exact-to-bytes"] }
+tokio-io-utility = { version = "0.6.1", features = ["mpsc", "read-exact-to-bytes"] }
+tokio-util = { version = "0.7.0" }
 tokio-pipe = "0.2.10"
 
 [dev-dependencies]
 tokio = { version = "1.11.0", features = ["rt", "macros", "process"] }
 once_cell = "1.8.0"
 tempfile = "3.1.0"
+pretty_assertions = "1.1.0"
 
 # Since openssh-sftp-client forbids unsafe code, I have
 # to put these code in another workspace.
