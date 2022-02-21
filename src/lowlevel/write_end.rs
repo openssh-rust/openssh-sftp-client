@@ -34,6 +34,7 @@ impl<Buffer, Auxiliary> Clone for WriteEnd<Buffer, Auxiliary> {
 }
 
 impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+    /// Create a [`WriteEnd`] from [`SharedData`].
     pub fn new(shared_data: SharedData<Buffer, Auxiliary>) -> Self {
         Self {
             serializer: Serializer::new(),
@@ -41,6 +42,7 @@ impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
         }
     }
 
+    /// Consume the [`WriteEnd`] and return the stored [`SharedData`].
     pub fn into_shared_data(self) -> SharedData<Buffer, Auxiliary> {
         self.shared_data
     }
