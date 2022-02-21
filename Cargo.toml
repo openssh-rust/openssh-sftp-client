@@ -22,7 +22,7 @@ members = [
 [dependencies]
 thiserror = "1.0.29"
 awaitable = "0.3.3"
-concurrent_arena = "0.1.4"
+concurrent_arena = "0.1.5"
 derive_destructure2 = "0.0.1"
 once_cell = { version = "1.8.0", features = ["parking_lot"] }
 
