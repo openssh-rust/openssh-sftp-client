@@ -83,10 +83,12 @@ impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
         Arc::strong_count(&self.0)
     }
 
+    /// Returned the auxiliary data.
     pub fn get_auxiliary(&self) -> &Auxiliary {
         &self.0.auxiliary
     }
 
+    /// Return the auxiliary data.
     pub fn get_auxiliary_mut(&mut self) -> Option<&mut Auxiliary> {
         Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.auxiliary)
     }
