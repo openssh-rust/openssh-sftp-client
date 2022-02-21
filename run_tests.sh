@@ -1,8 +1,10 @@
-#!/bin/sh -ex
+#!/bin/bash -ex
 
 git submodule update --init --depth 1 --recursive
 
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:/tmp}"
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+    export XDG_RUNTIME_DIR=/tmp
+fi
 
 # Remove all files in /tmp in the container
 mkdir -p $XDG_RUNTIME_DIR/openssh_sftp_client/
