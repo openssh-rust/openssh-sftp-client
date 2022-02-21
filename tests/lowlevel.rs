@@ -1,3 +1,6 @@
+mod common;
+use common::*;
+
 use lowlevel::*;
 use openssh_sftp_client::lowlevel;
 
@@ -10,45 +13,14 @@ use std::io;
 use std::io::IoSlice;
 use std::os::unix::fs::symlink;
 use std::path;
-use std::process::Stdio;
+
+use tokio::process;
 
 use bytes::Bytes;
-use once_cell::sync::OnceCell;
 use tempfile::{Builder, TempDir};
-use tokio::process;
 
 fn assert_not_found(err: io::Error) {
     assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
-}
-
-fn get_sftp_path() -> &'static path::Path {
-    static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
-
-    SFTP_PATH.get_or_init(|| {
-        let mut sftp_path: path::PathBuf = env::var("OUT_DIR").unwrap().into();
-        sftp_path.push("openssh-portable");
-        sftp_path.push("sftp-server");
-
-        eprintln!("sftp_path = {:#?}", sftp_path);
-
-        sftp_path
-    })
-}
-
-async fn launch_sftp() -> (process::Child, process::ChildStdin, process::ChildStdout) {
-    let mut child = process::Command::new(get_sftp_path())
-        .args(&["-e", "-l", "DEBUG"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()
-        .unwrap();
-
-    let stdin = child.stdin.take().unwrap();
-    let stdout = child.stdout.take().unwrap();
-
-    (child, stdin, stdout)
 }
 
 async fn connect_with_extensions() -> (
