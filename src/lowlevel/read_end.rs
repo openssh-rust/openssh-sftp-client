@@ -18,6 +18,7 @@ use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 use tokio_pipe::{PipeRead, PIPE_BUF};
 
+/// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
 pub struct ReadEnd<Buffer, Auxiliary = ()> {
     reader: BufReader<PipeRead>,
@@ -279,6 +280,7 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
         }
     }
 
+    /// Return the [`SharedData`] held by [`ReadEnd`].
     pub fn get_shared_data(&self) -> &SharedData<Buffer, Auxiliary> {
         &self.shared_data
     }
