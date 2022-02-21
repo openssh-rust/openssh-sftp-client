@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use super::*;
+use super::lowlevel::{SftpErrMsg, SftpErrorKind};
 
 use std::io;
 use std::num::TryFromIntError;

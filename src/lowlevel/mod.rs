@@ -20,7 +20,6 @@ mod awaitable_responses;
 mod awaitables;
 mod buffer;
 mod connection;
-mod error;
 mod read_end;
 mod write_end;
 mod writer;
@@ -57,8 +56,8 @@ pub use openssh_sftp_protocol::response::{
 };
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
+pub use super::Error;
 pub use connection::{connect, connect_with_auxiliary, SharedData};
-pub use error::Error;
 pub use read_end::ReadEnd;
 pub use write_end::WriteEnd;
 

@@ -1,7 +1,7 @@
-use super::lowlevel;
+use super::{lowlevel, Error};
 
 use lowlevel::{connect_with_auxiliary, Extensions};
-pub use lowlevel::{Error, UnixTimeStamp, UnixTimeStampError};
+pub use lowlevel::{UnixTimeStamp, UnixTimeStampError};
 
 use std::cmp::min;
 use std::convert::TryInto;
