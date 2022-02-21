@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use crate::*;
+use super::*;
 use awaitable_responses::ArenaArc;
 use connection::SharedData;
 use writer::WriteBuffer;
@@ -12,13 +12,12 @@ use std::io::IoSlice;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
+use bytes::Bytes;
 use openssh_sftp_protocol::file_attrs::FileAttrs;
 use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::Handle;
-
-use bytes::Bytes;
 
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].

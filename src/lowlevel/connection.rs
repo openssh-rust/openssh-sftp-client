@@ -4,16 +4,14 @@ use super::awaitable_responses::AwaitableResponses;
 use super::writer::Writer;
 use super::*;
 
-use core::fmt::Debug;
-
+use std::fmt::Debug;
 use std::io;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
+use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use tokio::sync::Notify;
 use tokio_pipe::{PipeRead, PipeWrite};
-
-use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
 // TODO:
 //  - Support for zero copy syscalls
@@ -249,7 +247,7 @@ pub async fn connect_with_auxiliary<Buffer: ToBuffer + Send + Sync + 'static, Au
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use super::super::*;
 
     use child_io_to_pipe::*;
 
@@ -312,7 +310,7 @@ mod tests {
         let stdout = child_stdout_to_pipewrite(stdout).unwrap();
         let stdin = child_stdin_to_pipewrite(stdin).unwrap();
 
-        let (write_end, read_end, extensions) = crate::connect(stdout, stdin).await.unwrap();
+        let (write_end, read_end, extensions) = super::connect(stdout, stdin).await.unwrap();
         (write_end, read_end, child, extensions)
     }
 

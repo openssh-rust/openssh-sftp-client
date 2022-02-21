@@ -2,13 +2,10 @@
 
 use super::Error;
 
-use core::fmt::Debug;
-
 use concurrent_arena::Arena;
-
-use openssh_sftp_protocol::response::ResponseInner;
-
 use derive_destructure2::destructure;
+use openssh_sftp_protocol::response::ResponseInner;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub(crate) enum Response<Buffer> {

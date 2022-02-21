@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
-use crate::awaitable_responses::ArenaArc;
-use crate::awaitable_responses::Response;
-use crate::connection::SharedData;
-use crate::Error;
-use crate::Extensions;
-use crate::ToBuffer;
+use super::awaitable_responses::ArenaArc;
+use super::awaitable_responses::Response;
+use super::connection::SharedData;
+use super::Error;
+use super::Extensions;
+use super::ToBuffer;
 
 use std::fmt::Debug;
 use std::io;
@@ -116,11 +116,11 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
 
         if let Some(mut buffer) = buffer {
             match buffer.get_buffer() {
-                crate::Buffer::Vector(vec) => {
+                super::Buffer::Vector(vec) => {
                     read_exact_to_vec(&mut self.reader, vec, len).await?;
                     Ok(Response::Buffer(buffer))
                 }
-                crate::Buffer::Slice(slice) => {
+                super::Buffer::Slice(slice) => {
                     if slice.len() >= len {
                         self.reader.read_exact(slice).await?;
                         Ok(Response::Buffer(buffer))
@@ -128,7 +128,7 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
                         self.read_in_data_packet_fallback(len).await
                     }
                 }
-                crate::Buffer::Bytes(bytes) => {
+                super::Buffer::Bytes(bytes) => {
                     read_exact_to_bytes(&mut self.reader, bytes, len).await?;
                     Ok(Response::Buffer(buffer))
                 }
