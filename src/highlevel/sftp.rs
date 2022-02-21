@@ -101,6 +101,7 @@ impl Sftp {
         Ok(())
     }
 
+    /// Create [`Sftp`].
     pub async fn new(
         stdin: PipeWrite,
         stdout: PipeRead,
