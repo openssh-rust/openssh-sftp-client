@@ -276,7 +276,6 @@ impl<'s> TokioCompactFile<'s> {
             _ => std::unreachable!("Expect Data::Buffer"),
         };
 
-        // Adjust offset and reset this.future
         Poll::Ready(Ok(()))
     }
 
