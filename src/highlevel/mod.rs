@@ -28,7 +28,7 @@ use handle::OwnedHandle;
 
 mod file;
 pub use file::TokioCompactFile;
-pub use file::{File, OpenOptions};
+pub use file::{File, OpenOptions, MAX_ATOMIC_WRITE_LEN};
 
 mod fs;
 pub use fs::DirEntry;

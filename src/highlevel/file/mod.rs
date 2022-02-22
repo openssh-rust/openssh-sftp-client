@@ -15,12 +15,21 @@ use std::task::{Context, Poll};
 use bytes::{Buf, Bytes, BytesMut};
 use tokio::io::AsyncSeek;
 use tokio_io_utility::IoSliceExt;
+use tokio_pipe::PIPE_BUF;
 
 mod tokio_compact_file;
 pub use tokio_compact_file::TokioCompactFile;
 
 mod utility;
 use utility::{take_bytes, take_io_slices};
+
+const _ASSERTION: [(); 0 - !{
+    const ASSERT: bool = (PIPE_BUF - 9 - 4 - 256 - 8 - 4) >= (MAX_ATOMIC_WRITE_LEN as usize);
+    ASSERT
+} as usize] = [];
+
+/// Maximum amount of data that can writen atomically.
+pub const MAX_ATOMIC_WRITE_LEN: u32 = 3000;
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Debug, Copy, Clone)]
@@ -200,6 +209,12 @@ impl<'s> File<'s> {
         self.get_auxiliary().limits().read_len
     }
 
+    /// Get maximum amount of bytes that [`File`] and [`TokioCompactFile`]
+    /// would write in a buffered manner.
+    pub fn max_buffered_write(&self) -> u32 {
+        self.get_auxiliary().max_buffered_write
+    }
+
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
         Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
@@ -355,7 +370,15 @@ impl<'s> File<'s> {
 
         let offset = self.offset;
 
+        // sftp v3 cannot send more than self.max_write_len() data at once.
         let max_write_len = self.max_write_len();
+
+        let max_buffered_write = self.max_buffered_write();
+
+        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // then the direct write is disabled.
+        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+
         let n: u32 = buf
             .len()
             .try_into()
@@ -365,12 +388,25 @@ impl<'s> File<'s> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let buf = &buf[..(n as usize)];
 
-        self.send_writable_request(|write_end, handle, id| {
-            Ok(write_end
-                .send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))?
-                .wait())
-        })
-        .await?;
+        if n <= max_buffered_write || !is_direct_write_enabled {
+            self.send_writable_request(|write_end, handle, id| {
+                Ok(write_end
+                    .send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))?
+                    .wait())
+            })
+            .await?;
+        } else {
+            let id = self.inner.get_id_mut();
+            let write_end = &mut self.inner.write_end;
+            let handle = &self.inner.handle;
+
+            let awaitable = write_end
+                .send_write_request_direct_atomic(id, Cow::Borrowed(handle), offset, buf)
+                .await?
+                .wait();
+
+            write_end.cancel_if_task_failed(awaitable).await?;
+        }
 
         // Adjust offset
         Pin::new(self).start_seek(io::SeekFrom::Current(n as i64))?;
@@ -388,27 +424,53 @@ impl<'s> File<'s> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let max_write_len = self.max_write_len();
 
+        let max_buffered_write = self.max_buffered_write();
+
+        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // then the direct write is disabled.
+        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
         } else {
             return Ok(0);
         };
 
+        let n: u32 = n.try_into().unwrap();
+
         let buffers = [bufs, &buf];
 
         let offset = self.offset;
 
-        self.send_writable_request(|write_end, handle, id| {
-            Ok(write_end
-                .send_write_request_buffered_vectored2(id, handle, offset, &buffers)?
-                .wait())
-        })
-        .await?;
+        if n <= max_buffered_write || !is_direct_write_enabled {
+            self.send_writable_request(|write_end, handle, id| {
+                Ok(write_end
+                    .send_write_request_buffered_vectored2(id, handle, offset, &buffers)?
+                    .wait())
+            })
+            .await?;
+        } else {
+            let id = self.inner.get_id_mut();
+            let write_end = &mut self.inner.write_end;
+            let handle = &self.inner.handle;
+
+            let awaitable = write_end
+                .send_write_request_direct_atomic_vectored2(
+                    id,
+                    Cow::Borrowed(handle),
+                    offset,
+                    &buffers,
+                )
+                .await?
+                .wait();
+
+            write_end.cancel_if_task_failed(awaitable).await?;
+        }
 
         // Adjust offset
-        Pin::new(self).start_seek(io::SeekFrom::Current(n.try_into().unwrap()))?;
+        Pin::new(self).start_seek(io::SeekFrom::Current(n as i64))?;
 
-        Ok(n)
+        Ok(n as usize)
     }
 
     /// This function can write at most [`File::max_write_len`] bytes in one

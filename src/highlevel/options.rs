@@ -8,6 +8,7 @@ pub struct SftpOptions {
     max_read_len: Option<NonZeroU32>,
     max_write_len: Option<NonZeroU32>,
     max_pending_requests: Option<NonZeroU16>,
+    max_buffered_write: Option<NonZeroU32>,
 }
 
 impl SftpOptions {
@@ -18,6 +19,7 @@ impl SftpOptions {
             max_read_len: None,
             max_write_len: None,
             max_pending_requests: None,
+            max_buffered_write: None,
         }
     }
 
@@ -95,5 +97,28 @@ impl SftpOptions {
         self.max_pending_requests
             .map(NonZeroU16::get)
             .unwrap_or(100)
+    }
+
+    /// Set `max_buffered_write`.
+    ///
+    /// It decides when [`crate::sftp::File`] and
+    /// [`crate::sftp::TokioCompactFile`] switch to directly write to the
+    /// buffer in an atomic manner.
+    /// NOTE that this would limit the maximum write to
+    /// [`crate::sftp::MAX_ATOMIC_WRITE_LEN`] bytes.
+    /// bytes.
+    ///
+    /// value greater or equal to [`crate::sftp::MAX_ATOMIC_WRITE_LEN`].
+    /// value greater or equal to [`MAX_ATOMIC_WRITE_LEN`].
+    ///
+    /// It is set to `200` by default.
+    #[must_use]
+    pub const fn max_buffered_write(mut self, max_buffered_write: NonZeroU32) -> Self {
+        self.max_buffered_write = Some(max_buffered_write);
+        self
+    }
+
+    pub(super) fn get_max_buffered_write(&self) -> u32 {
+        self.max_buffered_write.map(NonZeroU32::get).unwrap_or(200)
     }
 }

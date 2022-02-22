@@ -1,6 +1,6 @@
 use super::{
     auxiliary, lowlevel, tasks, Error, File, Fs, OpenOptions, SftpOptions, SharedData, WriteEnd,
-    WriteEndWithCachedId,
+    WriteEndWithCachedId, MAX_ATOMIC_WRITE_LEN,
 };
 
 use auxiliary::Auxiliary;
@@ -82,10 +82,17 @@ impl Sftp {
             .unwrap_or(read_len);
 
         let write_len = write_len.try_into().unwrap_or(packet_len - 300);
-        let write_len = options
+        let mut write_len = options
             .get_max_write_len()
             .map(|v| min(v, write_len))
             .unwrap_or(write_len);
+
+        // If max_buffered_write is less than MAX_ATOMIC_WRITE_LEN,
+        // then the direct write is enabled and MAX_ATOMIC_WRITE_LEN
+        // applies.
+        if write_end.get_auxiliary().max_buffered_write < MAX_ATOMIC_WRITE_LEN {
+            write_len = min(write_len, MAX_ATOMIC_WRITE_LEN);
+        }
 
         let limits = auxiliary::Limits {
             read_len,
@@ -110,7 +117,10 @@ impl Sftp {
         let (write_end, read_end, extensions) = connect_with_auxiliary(
             stdout,
             stdin,
-            Auxiliary::new(options.get_max_pending_requests()),
+            Auxiliary::new(
+                options.get_max_pending_requests(),
+                options.get_max_buffered_write(),
+            ),
         )
         .await?;
 
@@ -165,6 +175,10 @@ impl Sftp {
 
     /// Get maximum amount of bytes that one single write requests
     /// can write.
+    ///
+    /// If [`Sftp::max_buffered_write`] is less than [`MAX_ATOMIC_WRITE_LEN`],
+    /// then the direct write is enabled and [`Sftp::max_write_len`] must be
+    /// less than [`MAX_ATOMIC_WRITE_LEN`].
     pub fn max_write_len(&self) -> u32 {
         self.shared_data.get_auxiliary().limits().write_len
     }
@@ -173,6 +187,12 @@ impl Sftp {
     /// can read.
     pub fn max_read_len(&self) -> u32 {
         self.shared_data.get_auxiliary().limits().read_len
+    }
+
+    /// Get maximum amount of bytes that [`File`] and [`TokioCompactFile`]
+    /// would write in a buffered manner.
+    pub fn max_buffered_write(&self) -> u32 {
+        self.shared_data.get_auxiliary().max_buffered_write
     }
 
     /// Return a new [`OpenOptions`] object.

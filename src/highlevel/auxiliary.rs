@@ -21,6 +21,8 @@ pub(super) struct ConnInfo {
 pub(super) struct Auxiliary {
     pub(super) conn_info: OnceCell<ConnInfo>,
 
+    pub(super) max_buffered_write: u32,
+
     /// cancel_token is used to cancel `Awaitable*Future`
     /// when the read_task/flush_task has failed.
     pub(super) cancel_token: CancellationToken,
@@ -43,9 +45,11 @@ pub(super) struct Auxiliary {
 }
 
 impl Auxiliary {
-    pub(super) fn new(max_pending_requests: u16) -> Self {
+    pub(super) fn new(max_pending_requests: u16, max_buffered_write: u32) -> Self {
         Self {
             conn_info: OnceCell::new(),
+            max_buffered_write,
+
             cancel_token: CancellationToken::new(),
             flush_end_notify: Notify::new(),
 
