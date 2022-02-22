@@ -146,9 +146,6 @@ impl<'s> TokioCompactFile<'s> {
         self.into_inner().close().await
     }
 
-    /// Returns the contents of the internal buffer, filling it with more data
-    /// from the inner reader if it is empty.
-    ///
     /// This function is a lower-level call.
     ///
     /// It needs to be paired with the `consume` method or
