@@ -1,7 +1,7 @@
 use super::super::{BoxedWaitForCancellationFuture, Buffer, Data};
 use super::lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle};
 use super::utility::take_io_slices;
-use super::{Error, File, Id, WriteEnd};
+use super::{Error, File, Id, WriteEnd, MAX_ATOMIC_WRITE_LEN};
 
 use std::borrow::Cow;
 use std::cmp::min;
@@ -295,7 +295,7 @@ impl AsyncRead for TokioCompactFile<'_> {
 impl AsyncWrite for TokioCompactFile<'_> {
     fn poll_write(
         mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         if !self.is_writable {
@@ -310,27 +310,54 @@ impl AsyncWrite for TokioCompactFile<'_> {
         }
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
-        let buf = &buf[..min(buf.len(), self.max_write_len() as usize)];
+        let max_write_len = self.max_write_len();
+
+        let max_buffered_write = self.max_buffered_write();
+
+        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // then the direct write is disabled.
+        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+
+        let n: u32 = buf
+            .len()
+            .try_into()
+            .map(|n| min(n, max_write_len))
+            .unwrap_or(max_write_len);
+
+        // sftp v3 cannot send more than self.max_write_len() data at once.
+        let buf = &buf[..(n as usize)];
 
         // Dereference it here once so that there will be only
         // one mutable borrow to self.
         let this = &mut *self;
 
-        let future = send_request(&mut this.inner, |write_end, id, handle, offset| {
-            write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
-        })?
-        .wait();
+        let file = &mut this.inner;
+
+        let future = if n <= max_buffered_write || !is_direct_write_enabled {
+            send_request(file, |write_end, id, handle, offset| {
+                write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
+            })?
+            .wait()
+        } else {
+            let id = file.inner.get_id_mut();
+            let offset = file.offset;
+
+            let (write_end, handle) = file.get_inner();
+
+            let future = write_end.send_write_request_direct_atomic(id, handle, offset, buf);
+            tokio::pin!(future);
+
+            ready!(future.poll(cx)).map_err(sftp_to_io_error)?.wait()
+        };
 
         self.write_futures.push_back(future);
         // Since a new future is pushed, flushing is again required.
         self.need_flush = true;
 
-        let n = buf.len();
-
         // Adjust offset and reset self.future
         Poll::Ready(
-            self.start_seek(io::SeekFrom::Current(n.try_into().unwrap()))
-                .map(|_| n),
+            self.start_seek(io::SeekFrom::Current(n as i64))
+                .map(|_| n as usize),
         )
     }
 
@@ -385,7 +412,7 @@ impl AsyncWrite for TokioCompactFile<'_> {
 
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         if !self.is_writable {
@@ -399,13 +426,21 @@ impl AsyncWrite for TokioCompactFile<'_> {
             return Poll::Ready(Ok(0));
         }
 
-        let max_write_len = self.max_write_len() as usize;
+        let max_write_len = self.max_write_len();
 
-        let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len) {
+        let max_buffered_write = self.max_buffered_write();
+
+        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // then the direct write is disabled.
+        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+
+        let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
         } else {
             return Poll::Ready(Ok(0));
         };
+
+        let n: u32 = n.try_into().unwrap();
 
         let buffers = [bufs, &buf];
 
@@ -413,10 +448,25 @@ impl AsyncWrite for TokioCompactFile<'_> {
         // one mutable borrow to self.
         let this = &mut *self;
 
-        let future = send_request(&mut this.inner, |write_end, id, handle, offset| {
-            write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
-        })?
-        .wait();
+        let file = &mut this.inner;
+
+        let future = if n <= max_buffered_write || !is_direct_write_enabled {
+            send_request(file, |write_end, id, handle, offset| {
+                write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
+            })?
+            .wait()
+        } else {
+            let id = file.inner.get_id_mut();
+            let offset = file.offset;
+
+            let (write_end, handle) = file.get_inner();
+
+            let future =
+                write_end.send_write_request_direct_atomic_vectored2(id, handle, offset, &buffers);
+            tokio::pin!(future);
+
+            ready!(future.poll(cx)).map_err(sftp_to_io_error)?.wait()
+        };
 
         self.write_futures.push_back(future);
         // Since a new future is pushed, flushing is again required.
@@ -424,8 +474,8 @@ impl AsyncWrite for TokioCompactFile<'_> {
 
         // Adjust offset and reset self.future
         Poll::Ready(
-            self.start_seek(io::SeekFrom::Current(n.try_into().unwrap()))
-                .map(|_| n),
+            self.start_seek(io::SeekFrom::Current(n as i64))
+                .map(|_| n as usize),
         )
     }
 
