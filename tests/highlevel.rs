@@ -34,7 +34,7 @@ fn gen_path(func: &str) -> PathBuf {
                 .map(PathBuf::into_boxed_path)
         })
         .as_deref()
-        .unwrap_or(Path::new("/tmp"))
+        .unwrap_or_else(|| Path::new("/tmp"))
         .join(func)
 }
 
@@ -69,7 +69,7 @@ async fn sftp_file_basics() {
                 .open(&path)
                 .await
                 .unwrap()
-                .write(&content)
+                .write(content)
                 .await
                 .unwrap(),
             content.len()
@@ -84,7 +84,7 @@ async fn sftp_file_basics() {
             sftp.create(&path)
                 .await
                 .unwrap()
-                .write(&content)
+                .write(content)
                 .await
                 .unwrap(),
             content.len()
@@ -278,7 +278,7 @@ async fn sftp_tokio_compact_file_basics() {
             .unwrap();
 
         // Create new file with Excl and write to it.
-        debug_assert_eq!(file.write(&content).await.unwrap(), content.len());
+        debug_assert_eq!(file.write(content).await.unwrap(), content.len());
 
         file.flush().await.unwrap();
         file.close().await.unwrap();
@@ -289,7 +289,7 @@ async fn sftp_tokio_compact_file_basics() {
         //
         // Sftp::Create opens the file truncated.
         let mut file = sftp.create(&path).await.map(TokioCompactFile::new).unwrap();
-        debug_assert_eq!(file.write(&content).await.unwrap(), content.len());
+        debug_assert_eq!(file.write(content).await.unwrap(), content.len());
 
         // close also flush the internal future buffers, but using a
         // different implementation from `TokioCompactFile::poll_flush`
@@ -377,7 +377,7 @@ async fn sftp_tokio_compact_file_write_all() {
 
         let content = &tester.content;
 
-        tester.file.write_all(&content).await.unwrap();
+        tester.file.write_all(content).await.unwrap();
         tester.assert_content().await;
 
         // close sftp and child
