@@ -798,7 +798,32 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         offset: u64,
         data: &[IoSlice<'_>],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let len: usize = data.iter().map(|io_slice| io_slice.len()).sum();
+        self.send_write_request_direct_atomic_vectored2(id, handle, offset, &[data])
+            .await
+    }
+
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe.
+    pub async fn send_write_request_direct_atomic_vectored2(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data: &[&[IoSlice<'_>]],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let data_iter = data.iter().flat_map(Deref::deref);
+
+        let len: usize = data_iter.clone().map(|io_slice| io_slice.len()).sum();
         let len: u32 = len.try_into()?;
 
         let header = Request::serialize_write_request(
@@ -814,16 +839,21 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
             let mut io_slices = [IoSlice::new(&[]); 30];
 
             io_slices[0] = IoSlice::new(&*header);
-            io_slices[1..].iter_mut().zip(data).for_each(|(dst, src)| {
-                *dst = *src;
-            });
+            io_slices[1..]
+                .iter_mut()
+                .zip(data_iter)
+                .for_each(|(dst, src)| {
+                    *dst = *src;
+                });
 
             self.send_write_request_direct_atomic_vectored_impl(id, &io_slices)
                 .await
         } else {
             let mut vec = Vec::with_capacity(1 + data.len());
             vec.push(IoSlice::new(&*header));
-            vec.extend_from_slice(data);
+            for io_slices in data {
+                vec.extend_from_slice(io_slices);
+            }
 
             self.send_write_request_direct_atomic_vectored_impl(id, &vec)
                 .await

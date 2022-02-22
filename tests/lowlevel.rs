@@ -334,6 +334,21 @@ gen_test_write_direct!(
     }
 );
 
+gen_test_write_direct!(
+    test_write_direct_atomic_vectored2,
+    |write_end, id, handle, msg| async move {
+        write_end
+            .send_write_request_direct_atomic_vectored2(
+                id,
+                handle,
+                0,
+                &[&[IoSlice::new(&msg[..3])], &[IoSlice::new(&msg[3..])]],
+            )
+            .await
+            .unwrap()
+    }
+);
+
 #[tokio::test]
 async fn test_write_buffered() {
     test_write_impl(|write_end, id, handle, msg| {
