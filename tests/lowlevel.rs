@@ -212,77 +212,97 @@ async fn test_write_impl(
     assert!(child.wait().await.unwrap().success());
 }
 
-#[tokio::test]
-async fn test_write_direct_vectored() {
-    let (mut write_end, mut read_end, mut child) = connect().await;
+macro_rules! gen_test_write_direct {
+    ($name: ident, | $write_end:ident, $id:ident, $handle:ident, $msg:ident | async move $post_processing:block) => {
+        #[tokio::test]
+        async fn $name() {
+            async fn write(
+                $write_end: &mut WriteEnd<Vec<u8>>,
+                $id: Id<Vec<u8>>,
+                $handle: &Handle,
+                $msg: &[u8],
+            ) -> AwaitableStatus<Vec<u8>> {
+                $post_processing
+            }
 
-    let id = write_end.create_response_id();
+            let (mut write_end, mut read_end, mut child) = connect().await;
 
-    let tempdir = create_tmpdir();
+            let id = write_end.create_response_id();
 
-    let filename = tempdir.path().join("file");
+            let tempdir = create_tmpdir();
 
-    // Create one file and write to it
-    let mut file_attrs = FileAttrs::new();
-    file_attrs.set_size(2000);
-    file_attrs.set_permissions(Permissions::READ_BY_OWNER | Permissions::WRITE_BY_OWNER);
-    let file_attrs = file_attrs;
+            let filename = tempdir.path().join("file");
 
-    let awaitable = write_end
-        .send_open_file_request(
-            id,
-            OpenOptions::new().read(true).write(true).create(
-                Cow::Borrowed(&filename),
-                CreateFlags::Excl,
-                file_attrs,
-            ),
-        )
-        .unwrap();
+            // Create one file and write to it
+            let mut file_attrs = FileAttrs::new();
+            file_attrs.set_size(2000);
+            file_attrs.set_permissions(Permissions::READ_BY_OWNER | Permissions::WRITE_BY_OWNER);
+            let file_attrs = file_attrs;
 
-    read_one_packet(&mut write_end, &mut read_end).await;
-    let (id, handle) = awaitable.wait().await.unwrap();
+            let awaitable = write_end
+                .send_open_file_request(
+                    id,
+                    OpenOptions::new().read(true).write(true).create(
+                        Cow::Borrowed(&filename),
+                        CreateFlags::Excl,
+                        file_attrs,
+                    ),
+                )
+                .unwrap();
 
-    eprintln!("handle = {:#?}", handle);
+            read_one_packet(&mut write_end, &mut read_end).await;
+            let (id, handle) = awaitable.wait().await.unwrap();
 
-    let msg = "Hello, world!".as_bytes();
+            eprintln!("handle = {:#?}", handle);
 
-    let awaitable = write_end
-        .send_write_request_direct_vectored(
-            id,
-            Cow::Borrowed(&handle),
-            0,
-            &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
-        )
-        .await
-        .unwrap();
+            let msg = "Hello, world!".as_bytes();
 
-    eprintln!("Waiting for write response");
+            let awaitable = write(&mut write_end, id, &handle, msg).await;
 
-    read_one_packet(&mut write_end, &mut read_end).await;
-    let id = awaitable.wait().await.unwrap().0;
+            eprintln!("Waiting for write response");
 
-    // Read from it
-    let awaitable = write_end
-        .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
-        .unwrap();
+            read_one_packet(&mut write_end, &mut read_end).await;
+            let id = awaitable.wait().await.unwrap().0;
 
-    read_one_packet(&mut write_end, &mut read_end).await;
-    let (id, data) = awaitable.wait().await.unwrap();
+            // Read from it
+            let awaitable = write_end
+                .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
+                .unwrap();
 
-    match data {
-        Data::AllocatedBox(data) => assert_eq!(&*data, msg),
-        _ => panic!("Unexpected data"),
+            read_one_packet(&mut write_end, &mut read_end).await;
+            let (id, data) = awaitable.wait().await.unwrap();
+
+            match data {
+                Data::AllocatedBox(data) => assert_eq!(&*data, msg),
+                _ => panic!("Unexpected data"),
+            };
+
+            drop(id);
+            drop(write_end);
+
+            assert_eq!(read_end.wait_for_new_request().await, 0);
+
+            drop(read_end);
+
+            assert!(child.wait().await.unwrap().success());
+        }
     };
-
-    drop(id);
-    drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
-    drop(read_end);
-
-    assert!(child.wait().await.unwrap().success());
 }
+
+gen_test_write_direct!(
+    test_write_direct_vectored,
+    |write_end, id, handle, msg| async move {
+        write_end
+            .send_write_request_direct_vectored(
+                id,
+                Cow::Borrowed(handle),
+                0,
+                &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
+            )
+            .await
+            .unwrap()
+    }
+);
 
 #[tokio::test]
 async fn test_write_buffered() {
