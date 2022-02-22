@@ -1,4 +1,6 @@
 //! Highlevle API of sftp client
+//!
+//! All `async` functions in this module are cancel safe.
 
 use super::{lowlevel, Error};
 
