@@ -148,7 +148,12 @@ async fn test_file_desc() {
 }
 
 async fn test_write_impl(
-    write: impl FnOnce(&mut WriteEnd<Vec<u8>>, Id<Vec<u8>>, &Handle, &[u8]) -> AwaitableStatus<Vec<u8>>,
+    write: impl FnOnce(
+        &mut WriteEnd<Vec<u8>>,
+        Id<Vec<u8>>,
+        Cow<'_, Handle>,
+        &[u8],
+    ) -> AwaitableStatus<Vec<u8>>,
 ) {
     let (mut write_end, mut read_end, mut child) = connect().await;
 
@@ -182,7 +187,7 @@ async fn test_write_impl(
 
     let msg = "Hello, world!".as_bytes();
 
-    let awaitable = write(&mut write_end, id, &handle, msg);
+    let awaitable = write(&mut write_end, id, Cow::Borrowed(&handle), msg);
 
     eprintln!("Waiting for write response");
 
@@ -318,7 +323,7 @@ gen_test_write_direct!(
 async fn test_write_buffered() {
     test_write_impl(|write_end, id, handle, msg| {
         write_end
-            .send_write_request_buffered(id, Cow::Borrowed(handle), 0, Cow::Borrowed(msg))
+            .send_write_request_buffered(id, handle, 0, Cow::Borrowed(msg))
             .unwrap()
     })
     .await;
@@ -330,7 +335,7 @@ async fn test_write_buffered_vectored() {
         write_end
             .send_write_request_buffered_vectored(
                 id,
-                Cow::Borrowed(handle),
+                handle,
                 0,
                 &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
             )
@@ -345,7 +350,7 @@ async fn test_write_buffered_vectored2() {
         write_end
             .send_write_request_buffered_vectored2(
                 id,
-                Cow::Borrowed(handle),
+                handle,
                 0,
                 &[
                     [IoSlice::new(&msg[..3])].as_slice(),
@@ -363,7 +368,7 @@ async fn test_write_zero_copy() {
         write_end
             .send_write_request_zero_copy(
                 id,
-                Cow::Borrowed(handle),
+                handle,
                 0,
                 &[
                     Bytes::copy_from_slice(&msg[..3]),
@@ -381,7 +386,7 @@ async fn test_write_zero_copy2() {
         write_end
             .send_write_request_zero_copy2(
                 id,
-                Cow::Borrowed(handle),
+                handle,
                 0,
                 &[
                     [Bytes::copy_from_slice(&msg[..3])].as_slice(),
