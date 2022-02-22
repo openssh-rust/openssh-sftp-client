@@ -96,4 +96,8 @@ pub enum Error {
     /// tokio join error
     #[error("Failed to join tokio task")]
     TaskJoinError(#[from] tokio::task::JoinError),
+
+    /// Write is too large to be atomic
+    #[error("Write is too large to be atomic.")]
+    WriteTooLargeToBeAtomic,
 }

@@ -304,6 +304,16 @@ gen_test_write_direct!(
     }
 );
 
+gen_test_write_direct!(
+    test_write_direct_atomic,
+    |write_end, id, handle, msg| async move {
+        write_end
+            .send_write_request_direct_atomic(id, Cow::Borrowed(handle), 0, msg)
+            .await
+            .unwrap()
+    }
+);
+
 #[tokio::test]
 async fn test_write_buffered() {
     test_write_impl(|write_end, id, handle, msg| {

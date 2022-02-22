@@ -89,6 +89,40 @@ impl Writer {
         }
     }
 
+    pub(super) async fn write_vectored_all_direct_atomic(
+        &self,
+        bufs: AtomicWriteIoSlices<'_, '_>,
+    ) -> Result<(), io::Error> {
+        #[must_use = "futures do nothing unless you `.await` or poll them"]
+        struct AtomicWrite<'a>(&'a PipeWrite, AtomicWriteIoSlices<'a, 'a>);
+
+        impl Future for AtomicWrite<'_> {
+            type Output = Result<usize, io::Error>;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let writer = Pin::new(self.0);
+                let bufs = self.1;
+
+                writer.poll_write_vectored_atomic(cx, bufs)
+            }
+        }
+
+        let len = bufs.get_total_len();
+
+        if len == 0 {
+            return Ok(());
+        }
+
+        let n = AtomicWrite(&*self.0.read().await, bufs).await?;
+
+        if n == 0 {
+            Err(io::Error::new(io::ErrorKind::WriteZero, ""))
+        } else {
+            debug_assert_eq!(n, len);
+            Ok(())
+        }
+    }
+
     /// * `buf` - Must not be empty
     ///
     /// Write to pipe without any buffering.

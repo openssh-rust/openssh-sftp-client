@@ -18,6 +18,7 @@ use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::Handle;
+use tokio_pipe::AtomicWriteIoSlices;
 
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
@@ -727,6 +728,50 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         self.shared_data
             .writer()
             .write_vectored_all_direct_with_header(&IoSlice::new(&*header), data)
+            .await?;
+
+        self.shared_data.notify_new_packet_event();
+
+        Ok(AwaitableStatus::new(id.into_inner()))
+    }
+
+    /// Write will extend the file if writing beyond the end of the file.
+    ///
+    /// It is legal to write way beyond the end of the file, the semantics
+    /// are to write zeroes from the end of the file to the specified offset
+    /// and then the data.
+    ///
+    /// On most operating systems, such writes do not allocate disk space but
+    /// instead leave "holes" in the file.
+    ///
+    /// Return [`Error::NonAtomicWrite`] if the write is too large.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe.
+    pub async fn send_write_request_direct_atomic(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        let header = Request::serialize_write_request(
+            &mut self.serializer,
+            ArenaArc::slot(&id.0),
+            handle,
+            offset,
+            data.len().try_into()?,
+        )?
+        .split();
+
+        let io_slices = [IoSlice::new(&*header), IoSlice::new(data)];
+        let bufs = AtomicWriteIoSlices::new(&io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
+
+        id.0.reset(None);
+        self.shared_data
+            .writer()
+            .write_vectored_all_direct_atomic(bufs)
             .await?;
 
         self.shared_data.notify_new_packet_event();
