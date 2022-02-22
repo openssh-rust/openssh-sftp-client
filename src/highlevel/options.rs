@@ -101,15 +101,15 @@ impl SftpOptions {
 
     /// Set `max_buffered_write`.
     ///
-    /// It decides when [`crate::sftp::File`] and
-    /// [`crate::sftp::TokioCompactFile`] switch to directly write to the
+    /// It decides when [`crate::highlevel::File`] and
+    /// [`crate::highlevel::TokioCompactFile`] switch to directly write to the
     /// buffer in an atomic manner.
     /// NOTE that this would limit the maximum write to
-    /// [`crate::sftp::MAX_ATOMIC_WRITE_LEN`] bytes.
+    /// [`crate::highlevel::MAX_ATOMIC_WRITE_LEN`] bytes.
     /// bytes.
     ///
-    /// value greater or equal to [`crate::sftp::MAX_ATOMIC_WRITE_LEN`].
-    /// value greater or equal to [`MAX_ATOMIC_WRITE_LEN`].
+    /// value greater or equal to [`crate::highlevel::MAX_ATOMIC_WRITE_LEN`].
+    /// value greater or equal to [`crate::highlevel::MAX_ATOMIC_WRITE_LEN`].
     ///
     /// It is set to `200` by default.
     #[must_use]

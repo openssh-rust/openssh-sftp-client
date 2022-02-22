@@ -744,7 +744,7 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
     /// On most operating systems, such writes do not allocate disk space but
     /// instead leave "holes" in the file.
     ///
-    /// Return [`Error::NonAtomicWrite`] if the write is too large.
+    /// Return [`Error::WriteTooLargeToBeAtomic`] if the write is too large.
     ///
     /// # Cancel Safety
     ///

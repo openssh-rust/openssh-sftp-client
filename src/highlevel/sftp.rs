@@ -189,8 +189,8 @@ impl Sftp {
         self.shared_data.get_auxiliary().limits().read_len
     }
 
-    /// Get maximum amount of bytes that [`File`] and [`TokioCompactFile`]
-    /// would write in a buffered manner.
+    /// Get maximum amount of bytes that [`crate::highlevel::File`] and
+    /// [`crate::highlevel::TokioCompactFile`] would write in a buffered manner.
     pub fn max_buffered_write(&self) -> u32 {
         self.shared_data.get_auxiliary().max_buffered_write
     }
