@@ -29,7 +29,7 @@ const _ASSERTION: [(); 0 - !{
 } as usize] = [];
 
 /// Maximum amount of data that can writen atomically.
-pub const MAX_ATOMIC_WRITE_LEN: u32 = 3000;
+pub const MAX_ATOMIC_WRITE_LEN: u32 = 3815;
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Debug, Copy, Clone)]
