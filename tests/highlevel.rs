@@ -27,7 +27,7 @@ async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
 fn gen_path(func: &str) -> PathBuf {
     static XDG_RUNTIME_DIR: OnceCell<Option<Box<Path>>> = OnceCell::new();
 
-    XDG_RUNTIME_DIR
+    let mut path = XDG_RUNTIME_DIR
         .get_or_init(|| {
             env::var_os("XDG_RUNTIME_DIR")
                 .map(From::from)
@@ -35,7 +35,10 @@ fn gen_path(func: &str) -> PathBuf {
         })
         .as_deref()
         .unwrap_or_else(|| Path::new("/tmp"))
-        .join(func)
+        .join("openssh_sftp_client");
+
+    path.push(func);
+    path
 }
 
 #[tokio::test]
