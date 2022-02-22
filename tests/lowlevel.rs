@@ -219,7 +219,7 @@ macro_rules! gen_test_write_direct {
             async fn write(
                 $write_end: &mut WriteEnd<Vec<u8>>,
                 $id: Id<Vec<u8>>,
-                $handle: &Handle,
+                $handle: Cow<'_, Handle>,
                 $msg: &[u8],
             ) -> AwaitableStatus<Vec<u8>> {
                 $post_processing
@@ -257,7 +257,7 @@ macro_rules! gen_test_write_direct {
 
             let msg = "Hello, world!".as_bytes();
 
-            let awaitable = write(&mut write_end, id, &handle, msg).await;
+            let awaitable = write(&mut write_end, id, Cow::Borrowed(&handle), msg).await;
 
             eprintln!("Waiting for write response");
 
@@ -295,7 +295,7 @@ gen_test_write_direct!(
         write_end
             .send_write_request_direct_vectored(
                 id,
-                Cow::Borrowed(handle),
+                handle,
                 0,
                 &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
             )
@@ -308,7 +308,7 @@ gen_test_write_direct!(
     test_write_direct_atomic,
     |write_end, id, handle, msg| async move {
         write_end
-            .send_write_request_direct_atomic(id, Cow::Borrowed(handle), 0, msg)
+            .send_write_request_direct_atomic(id, handle, 0, msg)
             .await
             .unwrap()
     }
