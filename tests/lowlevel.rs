@@ -51,8 +51,8 @@ fn create_tmpdir() -> TempDir {
         .unwrap()
 }
 
-async fn read_one_packet(write_end: &mut WriteEnd<Vec<u8>>, read_end: &mut ReadEnd<Vec<u8>>) {
-    write_end.flush().await.unwrap();
+async fn read_one_packet(read_end: &mut ReadEnd<Vec<u8>>) {
+    read_end.get_shared_data().flush().await.unwrap();
 
     eprintln!("Wait for new request");
     assert_eq!(read_end.wait_for_new_request().await, 1);
@@ -88,7 +88,7 @@ async fn test_file_desc() {
         )
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     eprintln!("handle = {:#?}", handle);
@@ -103,7 +103,7 @@ async fn test_file_desc() {
 
     eprintln!("Waiting for write response");
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Close it
@@ -111,7 +111,7 @@ async fn test_file_desc() {
         .send_close_request(id, Cow::Borrowed(&handle))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Open it again
@@ -119,7 +119,7 @@ async fn test_file_desc() {
         .send_open_file_request(id, OpenFileRequest::open(Cow::Borrowed(&filename)))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     eprintln!("handle = {:#?}", handle);
@@ -129,7 +129,7 @@ async fn test_file_desc() {
         .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, data) = awaitable.wait().await.unwrap();
 
     match data {
@@ -175,7 +175,7 @@ async fn test_write_impl(
         )
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     eprintln!("handle = {:#?}", handle);
@@ -186,7 +186,7 @@ async fn test_write_impl(
 
     eprintln!("Waiting for write response");
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Read from it
@@ -194,7 +194,7 @@ async fn test_write_impl(
         .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, data) = awaitable.wait().await.unwrap();
 
     match data {
@@ -250,7 +250,7 @@ macro_rules! gen_test_write_direct {
                 )
                 .unwrap();
 
-            read_one_packet(&mut write_end, &mut read_end).await;
+            read_one_packet(&mut read_end).await;
             let (id, handle) = awaitable.wait().await.unwrap();
 
             eprintln!("handle = {:#?}", handle);
@@ -261,7 +261,7 @@ macro_rules! gen_test_write_direct {
 
             eprintln!("Waiting for write response");
 
-            read_one_packet(&mut write_end, &mut read_end).await;
+            read_one_packet(&mut read_end).await;
             let id = awaitable.wait().await.unwrap().0;
 
             // Read from it
@@ -269,7 +269,7 @@ macro_rules! gen_test_write_direct {
                 .send_read_request(id, Cow::Borrowed(&handle), 0, msg.len() as u32, None)
                 .unwrap();
 
-            read_one_packet(&mut write_end, &mut read_end).await;
+            read_one_packet(&mut read_end).await;
             let (id, data) = awaitable.wait().await.unwrap();
 
             match data {
@@ -398,7 +398,7 @@ async fn test_file_remove() {
         .send_remove_request(id, Cow::Borrowed(&filename))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Try open it again
@@ -433,7 +433,7 @@ async fn test_file_rename() {
         .send_rename_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Open it again
@@ -466,7 +466,7 @@ async fn test_mkdir() {
         .send_mkdir_request(id, Cow::Borrowed(&dirname), FileAttrs::default())
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Open it
@@ -498,7 +498,7 @@ async fn test_rmdir() {
         .send_rmdir_request(id, Cow::Borrowed(&dirname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Try open it
@@ -538,7 +538,7 @@ async fn test_dir_desc() {
         .send_opendir_request(id, Cow::Borrowed(&dirname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     // read it
@@ -546,7 +546,7 @@ async fn test_dir_desc() {
         .send_readdir_request(id, Cow::Borrowed(&*handle))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, entries) = awaitable.wait().await.unwrap();
 
     for entry in entries.iter() {
@@ -596,7 +596,7 @@ async fn test_stat() {
         .send_stat_request(id, Cow::Borrowed(&linkname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, attrs) = awaitable.wait().await.unwrap();
 
     assert_eq!(attrs.get_size().unwrap(), 2000);
@@ -631,7 +631,7 @@ async fn test_lstat() {
         .send_lstat_request(id, Cow::Borrowed(&linkname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, attrs) = awaitable.wait().await.unwrap();
 
     assert_eq!(attrs.get_filetype().unwrap(), FileType::Symlink);
@@ -662,7 +662,7 @@ async fn test_fstat() {
         .send_open_file_request(id, OpenFileRequest::open(Cow::Borrowed(&filename)))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     // fstat
@@ -670,7 +670,7 @@ async fn test_fstat() {
         .send_fstat_request(id, Cow::Borrowed(&handle))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, attrs) = awaitable.wait().await.unwrap();
 
     assert_eq!(attrs.get_size().unwrap(), 2000);
@@ -706,7 +706,7 @@ async fn test_setstat() {
         .send_setstat_request(id, Cow::Borrowed(&filename), fileattrs)
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // stat
@@ -714,7 +714,7 @@ async fn test_setstat() {
         .send_stat_request(id, Cow::Borrowed(&filename))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, attrs) = awaitable.wait().await.unwrap();
 
     assert_eq!(attrs.get_size().unwrap(), 10000);
@@ -752,7 +752,7 @@ async fn test_fsetstat() {
         )
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     // fsetstat
@@ -763,7 +763,7 @@ async fn test_fsetstat() {
         .send_fsetstat_request(id, Cow::Borrowed(&handle), fileattrs)
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // fstat
@@ -771,7 +771,7 @@ async fn test_fsetstat() {
         .send_fstat_request(id, Cow::Borrowed(&handle))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, attrs) = awaitable.wait().await.unwrap();
 
     assert_eq!(attrs.get_size().unwrap(), 10000);
@@ -806,7 +806,7 @@ async fn test_readlink() {
         .send_readlink_request(id, Cow::Borrowed(&linkname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, path) = awaitable.wait().await.unwrap();
 
     assert_eq!(&*path, &*filename);
@@ -840,7 +840,7 @@ async fn test_readpath() {
         .send_realpath_request(id, Cow::Borrowed(&linkname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, path) = awaitable.wait().await.unwrap();
 
     assert_eq!(&*path, &*fs::canonicalize(&filename).unwrap());
@@ -873,7 +873,7 @@ async fn test_symlink() {
         .send_symlink_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&linkname))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     assert_eq!(
@@ -900,7 +900,7 @@ async fn test_limits() {
     assert!(extensions.limits);
     let awaitable = write_end.send_limits_request(id).unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, limits) = awaitable.wait().await.unwrap();
 
     eprintln!("{:#?}", limits);
@@ -930,7 +930,7 @@ async fn test_expand_path() {
         .send_expand_path_request(id, Cow::Borrowed(path::Path::new("~")))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, expanded_path) = awaitable.wait().await.unwrap();
 
     assert_eq!(&*expanded_path, &*home);
@@ -968,7 +968,7 @@ async fn test_fsync() {
         )
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let (id, handle) = awaitable.wait().await.unwrap();
 
     // fsync
@@ -976,7 +976,7 @@ async fn test_fsync() {
         .send_fsync_request(id, Cow::Borrowed(&handle))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     drop(id);
@@ -1007,7 +1007,7 @@ async fn test_hardlink() {
         .send_hardlink_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Open the new name and old name again
@@ -1046,7 +1046,7 @@ async fn test_posix_rename() {
         .send_posix_rename_request(id, Cow::Borrowed(&filename), Cow::Borrowed(&new_filename))
         .unwrap();
 
-    read_one_packet(&mut write_end, &mut read_end).await;
+    read_one_packet(&mut read_end).await;
     let id = awaitable.wait().await.unwrap().0;
 
     // Open again
