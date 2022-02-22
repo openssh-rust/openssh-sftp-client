@@ -334,10 +334,15 @@ impl AsyncWrite for TokioCompactFile<'_> {
         let file = &mut this.inner;
 
         let future = if n <= max_buffered_write || !is_direct_write_enabled {
-            send_request(file, |write_end, id, handle, offset| {
+            let future = send_request(file, |write_end, id, handle, offset| {
                 write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
             })?
-            .wait()
+            .wait();
+
+            // Since a new request is buffered, flushing is required.
+            self.need_flush = true;
+
+            future
         } else {
             let id = file.inner.get_id_mut();
             let offset = file.offset;
@@ -351,8 +356,6 @@ impl AsyncWrite for TokioCompactFile<'_> {
         };
 
         self.write_futures.push_back(future);
-        // Since a new future is pushed, flushing is again required.
-        self.need_flush = true;
 
         // Adjust offset and reset self.future
         Poll::Ready(
@@ -451,10 +454,15 @@ impl AsyncWrite for TokioCompactFile<'_> {
         let file = &mut this.inner;
 
         let future = if n <= max_buffered_write || !is_direct_write_enabled {
-            send_request(file, |write_end, id, handle, offset| {
+            let future = send_request(file, |write_end, id, handle, offset| {
                 write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
             })?
-            .wait()
+            .wait();
+
+            // Since a new request is buffered, flushing is required.
+            self.need_flush = true;
+
+            future
         } else {
             let id = file.inner.get_id_mut();
             let offset = file.offset;
@@ -469,8 +477,6 @@ impl AsyncWrite for TokioCompactFile<'_> {
         };
 
         self.write_futures.push_back(future);
-        // Since a new future is pushed, flushing is again required.
-        self.need_flush = true;
 
         // Adjust offset and reset self.future
         Poll::Ready(
