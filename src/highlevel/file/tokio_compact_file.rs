@@ -4,19 +4,27 @@ use super::utility::take_io_slices;
 use super::{Error, File, Id, WriteEnd, MAX_ATOMIC_WRITE_LEN};
 
 use std::borrow::Cow;
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::future::Future;
 use std::io::{self, IoSlice};
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use bytes::BytesMut;
-use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+use bytes::{Buf, Bytes, BytesMut};
+use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use derive_destructure2::destructure;
+
+/// The default length of the buffer used in [`TokioCompactFile`].
+pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };
+
+/// The default maximum length of the buffer that can be created in
+/// [`AsyncRead`] implementation of [`TokioCompactFile`].
+pub const DEFAULT_MAX_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096 * 10) };
 
 macro_rules! ready {
     ($e:expr) => {
@@ -34,7 +42,7 @@ fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     }
 }
 
-fn send_request<Func, R>(file: &mut File<'_>, f: Func) -> Result<R, io::Error>
+fn send_request<Func, R>(file: &mut File<'_>, f: Func) -> Result<R, Error>
 where
     Func: FnOnce(&mut WriteEnd, Id, Cow<'_, Handle>, u64) -> Result<R, Error>,
 {
@@ -45,7 +53,7 @@ where
     let (write_end, handle) = file.get_inner();
 
     // Add request to write buffer
-    let awaitable = f(write_end, id, handle, offset).map_err(sftp_to_io_error)?;
+    let awaitable = f(write_end, id, handle, offset)?;
 
     // Requests is already added to write buffer, so wakeup
     // the `flush_task`.
@@ -61,6 +69,8 @@ where
 pub struct TokioCompactFile<'s> {
     inner: File<'s>,
 
+    buffer_len: NonZeroUsize,
+    max_buffer_len: NonZeroUsize,
     buffer: BytesMut,
 
     read_future: Option<AwaitableDataFuture<Buffer>>,
@@ -73,10 +83,32 @@ pub struct TokioCompactFile<'s> {
 impl<'s> TokioCompactFile<'s> {
     /// Create a [`TokioCompactFile`].
     pub fn new(inner: File<'s>) -> Self {
+        Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
+    }
+
+    /// Create a [`TokioCompactFile`].
+    ///
+    /// * `buffer_len` - buffer len to be used in [`AsyncBufRead`]
+    ///   and the minimum length to read in [`AsyncRead`].
+    /// * `max_buffer_len` - maximum len to be used in [`AsyncRead`].
+    ///
+    /// If `max_buffer_len` is less than `buffer_len`, then it will be set to
+    /// `buffer_len`.
+    pub fn with_capacity(
+        inner: File<'s>,
+        buffer_len: NonZeroUsize,
+        mut max_buffer_len: NonZeroUsize,
+    ) -> Self {
+        if max_buffer_len < buffer_len {
+            max_buffer_len = buffer_len;
+        }
+
         Self {
             inner,
 
             buffer: BytesMut::new(),
+            buffer_len,
+            max_buffer_len,
 
             read_future: None,
             read_cancellation_future: BoxedWaitForCancellationFuture::new(),
@@ -113,6 +145,172 @@ impl<'s> TokioCompactFile<'s> {
 
         self.into_inner().close().await
     }
+
+    /// Returns the contents of the internal buffer, filling it with more data
+    /// from the inner reader if it is empty.
+    ///
+    /// This function is a lower-level call.
+    ///
+    /// It needs to be paired with the `consume` method or
+    /// [`TokioCompactFile::consume_and_return_buffer`] to function properly.
+    ///
+    /// When calling this method, none of the contents will be "read" in the
+    /// sense that later calling read may return the same contents.
+    ///
+    /// As such, you must consume the corresponding bytes using the methods
+    /// listed above.
+    ///
+    /// An empty buffer returned indicates that the stream has reached EOF.
+    ///
+    /// This function does not change the offset into the file.
+    pub async fn fill_buf(&mut self) -> Result<(), Error> {
+        if self.buffer.is_empty() {
+            let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
+            let buffer_len = NonZeroU32::new(buffer_len).unwrap();
+
+            self.read_into_buffer(buffer_len).await?;
+        }
+
+        Ok(())
+    }
+
+    /// This can be used together with [`AsyncBufRead`] implementation for
+    /// [`TokioCompactFile`] or [`TokioCompactFile::fill_buf`] or
+    /// [`TokioCompactFile::read_into_buffer`] to avoid copying data.
+    ///
+    /// Return empty [`Bytes`] on EOF.
+    ///
+    /// This function does change the offset into the file.
+    pub fn consume_and_return_buffer(&mut self, amt: usize) -> Bytes {
+        let buffer = &mut self.buffer;
+        let amt = min(amt, buffer.len());
+        let bytes = self.buffer.split_to(amt).freeze();
+
+        self.offset += amt as u64;
+
+        bytes
+    }
+
+    /// * `amt` - Amount of data to read into the buffer.
+    ///
+    /// This function is a lower-level call.
+    ///
+    /// It needs to be paired with the `consume` method or
+    /// [`TokioCompactFile::consume_and_return_buffer`] to function properly.
+    ///
+    /// When calling this method, none of the contents will be "read" in the
+    /// sense that later calling read may return the same contents.
+    ///
+    /// As such, you must consume the corresponding bytes using the methods
+    /// listed above.
+    ///
+    /// An empty buffer returned indicates that the stream has reached EOF.
+    ///
+    /// This function does not change the offset into the file.
+    pub fn poll_read_into_buffer(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        amt: NonZeroU32,
+    ) -> Poll<Result<(), Error>> {
+        // Dereference it here once so that there will be only
+        // one mutable borrow to self.
+        let this = &mut *self;
+
+        if !this.is_readable {
+            return Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::Other,
+                "This file is not opened for reading",
+            )
+            .into()));
+        }
+
+        let max_read_len = this.max_read_len();
+        let amt = min(amt.get(), max_read_len);
+
+        let future = if let Some(future) = &mut this.read_future {
+            // Get the active future.
+            //
+            // The future might read more/less than remaining,
+            // but the offset must be equal to this.offset,
+            // since AsyncSeek::start_seek would reset this.future
+            // if this.offset is changed.
+            future
+        } else {
+            this.buffer.reserve(amt as usize);
+            let cap = this.buffer.capacity();
+            let buffer = this.buffer.split_off(cap - (amt as usize));
+
+            let future = send_request(&mut this.inner, |write_end, id, handle, offset| {
+                write_end.send_read_request(id, handle, offset, amt, Some(buffer))
+            })?
+            .wait();
+
+            // Store it in this.read_future
+            this.read_future = Some(future);
+            this.read_future
+                .as_mut()
+                .expect("FileFuture::Data is just assigned to self.future!")
+        };
+
+        this.read_cancellation_future
+            .poll_for_task_failure(cx, this.inner.get_auxiliary())?;
+
+        // Wait for the future
+        let res = ready!(Pin::new(future).poll(cx));
+        this.read_future = None;
+        let (id, data) = res?;
+
+        this.inner.inner.cache_id_mut(id);
+        match data {
+            Data::Buffer(buffer) => {
+                // Since amt != 0, all AwaitableDataFuture created
+                // must at least read in one byte.
+                debug_assert!(!buffer.is_empty());
+
+                // sftp v3 can at most read in max_read_len bytes.
+                debug_assert!(buffer.len() <= max_read_len as usize);
+
+                this.buffer.unsplit(buffer);
+            }
+            Data::Eof => return Poll::Ready(Ok(())),
+            _ => std::unreachable!("Expect Data::Buffer"),
+        };
+
+        // Adjust offset and reset this.future
+        Poll::Ready(Ok(()))
+    }
+
+    /// * `amt` - Amount of data to read into the buffer.
+    ///
+    /// This function is a lower-level call.
+    ///
+    /// It needs to be paired with the `consume` method or
+    /// [`TokioCompactFile::consume_and_return_buffer`] to function properly.
+    ///
+    /// When calling this method, none of the contents will be "read" in the
+    /// sense that later calling read may return the same contents.
+    ///
+    /// As such, you must consume the corresponding bytes using the methods
+    /// listed above.
+    ///
+    /// An empty buffer returned indicates that the stream has reached EOF.
+    ///
+    /// This function does not change the offset into the file.
+    pub async fn read_into_buffer(&mut self, amt: NonZeroU32) -> Result<(), Error> {
+        #[must_use]
+        struct ReadIntoBuffer<'a, 's>(&'a mut TokioCompactFile<'s>, NonZeroU32);
+
+        impl Future for ReadIntoBuffer<'_, '_> {
+            type Output = Result<(), Error>;
+
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let amt = self.1;
+                Pin::new(&mut *self.0).poll_read_into_buffer(cx, amt)
+            }
+        }
+
+        ReadIntoBuffer(self, amt).await
+    }
 }
 
 impl<'s> From<File<'s>> for TokioCompactFile<'s> {
@@ -135,7 +333,7 @@ impl Clone for TokioCompactFile<'_> {
     fn clone(&self) -> Self {
         let mut inner = self.inner.clone();
         inner.need_flush = false;
-        Self::new(inner)
+        Self::with_capacity(inner, self.buffer_len, self.max_buffer_len)
     }
 }
 
@@ -162,6 +360,15 @@ impl AsyncSeek for TokioCompactFile<'_> {
         if new_offset != prev_offset {
             // Reset future since they are invalidated by change of offset.
             self.read_future = None;
+
+            // Reset buffer or consume buffer if necessary.
+            if new_offset < prev_offset {
+                self.buffer.clear();
+            } else if let Ok(offset) = (new_offset - prev_offset).try_into() {
+                self.consume(offset);
+            } else {
+                self.buffer.clear();
+            }
         }
 
         Ok(())
@@ -169,6 +376,28 @@ impl AsyncSeek for TokioCompactFile<'_> {
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         Pin::new(&mut self.inner).poll_complete(cx)
+    }
+}
+
+impl AsyncBufRead for TokioCompactFile<'_> {
+    fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        if self.buffer.is_empty() {
+            let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
+            let buffer_len = NonZeroU32::new(buffer_len).unwrap();
+
+            ready!(self.as_mut().poll_read_into_buffer(cx, buffer_len))
+                .map_err(sftp_to_io_error)?;
+        }
+
+        Poll::Ready(Ok(&Pin::into_inner(self).buffer))
+    }
+
+    fn consume(mut self: Pin<&mut Self>, amt: usize) {
+        let buffer = &mut self.buffer;
+        let amt = min(buffer.len(), amt);
+
+        buffer.advance(amt);
+        self.offset += amt as u64;
     }
 }
 
@@ -180,11 +409,7 @@ impl AsyncRead for TokioCompactFile<'_> {
         cx: &mut Context<'_>,
         read_buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Dereference it here once so that there will be only
-        // one mutable borrow to self.
-        let this = &mut *self;
-
-        if !this.is_readable {
+        if !self.is_readable {
             return Poll::Ready(Err(io::Error::new(
                 io::ErrorKind::Other,
                 "This file is not opened for reading",
@@ -196,72 +421,20 @@ impl AsyncRead for TokioCompactFile<'_> {
             return Poll::Ready(Ok(()));
         }
 
-        let remaining = min(remaining, this.max_read_len() as usize);
+        if self.buffer.is_empty() {
+            let n = max(remaining, DEFAULT_BUFLEN.get());
+            let n = min(n, self.max_buffer_len.get());
+            let n = n.try_into().unwrap_or(u32::MAX);
+            let n = NonZeroU32::new(n).unwrap();
 
-        let future = if let Some(future) = &mut this.read_future {
-            // Get the active future.
-            //
-            // The future might read more/less than remaining,
-            // but the offset must be equal to this.offset,
-            // since AsyncSeek::start_seek would reset this.future
-            // if this.offset is changed.
-            future
-        } else {
-            this.buffer.clear();
-            this.buffer.reserve(remaining);
-            let cap = this.buffer.capacity();
-            let buffer = this.buffer.split_off(cap - remaining);
+            ready!(self.as_mut().poll_read_into_buffer(cx, n)).map_err(sftp_to_io_error)?;
+        }
 
-            let future = send_request(&mut this.inner, |write_end, id, handle, offset| {
-                write_end.send_read_request(
-                    id,
-                    handle,
-                    offset,
-                    remaining.try_into().unwrap_or(u32::MAX),
-                    Some(buffer),
-                )
-            })?
-            .wait();
+        let n = min(remaining, self.buffer.len());
+        read_buf.put_slice(&self.buffer[..n]);
+        self.consume(n);
 
-            // Store it in this.read_future
-            this.read_future = Some(future);
-            this.read_future
-                .as_mut()
-                .expect("FileFuture::Data is just assigned to self.future!")
-        };
-
-        this.read_cancellation_future
-            .poll_for_task_failure(cx, this.inner.get_auxiliary())?;
-
-        // Wait for the future
-        let (id, data) = ready!(Pin::new(future).poll(cx)).map_err(sftp_to_io_error)?;
-
-        this.inner.inner.cache_id_mut(id);
-        let buffer = match data {
-            Data::Buffer(buffer) => {
-                // since remaining != 0, all AwaitableDataFuture created
-                // must at least read in one byte.
-                debug_assert!(!buffer.is_empty());
-
-                // sftp v3 can at most read in u32::MAX bytes.
-                debug_assert!(buffer.len() <= this.max_read_len() as usize);
-
-                buffer
-            }
-            Data::Eof => return Poll::Ready(Ok(())),
-            _ => std::unreachable!("Expect Data::Buffer"),
-        };
-
-        // Filled the buffer
-        let n = min(remaining, buffer.len());
-
-        // Since remaining != 0 and buffer.len() != 0, n != 0.
-        debug_assert_ne!(n, 0);
-
-        read_buf.put_slice(&buffer[..n]);
-
-        // Adjust offset and reset this.future
-        Poll::Ready(self.start_seek(io::SeekFrom::Current(n.try_into().unwrap())))
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -336,7 +509,8 @@ impl AsyncWrite for TokioCompactFile<'_> {
         let future = if n <= max_buffered_write || !is_direct_write_enabled {
             let future = send_request(file, |write_end, id, handle, offset| {
                 write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
-            })?
+            })
+            .map_err(sftp_to_io_error)?
             .wait();
 
             // Since a new request is buffered, flushing is required.
@@ -388,7 +562,8 @@ impl AsyncWrite for TokioCompactFile<'_> {
         }
 
         this.write_cancellation_future
-            .poll_for_task_failure(cx, this.inner.get_auxiliary())?;
+            .poll_for_task_failure(cx, this.inner.get_auxiliary())
+            .map_err(sftp_to_io_error)?;
 
         loop {
             let res = if let Some(future) = this.write_futures.front_mut() {
@@ -456,7 +631,8 @@ impl AsyncWrite for TokioCompactFile<'_> {
         let future = if n <= max_buffered_write || !is_direct_write_enabled {
             let future = send_request(file, |write_end, id, handle, offset| {
                 write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
-            })?
+            })
+            .map_err(sftp_to_io_error)?
             .wait();
 
             // Since a new request is buffered, flushing is required.

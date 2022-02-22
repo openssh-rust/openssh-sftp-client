@@ -30,6 +30,8 @@ use handle::OwnedHandle;
 
 mod file;
 pub use file::TokioCompactFile;
+pub use file::DEFAULT_BUFLEN;
+pub use file::DEFAULT_MAX_BUFLEN;
 pub use file::{File, OpenOptions, MAX_ATOMIC_WRITE_LEN};
 
 mod fs;

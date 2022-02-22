@@ -1,7 +1,6 @@
 use super::{Auxiliary, Error};
 
 use std::future::Future;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -25,10 +24,6 @@ impl<'s> BoxedWaitForCancellationFuture<'s> {
 
     pub(super) fn cancel_error() -> Error {
         Error::BackgroundTaskFailure(&"read/flush task failed")
-    }
-
-    fn cancel_io_error() -> io::Error {
-        io::Error::new(io::ErrorKind::Other, Self::cancel_error())
     }
 
     fn get_future(&mut self, auxiliary: &'s Auxiliary) -> Pin<&mut WaitForCancellationFuture<'s>> {
@@ -59,9 +54,9 @@ impl<'s> BoxedWaitForCancellationFuture<'s> {
         &mut self,
         cx: &mut Context<'_>,
         auxiliary: &'s Auxiliary,
-    ) -> Result<(), io::Error> {
+    ) -> Result<(), Error> {
         if auxiliary.cancel_token.is_cancelled() {
-            return Err(Self::cancel_io_error());
+            return Err(Self::cancel_error());
         }
 
         match self.get_future(auxiliary).poll(cx) {
@@ -69,7 +64,7 @@ impl<'s> BoxedWaitForCancellationFuture<'s> {
                 // Drop future since a completed future cannot be called again.
                 self.0 = None;
 
-                Err(Self::cancel_io_error())
+                Err(Self::cancel_error())
             }
             Poll::Pending => Ok(()),
         }

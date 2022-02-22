@@ -18,7 +18,7 @@ use tokio_io_utility::IoSliceExt;
 use tokio_pipe::PIPE_BUF;
 
 mod tokio_compact_file;
-pub use tokio_compact_file::TokioCompactFile;
+pub use tokio_compact_file::{TokioCompactFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN};
 
 mod utility;
 use utility::{take_bytes, take_io_slices};
