@@ -1,6 +1,6 @@
 # openssh-sftp-client
 
-[![Rust](https://github.com/NobodyXu/openssh-sftp-client/actions/workflows/rust.yml/badge.svg)](https://github.com/NobodyXu/openssh-sftp-client/actions/workflows/rust.yml)
+[![Rust](https://github.com/openssh-rust/openssh-sftp-client/actions/workflows/rust.yml/badge.svg)](https://github.com/openssh-rust/openssh-sftp-client/actions/workflows/rust.yml)
 
 [![crate.io downloads](https://img.shields.io/crates/d/openssh-sftp-client)](https://crates.io/crates/openssh-sftp-client)
 
