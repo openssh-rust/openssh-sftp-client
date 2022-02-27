@@ -24,12 +24,13 @@ mod utility;
 use utility::{take_bytes, take_io_slices};
 
 const _ASSERTION: [(); 0 - !{
-    const ASSERT: bool = (PIPE_BUF - 9 - 4 - 256 - 8 - 4) >= (MAX_ATOMIC_WRITE_LEN as usize);
+    // If `MAX_ATOMIC_WRITE_LEN` == `u32::MAX`, then it ust have overflowed.
+    const ASSERT: bool = MAX_ATOMIC_WRITE_LEN != u32::MAX;
     ASSERT
 } as usize] = [];
 
 /// Maximum amount of data that can writen atomically.
-pub const MAX_ATOMIC_WRITE_LEN: u32 = 3815;
+pub const MAX_ATOMIC_WRITE_LEN: u32 = (PIPE_BUF - 9 - 4 - 256 - 8 - 4) as u32;
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Debug, Copy, Clone)]
