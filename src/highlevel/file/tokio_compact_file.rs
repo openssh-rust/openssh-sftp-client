@@ -62,8 +62,8 @@ where
     Ok(awaitable)
 }
 
-/// File that implements [`AsyncRead`], [`AsyncSeek`] and [`AsyncWrite`],
-/// that is compatible with
+/// File that implements [`AsyncRead`], [`AsyncBufRead`], [`AsyncSeek`] and
+/// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
 pub struct TokioCompactFile<'s> {
