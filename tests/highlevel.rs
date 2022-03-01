@@ -4,11 +4,13 @@ use common::*;
 use openssh_sftp_client::highlevel::*;
 
 use std::cmp::{max, min};
+use std::convert::identity;
 use std::convert::TryInto;
 use std::env;
 use std::io::IoSlice;
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
+use std::stringify;
 
 use bytes::BytesMut;
 use once_cell::sync::OnceCell;
@@ -104,173 +106,132 @@ async fn sftp_file_basics() {
     assert!(child.wait().await.unwrap().success());
 }
 
-struct SftpFileWriteAllTester<'s> {
-    path: &'s Path,
-    file: File<'s>,
-    fs: Fs<'s>,
-    content: Vec<u8>,
-}
-
-impl<'s> SftpFileWriteAllTester<'s> {
-    async fn new(sftp: &'s Sftp, path: &'s Path) -> SftpFileWriteAllTester<'s> {
-        let max_len = max(sftp.max_write_len(), sftp.max_read_len()) as usize;
-        let content = b"HELLO, WORLD!\n".repeat(max_len / 8);
-
-        let file = sftp
-            .options()
-            .write(true)
-            .read(true)
-            .create(true)
-            .open(path)
-            .await
-            .unwrap();
-        let fs = sftp.fs("");
-
-        Self {
-            path,
-            file,
-            fs,
-            content,
-        }
-    }
-
-    async fn assert_content(mut self) {
-        let len = self.content.len();
-
-        self.file.rewind().await.unwrap();
-
-        let buffer = self
-            .file
-            .read_all(len, BytesMut::with_capacity(len))
-            .await
-            .unwrap();
-
-        assert_eq!(&*buffer, &*self.content);
-
-        // remove the file
-        self.fs.remove_file(self.path).await.unwrap();
-    }
-}
-
-#[tokio::test]
-/// Test File::write_all, File::read_all and AsyncSeek implementation
-async fn sftp_file_write_all() {
-    let path = gen_path("sftp_file_write_all");
-
-    for (msg, (mut child, sftp)) in vec![
-        (
-            "Test direct write",
-            connect(SftpOptions::new().max_buffered_write(NonZeroU32::new(1).unwrap())).await,
-        ),
-        (
-            "Test buffered write",
-            connect(SftpOptions::new().max_buffered_write(NonZeroU32::new(u32::MAX).unwrap()))
-                .await,
-        ),
-    ] {
-        let mut tester = SftpFileWriteAllTester::new(&sftp, &path).await;
-
-        eprintln!("{}", msg);
-        tester.file.write_all(&tester.content).await.unwrap();
-
-        eprintln!("Verifing the write");
-        tester.assert_content().await;
-
-        eprintln!("Closing sftp and child");
-        sftp.close().await.unwrap();
-        // TODO: somehow sftp-server hangs here
-        child.kill().await.unwrap();
-    }
-}
-
-#[tokio::test]
-/// Test File::write_all_vectorized, File::read_all and AsyncSeek implementation
-async fn sftp_file_write_all_vectored() {
-    let path = gen_path("sftp_file_write_all_vectored");
+/// Return `SftpOptions` that has `max_rw_len` set to `200`.
+fn sftp_options_with_max_rw_len() -> SftpOptions {
     let max_rw_len = NonZeroU32::new(200).unwrap();
 
-    let sftp_options = SftpOptions::new()
+    SftpOptions::new()
         .max_write_len(max_rw_len)
-        .max_read_len(max_rw_len);
-
-    for (msg, (mut child, sftp)) in vec![
-        (
-            "Test direct write",
-            connect(sftp_options.max_buffered_write(NonZeroU32::new(1).unwrap())).await,
-        ),
-        (
-            "Test buffered write",
-            connect(sftp_options.max_buffered_write(NonZeroU32::new(u32::MAX).unwrap())).await,
-        ),
-    ] {
-        let mut tester = SftpFileWriteAllTester::new(&sftp, &path).await;
-
-        let content = &tester.content;
-        let len = content.len();
-
-        eprintln!("{}", msg);
-
-        tester
-            .file
-            .write_all_vectorized(
-                [
-                    IoSlice::new(&content[..len / 2]),
-                    IoSlice::new(&content[len / 2..]),
-                ]
-                .as_mut_slice(),
-            )
-            .await
-            .unwrap();
-
-        eprintln!("Verifing the write");
-        tester.assert_content().await;
-
-        eprintln!("Closing sftp and child");
-        sftp.close().await.unwrap();
-        // TODO: somehow sftp-server hangs here
-        child.kill().await.unwrap();
-    }
+        .max_read_len(max_rw_len)
 }
 
-#[tokio::test]
-/// Test File::write_all_vectorized, File::read_all and AsyncSeek implementation
-async fn sftp_file_write_all_zero_copy() {
-    let path = gen_path("sftp_file_write_all_zero_copy");
-    let max_rw_len = NonZeroU32::new(200).unwrap();
+macro_rules! def_write_all_test {
+    ($fname:ident, $sftp_options:expr, $file_converter:expr, $file_var:ident, $content_var:ident , $test_block:block) => {
+        #[tokio::test]
+        async fn $fname() {
+            let path = gen_path(stringify!($fname));
 
+            for (msg, (mut child, sftp)) in vec![
+                (
+                    "Test direct write",
+                    connect($sftp_options.max_buffered_write(NonZeroU32::new(1).unwrap())).await,
+                ),
+                (
+                    "Test buffered write",
+                    connect($sftp_options.max_buffered_write(NonZeroU32::new(u32::MAX).unwrap()))
+                        .await,
+                ),
+            ] {
+                let max_len = max(sftp.max_write_len(), sftp.max_read_len()) as usize;
+                let content = b"HELLO, WORLD!\n".repeat(max_len / 8);
+
+                let mut file = sftp
+                    .options()
+                    .write(true)
+                    .read(true)
+                    .create(true)
+                    .open(&path)
+                    .await
+                    .map($file_converter)
+                    .unwrap();
+
+                let len = content.len();
+
+                eprintln!("{}", msg);
+
+                {
+                    let $file_var = &mut file;
+                    let $content_var = &content;
+
+                    $test_block;
+                }
+
+                eprintln!("Verifing the write");
+
+                file.rewind().await.unwrap();
+
+                let buffer = file
+                    .read_all(len, BytesMut::with_capacity(len))
+                    .await
+                    .unwrap();
+
+                assert_eq!(&*buffer, &content);
+
+                // remove the file
+                drop(file);
+                sftp.fs("").remove_file(&path).await.unwrap();
+
+                eprintln!("Closing sftp and child");
+                sftp.close().await.unwrap();
+                // TODO: somehow sftp-server hangs here
+                child.kill().await.unwrap();
+            }
+        }
+    };
+}
+
+def_write_all_test!(
+    sftp_file_write_all,
+    SftpOptions::new(),
+    identity,
+    file,
+    content,
     {
-        let (mut child, sftp) = connect(
-            SftpOptions::new()
-                .max_write_len(max_rw_len)
-                .max_read_len(max_rw_len),
-        )
-        .await;
+        file.write_all(content).await.unwrap();
+    }
+);
 
-        let mut tester = SftpFileWriteAllTester::new(&sftp, &path).await;
-
-        let content = &tester.content;
+def_write_all_test!(
+    sftp_file_write_all_vectored,
+    sftp_options_with_max_rw_len(),
+    identity,
+    file,
+    content,
+    {
         let len = content.len();
 
-        tester
-            .file
-            .write_all_zero_copy(
-                [
-                    BytesMut::from(&content[..len / 2]).freeze(),
-                    BytesMut::from(&content[len / 2..]).freeze(),
-                ]
-                .as_mut_slice(),
-            )
-            .await
-            .unwrap();
-
-        eprintln!("Verifing the write");
-        tester.assert_content().await;
-
-        // close sftp and child
-        sftp.close().await.unwrap();
-        assert!(child.wait().await.unwrap().success());
+        file.write_all_vectorized(
+            [
+                IoSlice::new(&content[..len / 2]),
+                IoSlice::new(&content[len / 2..]),
+            ]
+            .as_mut_slice(),
+        )
+        .await
+        .unwrap();
     }
-}
+);
+
+def_write_all_test!(
+    sftp_file_write_all_zero_copy,
+    sftp_options_with_max_rw_len(),
+    identity,
+    file,
+    content,
+    {
+        let len = content.len();
+
+        file.write_all_zero_copy(
+            [
+                BytesMut::from(&content[..len / 2]).freeze(),
+                BytesMut::from(&content[len / 2..]).freeze(),
+            ]
+            .as_mut_slice(),
+        )
+        .await
+        .unwrap();
+    }
+);
 
 #[tokio::test]
 /// Test creating new TokioCompactFile, truncating and opening existing file,
@@ -338,120 +299,28 @@ async fn sftp_tokio_compact_file_basics() {
     assert!(child.wait().await.unwrap().success());
 }
 
-struct SftpTokioCompactFileWriteAllTester<'s> {
-    path: &'s Path,
-    file: TokioCompactFile<'s>,
-    fs: Fs<'s>,
-    content: Vec<u8>,
-}
-
-impl<'s> SftpTokioCompactFileWriteAllTester<'s> {
-    async fn new(sftp: &'s Sftp, path: &'s Path) -> SftpTokioCompactFileWriteAllTester<'s> {
-        let max_len = max(sftp.max_write_len(), sftp.max_read_len()) as usize;
-        let content = b"HELLO, WORLD!\n".repeat(max_len / 8);
-
-        let file = sftp
-            .options()
-            .write(true)
-            .read(true)
-            .create(true)
-            .open(path)
-            .await
-            .map(TokioCompactFile::new)
-            .unwrap();
-        let fs = sftp.fs("");
-
-        Self {
-            path,
-            file,
-            fs,
-            content,
-        }
+def_write_all_test!(
+    sftp_tokio_compact_file_write_all,
+    sftp_options_with_max_rw_len(),
+    TokioCompactFile::new,
+    file,
+    content,
+    {
+        file.write_all(content).await.unwrap();
     }
+);
 
-    async fn assert_content(mut self) {
-        let len = self.content.len();
-
-        self.file.rewind().await.unwrap();
-
-        let buffer = self
-            .file
-            .read_all(len, BytesMut::with_capacity(len))
-            .await
-            .unwrap();
-
-        assert_eq!(&*buffer, &*self.content);
-
-        // remove the file
-        self.fs.remove_file(self.path).await.unwrap();
-    }
-}
-
-#[tokio::test]
-/// Test File::write_all_vectorized, File::read_all and AsyncSeek implementation
-async fn sftp_tokio_compact_file_write_all() {
-    let path = gen_path("sftp_tokio_compact_file_write_all");
-    let max_rw_len = NonZeroU32::new(200).unwrap();
-
-    let sftp_options = SftpOptions::new()
-        .max_write_len(max_rw_len)
-        .max_read_len(max_rw_len);
-
-    for (msg, (mut child, sftp)) in vec![
-        (
-            "Test direct write",
-            connect(sftp_options.max_buffered_write(NonZeroU32::new(1).unwrap())).await,
-        ),
-        (
-            "Test buffered write",
-            connect(sftp_options.max_buffered_write(NonZeroU32::new(u32::MAX).unwrap())).await,
-        ),
-    ] {
-        let mut tester = SftpTokioCompactFileWriteAllTester::new(&sftp, &path).await;
-
-        let content = &tester.content;
-
-        eprintln!("{}", msg);
-        tester.file.write_all(content).await.unwrap();
-
-        eprintln!("Verifing write");
-        tester.assert_content().await;
-
-        eprintln!("Close sftp and child");
-        sftp.close().await.unwrap();
-        // TODO: somehow sftp-server hangs here
-        child.kill().await.unwrap();
-    }
-}
-
-#[tokio::test]
-/// Test File::write_all_vectorized, File::read_all and AsyncSeek implementation
-async fn sftp_tokio_compact_file_write_vectored_all() {
-    let path = gen_path("sftp_tokio_compact_file_write_vectored_all");
-    let max_rw_len = NonZeroU32::new(200).unwrap();
-
-    let sftp_options = SftpOptions::new()
-        .max_write_len(max_rw_len)
-        .max_read_len(max_rw_len);
-
-    for (msg, (mut child, sftp)) in vec![
-        (
-            "Test direct write",
-            connect(sftp_options.max_buffered_write(NonZeroU32::new(1).unwrap())).await,
-        ),
-        (
-            "Test buffered write",
-            connect(sftp_options.max_buffered_write(NonZeroU32::new(u32::MAX).unwrap())).await,
-        ),
-    ] {
-        let mut tester = SftpTokioCompactFileWriteAllTester::new(&sftp, &path).await;
-
-        let content = &tester.content;
+def_write_all_test!(
+    sftp_tokio_compact_file_write_vectored_all,
+    sftp_options_with_max_rw_len(),
+    TokioCompactFile::new,
+    file,
+    content,
+    {
         let len = content.len();
 
-        eprintln!("{}", msg);
         write_vectored_all(
-            &mut tester.file,
+            file,
             [
                 IoSlice::new(&content[..len / 2]),
                 IoSlice::new(&content[len / 2..]),
@@ -460,29 +329,15 @@ async fn sftp_tokio_compact_file_write_vectored_all() {
         )
         .await
         .unwrap();
-
-        eprintln!("Verifing write");
-        tester.assert_content().await;
-
-        eprintln!("Close sftp and child");
-        sftp.close().await.unwrap();
-        // TODO: somehow sftp-server hangs here
-        child.kill().await.unwrap();
     }
-}
+);
 
 #[tokio::test]
 /// Test File::{set_len, set_permissions, metadata}.
 async fn sftp_file_metadata() {
     let path = gen_path("sftp_file_metadata");
-    let max_rw_len = NonZeroU32::new(200).unwrap();
 
-    let (mut child, sftp) = connect(
-        SftpOptions::new()
-            .max_write_len(max_rw_len)
-            .max_read_len(max_rw_len),
-    )
-    .await;
+    let (mut child, sftp) = connect(sftp_options_with_max_rw_len()).await;
 
     {
         let mut file = sftp
@@ -509,14 +364,8 @@ async fn sftp_file_metadata() {
 /// Test File::sync_all.
 async fn sftp_file_sync_all() {
     let path = gen_path("sftp_file_sync_all");
-    let max_rw_len = NonZeroU32::new(200).unwrap();
 
-    let (mut child, sftp) = connect(
-        SftpOptions::new()
-            .max_write_len(max_rw_len)
-            .max_read_len(max_rw_len),
-    )
-    .await;
+    let (mut child, sftp) = connect(sftp_options_with_max_rw_len()).await;
 
     sftp.create(path).await.unwrap().sync_all().await.unwrap();
 
@@ -657,15 +506,9 @@ async fn sftp_fs_rename() {
 /// Test Fs::{metadata, set_metadata}.
 async fn sftp_fs_metadata() {
     let path = gen_path("sftp_fs_metadata");
-    let max_rw_len = NonZeroU32::new(200).unwrap();
     let content = b"hello, world!\n";
 
-    let (mut child, sftp) = connect(
-        SftpOptions::new()
-            .max_write_len(max_rw_len)
-            .max_read_len(max_rw_len),
-    )
-    .await;
+    let (mut child, sftp) = connect(sftp_options_with_max_rw_len()).await;
 
     {
         let mut fs = sftp.fs("");
