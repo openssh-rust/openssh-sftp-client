@@ -1,6 +1,6 @@
 use super::{
     lowlevel, Auxiliary, Buffer, Error, Id, MetaData, MetaDataBuilder, OwnedHandle, Permissions,
-    Sftp, WriteEnd, WriteEndWithCachedId,
+    Sftp, WriteEnd, WriteEndWithCachedId, Writer,
 };
 
 use std::borrow::Cow;
@@ -15,18 +15,18 @@ pub use dir::{DirEntry, ReadDir};
 
 type AwaitableStatus = lowlevel::AwaitableStatus<Buffer>;
 type AwaitableAttrs = lowlevel::AwaitableAttrs<Buffer>;
-type SendLinkingRequest =
-    fn(&mut WriteEnd, Id, Cow<'_, Path>, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
+type SendLinkingRequest<W> =
+    fn(&mut WriteEnd<W>, Id, Cow<'_, Path>, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
 
 /// A struct used to perform operations on remote filesystem.
 #[derive(Debug, Clone)]
-pub struct Fs<'s> {
-    write_end: WriteEndWithCachedId<'s>,
+pub struct Fs<'s, W> {
+    write_end: WriteEndWithCachedId<'s, W>,
     cwd: Box<Path>,
 }
 
-impl<'s> Fs<'s> {
-    pub(super) fn new(write_end: WriteEndWithCachedId<'s>, cwd: PathBuf) -> Self {
+impl<'s, W> Fs<'s, W> {
+    pub(super) fn new(write_end: WriteEndWithCachedId<'s, W>, cwd: PathBuf) -> Self {
         Self {
             write_end,
             cwd: cwd.into_boxed_path(),
@@ -38,7 +38,7 @@ impl<'s> Fs<'s> {
     }
 
     /// Return the underlying sftp.
-    pub fn sftp(&self) -> &'s Sftp {
+    pub fn sftp(&self) -> &'s Sftp<W> {
         self.write_end.sftp()
     }
 
@@ -63,8 +63,10 @@ impl<'s> Fs<'s> {
             Cow::Owned(self.cwd.join(path))
         }
     }
+}
 
-    async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_>, Error> {
+impl<'s, W: Writer> Fs<'s, W> {
+    async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_, W>, Error> {
         let path = self.concat_path_if_needed(path);
 
         self.write_end
@@ -74,12 +76,12 @@ impl<'s> Fs<'s> {
     }
 
     /// Open a remote dir
-    pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir<'_>, Error> {
+    pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir<'_, W>, Error> {
         self.open_dir_impl(path.as_ref()).await
     }
 
     /// Create a directory builder.
-    pub fn dir_builder(&mut self) -> DirBuilder<'_, 's> {
+    pub fn dir_builder(&mut self) -> DirBuilder<'_, 's, W> {
         DirBuilder {
             fs: self,
             metadata_builder: MetaDataBuilder::new(),
@@ -94,7 +96,7 @@ impl<'s> Fs<'s> {
     async fn remove_impl(
         &mut self,
         path: &Path,
-        f: fn(&mut WriteEnd, Id, Cow<'_, Path>) -> Result<AwaitableStatus, Error>,
+        f: fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableStatus, Error>,
     ) -> Result<(), Error> {
         let path = self.concat_path_if_needed(path);
 
@@ -145,7 +147,7 @@ impl<'s> Fs<'s> {
         &mut self,
         src: &Path,
         dst: &Path,
-        f: SendLinkingRequest,
+        f: SendLinkingRequest<W>,
     ) -> Result<(), Error> {
         let src = self.concat_path_if_needed(src);
         let dst = self.concat_path_if_needed(dst);
@@ -257,7 +259,7 @@ impl<'s> Fs<'s> {
     async fn metadata_impl(
         &mut self,
         path: &Path,
-        f: fn(&mut WriteEnd, Id, Cow<'_, Path>) -> Result<AwaitableAttrs, Error>,
+        f: fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableAttrs, Error>,
     ) -> Result<MetaData, Error> {
         let path = self.concat_path_if_needed(path);
 
@@ -352,9 +354,9 @@ impl<'s> Fs<'s> {
 /// Remote Directory
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Dir<'s>(OwnedHandle<'s>);
+pub struct Dir<'s, W: Writer>(OwnedHandle<'s, W>);
 
-impl Dir<'_> {
+impl<W: Writer> Dir<'_, W> {
     /// Read dir.
     pub async fn read_dir(&mut self) -> Result<ReadDir, Error> {
         self.0
@@ -373,12 +375,12 @@ impl Dir<'_> {
 
 /// Builder for new directory to create.
 #[derive(Debug)]
-pub struct DirBuilder<'a, 's> {
-    fs: &'a mut Fs<'s>,
+pub struct DirBuilder<'a, 's, W> {
+    fs: &'a mut Fs<'s, W>,
     metadata_builder: MetaDataBuilder,
 }
 
-impl DirBuilder<'_, '_> {
+impl<W> DirBuilder<'_, '_, W> {
     /// Reset builder back to default.
     pub fn reset(&mut self) -> &mut Self {
         self.metadata_builder = MetaDataBuilder::new();
@@ -396,7 +398,9 @@ impl DirBuilder<'_, '_> {
         self.metadata_builder.permissions(perm);
         self
     }
+}
 
+impl<W: Writer> DirBuilder<'_, '_, W> {
     async fn create_impl(&mut self, path: &Path) -> Result<(), Error> {
         let fs = &mut self.fs;
 

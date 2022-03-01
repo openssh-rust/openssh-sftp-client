@@ -1,12 +1,11 @@
 #![forbid(unsafe_code)]
 
-use crate::{AtomicWriteIoSlicesTrait, Writer};
+use crate::{Error, Writer};
 
-use std::cmp::max;
 use std::convert::TryInto;
 use std::future::Future;
-use std::io;
-use std::io::IoSlice;
+use std::io::{self, IoSlice};
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -17,7 +16,24 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
 use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
 
-const MAX_ATOMIC_ATTEMPT: u16 = 50;
+#[derive(Debug, Copy, Clone)]
+pub(super) struct AtomicWriteIoSlices<'a, W: Writer>(&'a [IoSlice<'a>], PhantomData<W>);
+
+impl<'a, W: Writer> AtomicWriteIoSlices<'a, W> {
+    pub(super) fn new(buffers: &'a [io::IoSlice<'a>]) -> Result<Self, Error> {
+        let mut total_len = 0;
+
+        for buffer in buffers {
+            total_len += buffer.len();
+
+            if total_len > W::MAX_ATOMIC_WRITE_LEN {
+                return Err(Error::WriteTooLargeToBeAtomic);
+            }
+        }
+
+        Ok(Self(buffers, PhantomData))
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct WriterBuffered<W>(RwLockAsync<W>, MpScBytesQueue);
@@ -32,45 +48,25 @@ impl<W: Writer> WriterBuffered<W> {
 
     /// Return `Ok(true)` is atomic write succeeds, `Ok(false)` if non-atomic
     /// write is required.
-    pub(crate) async fn atomic_write_vectored_all(
+    pub(super) async fn atomic_write_vectored_all(
         &self,
-        bufs: W::AtomicWriteIoSlices,
-    ) -> Result<bool, io::Error> {
+        bufs: AtomicWriteIoSlices<'_, W>,
+    ) -> Result<(), io::Error> {
         #[must_use = "futures do nothing unless you `.await` or poll them"]
-        struct AtomicWrite<'a, W: Writer>(&'a W, W::AtomicWriteIoSlices, u16, u16);
+        struct AtomicWrite<'a, W: Writer>(&'a W, &'a [IoSlice<'a>]);
 
         impl<W: Writer> Future for AtomicWrite<'_, W> {
-            type Output = Result<bool, io::Error>;
+            type Output = Result<(), io::Error>;
 
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                if self.2 >= self.3 {
-                    return Poll::Ready(Ok(false));
-                }
-
-                self.2 += 1;
-
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 let writer = Pin::new(self.0);
                 let input = self.1;
 
-                writer.poll_write_vectored_atomic(cx, input).map(|res| {
-                    res?;
-                    Ok(true)
-                })
+                writer.poll_write_vectored_atomic(cx, input)
             }
         }
 
-        AtomicWrite(
-            &*self.0.read().await,
-            bufs,
-            0,
-            max(
-                // PIPE_BUF is 4096, less than u16::MAX,
-                // so the result of division must also be less than u16::MAX.
-                (W::MAX_ATOMIC_WRITE_LEN / bufs.get_total_len()) as u16,
-                MAX_ATOMIC_ATTEMPT,
-            ),
-        )
-        .await
+        AtomicWrite(&*self.0.read().await, bufs.0).await
     }
 
     /// * `buf` - Must not be empty
@@ -92,8 +88,10 @@ impl<W: Writer> WriterBuffered<W> {
             type Output = Result<(), io::Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let writer = Pin::new(&mut *self.0);
-                let buffers = &mut self.1;
+                let this = &mut *self;
+
+                let writer = &mut this.0;
+                let buffers = &mut this.1;
 
                 writer.poll_flush_buffers(cx, buffers)
             }

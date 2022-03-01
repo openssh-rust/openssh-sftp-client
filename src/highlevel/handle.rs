@@ -1,5 +1,5 @@
 use super::lowlevel::{Handle, HandleOwned};
-use super::{Error, Id, WriteEnd, WriteEndWithCachedId};
+use super::{Error, Id, WriteEnd, WriteEndWithCachedId, Writer};
 
 use std::borrow::Cow;
 use std::future::Future;
@@ -9,13 +9,22 @@ use std::sync::Arc;
 use derive_destructure2::destructure;
 
 /// Remote Directory
-#[derive(Debug, Clone, destructure)]
-pub(super) struct OwnedHandle<'s> {
-    pub(super) write_end: WriteEndWithCachedId<'s>,
+#[derive(Debug, destructure)]
+pub(super) struct OwnedHandle<'s, W: Writer> {
+    pub(super) write_end: WriteEndWithCachedId<'s, W>,
     pub(super) handle: Arc<HandleOwned>,
 }
 
-impl Drop for OwnedHandle<'_> {
+impl<W: Writer> Clone for OwnedHandle<'_, W> {
+    fn clone(&self) -> Self {
+        Self {
+            write_end: self.write_end.clone(),
+            handle: self.handle.clone(),
+        }
+    }
+}
+
+impl<W: Writer> Drop for OwnedHandle<'_, W> {
     fn drop(&mut self) {
         let write_end = &mut self.write_end;
         let handle = &self.handle;
@@ -28,8 +37,8 @@ impl Drop for OwnedHandle<'_> {
     }
 }
 
-impl<'s> OwnedHandle<'s> {
-    pub(super) fn new(write_end: WriteEndWithCachedId<'s>, handle: HandleOwned) -> Self {
+impl<'s, W: Writer> OwnedHandle<'s, W> {
+    pub(super) fn new(write_end: WriteEndWithCachedId<'s, W>, handle: HandleOwned) -> Self {
         Self {
             write_end,
             handle: Arc::new(handle),
@@ -38,7 +47,7 @@ impl<'s> OwnedHandle<'s> {
 
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd<W>, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         let handle = &self.handle;
@@ -74,15 +83,15 @@ impl<'s> OwnedHandle<'s> {
     }
 }
 
-impl<'s> Deref for OwnedHandle<'s> {
-    type Target = WriteEndWithCachedId<'s>;
+impl<'s, W: Writer> Deref for OwnedHandle<'s, W> {
+    type Target = WriteEndWithCachedId<'s, W>;
 
     fn deref(&self) -> &Self::Target {
         &self.write_end
     }
 }
 
-impl DerefMut for OwnedHandle<'_> {
+impl<W: Writer> DerefMut for OwnedHandle<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.write_end
     }

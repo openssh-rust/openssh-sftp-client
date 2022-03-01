@@ -1,6 +1,6 @@
 use super::{
-    auxiliary, lowlevel, tasks, Error, File, Fs, OpenOptions, SftpOptions, SharedData, WriteEnd,
-    WriteEndWithCachedId, MAX_ATOMIC_WRITE_LEN,
+    auxiliary, lowlevel, max_atomic_write_len, tasks, Error, File, Fs, OpenOptions, SftpOptions,
+    SharedData, WriteEnd, WriteEndWithCachedId, Writer,
 };
 
 use auxiliary::Auxiliary;
@@ -15,21 +15,61 @@ use std::sync::atomic::Ordering;
 
 use derive_destructure2::destructure;
 use tokio::task::JoinHandle;
-use tokio_pipe::{PipeRead, PipeWrite};
+use tokio_pipe::PipeRead;
 use tokio_util::sync::CancellationToken;
 
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]
-pub struct Sftp {
-    shared_data: SharedData,
+pub struct Sftp<W> {
+    shared_data: SharedData<W>,
     flush_task: JoinHandle<Result<(), Error>>,
     read_task: JoinHandle<Result<(), Error>>,
 }
 
-impl Sftp {
+impl<W: Writer + Send + Sync + 'static> Sftp<W> {
+    /// Create [`Sftp`].
+    pub async fn new(stdin: W, stdout: PipeRead, options: SftpOptions) -> Result<Self, Error> {
+        let (write_end, read_end, extensions) = connect_with_auxiliary(
+            stdout,
+            stdin,
+            Auxiliary::new(
+                options.get_max_pending_requests(),
+                options.get_max_buffered_write(),
+            ),
+        )
+        .await?;
+
+        // Create sftp here.
+        //
+        // It would also gracefully shutdown `flush_task` and `read_task` if
+        // the future is cancelled or error is encounted.
+        let sftp = Self {
+            shared_data: SharedData::clone(&write_end),
+
+            flush_task: create_flush_task(
+                SharedData::clone(&write_end),
+                options.get_flush_interval(),
+            ),
+            read_task: create_read_task(read_end),
+        };
+
+        match sftp.set_limits(write_end, options, extensions).await {
+            Err(Error::BackgroundTaskFailure(_)) => {
+                // Wait on flush_task and read_task to get a more detailed error message.
+                sftp.close().await?;
+                std::unreachable!("Error must have occurred in either read_task or flush_task")
+            }
+            res => res?,
+        }
+
+        Ok(sftp)
+    }
+}
+
+impl<W: Writer> Sftp<W> {
     async fn set_limits(
         &self,
-        write_end: WriteEnd,
+        write_end: WriteEnd<W>,
         options: SftpOptions,
         extensions: Extensions,
     ) -> Result<(), Error> {
@@ -87,11 +127,11 @@ impl Sftp {
             .map(|v| min(v, write_len))
             .unwrap_or(write_len);
 
-        // If max_buffered_write is less than MAX_ATOMIC_WRITE_LEN,
-        // then the direct write is enabled and MAX_ATOMIC_WRITE_LEN
+        // If max_buffered_write is less than max_atomic_write_len,
+        // then the direct write is enabled and max_atomic_write_len
         // applies.
-        if write_end.get_auxiliary().max_buffered_write < MAX_ATOMIC_WRITE_LEN {
-            write_len = min(write_len, MAX_ATOMIC_WRITE_LEN);
+        if write_end.get_auxiliary().max_buffered_write < max_atomic_write_len::<W>() {
+            write_len = min(write_len, max_atomic_write_len::<W>());
         }
 
         let limits = auxiliary::Limits {
@@ -106,48 +146,6 @@ impl Sftp {
             .expect("auxiliary.conn_info shall be empty");
 
         Ok(())
-    }
-
-    /// Create [`Sftp`].
-    pub async fn new(
-        stdin: PipeWrite,
-        stdout: PipeRead,
-        options: SftpOptions,
-    ) -> Result<Sftp, Error> {
-        let (write_end, read_end, extensions) = connect_with_auxiliary(
-            stdout,
-            stdin,
-            Auxiliary::new(
-                options.get_max_pending_requests(),
-                options.get_max_buffered_write(),
-            ),
-        )
-        .await?;
-
-        // Create sftp here.
-        //
-        // It would also gracefully shutdown `flush_task` and `read_task` if
-        // the future is cancelled or error is encounted.
-        let sftp = Self {
-            shared_data: SharedData::clone(&write_end),
-
-            flush_task: create_flush_task(
-                SharedData::clone(&write_end),
-                options.get_flush_interval(),
-            ),
-            read_task: create_read_task(read_end),
-        };
-
-        match sftp.set_limits(write_end, options, extensions).await {
-            Err(Error::BackgroundTaskFailure(_)) => {
-                // Wait on flush_task and read_task to get a more detailed error message.
-                sftp.close().await?;
-                std::unreachable!("Error must have occurred in either read_task or flush_task")
-            }
-            res => res?,
-        }
-
-        Ok(sftp)
     }
 
     /// Close sftp connection
@@ -167,67 +165,6 @@ impl Sftp {
         read_task.await??;
 
         Ok(())
-    }
-
-    pub(super) fn write_end(&self) -> WriteEndWithCachedId<'_> {
-        WriteEndWithCachedId::new(self, WriteEnd::new(self.shared_data.clone()))
-    }
-
-    /// Get maximum amount of bytes that one single write requests
-    /// can write.
-    ///
-    /// If [`Sftp::max_buffered_write`] is less than [`MAX_ATOMIC_WRITE_LEN`],
-    /// then the direct write is enabled and [`Sftp::max_write_len`] must be
-    /// less than [`MAX_ATOMIC_WRITE_LEN`].
-    pub fn max_write_len(&self) -> u32 {
-        self.shared_data.get_auxiliary().limits().write_len
-    }
-
-    /// Get maximum amount of bytes that one single read requests
-    /// can read.
-    pub fn max_read_len(&self) -> u32 {
-        self.shared_data.get_auxiliary().limits().read_len
-    }
-
-    /// Get maximum amount of bytes that [`crate::highlevel::File`] and
-    /// [`crate::highlevel::TokioCompactFile`] would write in a buffered manner.
-    pub fn max_buffered_write(&self) -> u32 {
-        self.shared_data.get_auxiliary().max_buffered_write
-    }
-
-    /// Return a new [`OpenOptions`] object.
-    pub fn options(&self) -> OpenOptions<'_> {
-        OpenOptions::new(self)
-    }
-
-    /// Opens a file in write-only mode.
-    ///
-    /// This function will create a file if it does not exist, and will truncate
-    /// it if it does.
-    pub async fn create(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
-        self.options()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .await
-    }
-
-    /// Attempts to open a file in read-only mode.
-    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
-        self.options().read(true).open(path).await
-    }
-
-    /// * `cwd` - The current working dir for the [`Fs`].
-    ///           If `cwd` is empty, then it is set to use
-    ///           the default directory set by the remote
-    ///           `sftp-server`.
-    pub fn fs(&self, cwd: impl Into<PathBuf>) -> Fs<'_> {
-        Fs::new(self.write_end(), cwd.into())
-    }
-
-    pub(super) fn auxiliary(&self) -> &Auxiliary {
-        self.shared_data.get_auxiliary()
     }
 
     /// without doing anything and return `false`.
@@ -266,6 +203,69 @@ impl Sftp {
         Ok(())
     }
 
+    /// Return a new [`OpenOptions`] object.
+    pub fn options(&self) -> OpenOptions<'_, W> {
+        OpenOptions::new(self)
+    }
+
+    /// Opens a file in write-only mode.
+    ///
+    /// This function will create a file if it does not exist, and will truncate
+    /// it if it does.
+    pub async fn create(&self, path: impl AsRef<Path>) -> Result<File<'_, W>, Error> {
+        self.options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .await
+    }
+
+    /// Attempts to open a file in read-only mode.
+    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'_, W>, Error> {
+        self.options().read(true).open(path).await
+    }
+
+    /// * `cwd` - The current working dir for the [`Fs`].
+    ///           If `cwd` is empty, then it is set to use
+    ///           the default directory set by the remote
+    ///           `sftp-server`.
+    pub fn fs(&self, cwd: impl Into<PathBuf>) -> Fs<'_, W> {
+        Fs::new(self.write_end(), cwd.into())
+    }
+}
+
+impl<W> Sftp<W> {
+    pub(super) fn write_end(&self) -> WriteEndWithCachedId<'_, W> {
+        WriteEndWithCachedId::new(self, WriteEnd::new(self.shared_data.clone()))
+    }
+
+    /// Get maximum amount of bytes that one single write requests
+    /// can write.
+    ///
+    /// If [`Sftp::max_buffered_write`] is less than [`max_atomic_write_len`],
+    /// then the direct write is enabled and [`Sftp::max_write_len`] must be
+    /// less than [`max_atomic_write_len`].
+    pub fn max_write_len(&self) -> u32 {
+        self.shared_data.get_auxiliary().limits().write_len
+    }
+
+    /// Get maximum amount of bytes that one single read requests
+    /// can read.
+    pub fn max_read_len(&self) -> u32 {
+        self.shared_data.get_auxiliary().limits().read_len
+    }
+
+    /// Get maximum amount of bytes that [`crate::highlevel::File`] and
+    /// [`crate::highlevel::TokioCompactFile`] would write in a buffered manner.
+    pub fn max_buffered_write(&self) -> u32 {
+        self.shared_data.get_auxiliary().max_buffered_write
+    }
+
+    pub(super) fn auxiliary(&self) -> &Auxiliary {
+        self.shared_data.get_auxiliary()
+    }
+
     /// Trigger flushing in the `flush_task`.
     ///
     /// If there are pending requests, then flushing would happen immediately.
@@ -291,7 +291,7 @@ impl Sftp {
     }
 }
 
-impl Drop for Sftp {
+impl<W> Drop for Sftp<W> {
     fn drop(&mut self) {
         // This will terminate flush_task, otherwise read_task would not return.
         self.shared_data.get_auxiliary().requests_shutdown();

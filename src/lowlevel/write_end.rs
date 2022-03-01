@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
 use super::*;
-use crate::{AtomicWriteIoSlicesTrait, Writer};
+use crate::Writer;
 
 use awaitable_responses::ArenaArc;
 use connection::SharedData;
-use writer_buffered::WriteBuffer;
+use writer_buffered::{AtomicWriteIoSlices, WriteBuffer};
 
 use std::borrow::Cow;
 use std::convert::TryInto;
@@ -674,7 +674,7 @@ impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         .split();
 
         let io_slices = [IoSlice::new(&*header), IoSlice::new(data)];
-        let bufs = W::AtomicWriteIoSlices::new(&io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
+        let bufs = AtomicWriteIoSlices::new(&io_slices)?;
 
         id.0.reset(None);
         self.shared_data
@@ -777,7 +777,7 @@ impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         id: Id<Buffer>,
         io_slices: &[IoSlice<'_>],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let bufs = W::AtomicWriteIoSlices::new(io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
+        let bufs = AtomicWriteIoSlices::new(io_slices)?;
 
         id.0.reset(None);
         self.shared_data
