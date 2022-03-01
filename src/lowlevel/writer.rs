@@ -15,7 +15,6 @@ use openssh_sftp_protocol::ssh_format::SerBacker;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
 use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
-use tokio_io_utility::write_vectored_all;
 use tokio_pipe::{AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
@@ -132,57 +131,6 @@ impl Writer {
     /// This function is cancel safe, but it might cause the data to be partially written.
     pub(crate) async fn write_all(&mut self, buf: &[u8]) -> Result<(), io::Error> {
         self.0.get_mut().write_all(buf).await
-    }
-
-    /// * `bufs` - Accmulated len of all buffers must not be `0`.
-    ///
-    /// Write to pipe without any buffering.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_vectored_all_direct(
-        &self,
-        bufs: &mut [io::IoSlice<'_>],
-    ) -> Result<(), io::Error> {
-        if let Some(bufs) = AtomicWriteIoSlices::new(bufs) {
-            if self.atomic_write_vectored_all(bufs).await? {
-                return Ok(());
-            }
-        }
-
-        write_vectored_all(&mut *self.0.write().await, bufs).await
-    }
-
-    /// * `bufs` - Accmulated len of all buffers must not be `0`.
-    ///
-    /// Write to pipe without any buffering.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_vectored_all_direct_with_header(
-        &self,
-        header: &io::IoSlice<'_>,
-        bufs: &[io::IoSlice<'_>],
-    ) -> Result<(), io::Error> {
-        if bufs.len() <= 29 {
-            let mut io_slices = [IoSlice::new(&[]); 30];
-
-            io_slices[0] = *header;
-            io_slices[1..].iter_mut().zip(bufs).for_each(|(dst, src)| {
-                *dst = *src;
-            });
-
-            self.write_vectored_all_direct(&mut io_slices[..bufs.len() + 1])
-                .await
-        } else {
-            let mut vec = Vec::with_capacity(1 + bufs.len());
-            vec.push(*header);
-            vec.extend_from_slice(bufs);
-
-            self.write_vectored_all_direct(&mut vec).await
-        }
     }
 
     async fn flush_impl(&self, mut buffers: Buffers<'_>) -> Result<(), io::Error> {

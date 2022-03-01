@@ -97,7 +97,7 @@ async fn test_file_desc() {
     let msg = "Hello, world!".as_bytes();
 
     let awaitable = write_end
-        .send_write_request_direct(id, Cow::Borrowed(&handle), 0, msg)
+        .send_write_request_direct_atomic(id, Cow::Borrowed(&handle), 0, msg)
         .await
         .unwrap();
 
@@ -293,21 +293,6 @@ macro_rules! gen_test_write_direct {
         }
     };
 }
-
-gen_test_write_direct!(
-    test_write_direct_vectored,
-    |write_end, id, handle, msg| async move {
-        write_end
-            .send_write_request_direct_vectored(
-                id,
-                handle,
-                0,
-                &[IoSlice::new(&msg[..3]), IoSlice::new(&msg[3..])],
-            )
-            .await
-            .unwrap()
-    }
-);
 
 gen_test_write_direct!(
     test_write_direct_atomic,
