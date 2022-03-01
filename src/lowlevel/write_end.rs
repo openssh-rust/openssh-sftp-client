@@ -1,9 +1,11 @@
 #![forbid(unsafe_code)]
 
 use super::*;
+use crate::{AtomicWriteIoSlicesTrait, Writer};
+
 use awaitable_responses::ArenaArc;
 use connection::SharedData;
-use writer::WriteBuffer;
+use writer_buffered::WriteBuffer;
 
 use std::borrow::Cow;
 use std::convert::TryInto;
@@ -18,25 +20,24 @@ use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::Handle;
-use tokio_pipe::AtomicWriteIoSlices;
 
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
-pub struct WriteEnd<Buffer, Auxiliary = ()> {
+pub struct WriteEnd<W, Buffer, Auxiliary = ()> {
     serializer: Serializer<WriteBuffer>,
-    shared_data: SharedData<Buffer, Auxiliary>,
+    shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
-impl<Buffer, Auxiliary> Clone for WriteEnd<Buffer, Auxiliary> {
+impl<W, Buffer, Auxiliary> Clone for WriteEnd<W, Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+impl<W, Buffer, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     /// Create a [`WriteEnd`] from [`SharedData`].
-    pub fn new(shared_data: SharedData<Buffer, Auxiliary>) -> Self {
+    pub fn new(shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
@@ -44,26 +45,26 @@ impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     }
 
     /// Consume the [`WriteEnd`] and return the stored [`SharedData`].
-    pub fn into_shared_data(self) -> SharedData<Buffer, Auxiliary> {
+    pub fn into_shared_data(self) -> SharedData<W, Buffer, Auxiliary> {
         self.shared_data
     }
 }
 
-impl<Buffer, Auxiliary> Deref for WriteEnd<Buffer, Auxiliary> {
-    type Target = SharedData<Buffer, Auxiliary>;
+impl<W, Buffer, Auxiliary> Deref for WriteEnd<W, Buffer, Auxiliary> {
+    type Target = SharedData<W, Buffer, Auxiliary>;
 
     fn deref(&self) -> &Self::Target {
         &self.shared_data
     }
 }
 
-impl<Buffer, Auxiliary> DerefMut for WriteEnd<Buffer, Auxiliary> {
+impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.shared_data
     }
 }
 
-impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+impl<W: Writer, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .get_mut_writer()
@@ -426,7 +427,9 @@ impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     }
 }
 
-impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
+    WriteEnd<W, Buffer, Auxiliary>
+{
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics
@@ -671,12 +674,12 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         .split();
 
         let io_slices = [IoSlice::new(&*header), IoSlice::new(data)];
-        let bufs = AtomicWriteIoSlices::new(&io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
+        let bufs = W::AtomicWriteIoSlices::new(&io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
 
         id.0.reset(None);
         self.shared_data
             .writer()
-            .write_vectored_all_direct_atomic(bufs)
+            .atomic_write_vectored_all(bufs)
             .await?;
 
         self.shared_data.notify_new_packet_event();
@@ -774,12 +777,12 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         id: Id<Buffer>,
         io_slices: &[IoSlice<'_>],
     ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let bufs = AtomicWriteIoSlices::new(io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
+        let bufs = W::AtomicWriteIoSlices::new(io_slices).ok_or(Error::WriteTooLargeToBeAtomic)?;
 
         id.0.reset(None);
         self.shared_data
             .writer()
-            .write_vectored_all_direct_atomic(bufs)
+            .atomic_write_vectored_all(bufs)
             .await?;
 
         self.shared_data.notify_new_packet_event();

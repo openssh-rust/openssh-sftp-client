@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+use crate::Writer;
+
 use super::awaitable_responses::ArenaArc;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
@@ -20,14 +22,14 @@ use tokio_pipe::{PipeRead, PIPE_BUF};
 
 /// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
-pub struct ReadEnd<Buffer, Auxiliary = ()> {
+pub struct ReadEnd<W, Buffer, Auxiliary = ()> {
     reader: BufReader<PipeRead>,
     buffer: Vec<u8>,
-    shared_data: SharedData<Buffer, Auxiliary>,
+    shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
-impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxiliary> {
-    pub(crate) fn new(reader: PipeRead, shared_data: SharedData<Buffer, Auxiliary>) -> Self {
+impl<W: Writer, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<W, Buffer, Auxiliary> {
+    pub(crate) fn new(reader: PipeRead, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
         Self {
             reader: BufReader::with_capacity(PIPE_BUF, reader),
             buffer: Vec::with_capacity(64),
@@ -281,7 +283,7 @@ impl<Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<Buffer, Auxili
     }
 
     /// Return the [`SharedData`] held by [`ReadEnd`].
-    pub fn get_shared_data(&self) -> &SharedData<Buffer, Auxiliary> {
+    pub fn get_shared_data(&self) -> &SharedData<W, Buffer, Auxiliary> {
         &self.shared_data
     }
 }

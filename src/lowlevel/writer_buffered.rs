@@ -1,11 +1,12 @@
 #![forbid(unsafe_code)]
 
+use crate::{AtomicWriteIoSlicesTrait, Writer};
+
 use std::cmp::max;
 use std::convert::TryInto;
 use std::future::Future;
 use std::io;
 use std::io::IoSlice;
-use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -15,36 +16,35 @@ use openssh_sftp_protocol::ssh_format::SerBacker;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock as RwLockAsync;
 use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
-use tokio_pipe::{AtomicWriteIoSlices, PipeWrite, PIPE_BUF};
 
 const MAX_ATOMIC_ATTEMPT: u16 = 50;
 
 #[derive(Debug)]
-pub(crate) struct Writer(RwLockAsync<PipeWrite>, MpScBytesQueue);
+pub(crate) struct WriterBuffered<W>(RwLockAsync<W>, MpScBytesQueue);
 
-impl Writer {
-    pub(crate) fn new(pipe_write: PipeWrite) -> Self {
+impl<W: Writer> WriterBuffered<W> {
+    pub(crate) fn new(writer: W) -> Self {
         Self(
-            RwLockAsync::new(pipe_write),
-            MpScBytesQueue::new(NonZeroUsize::new(128).unwrap()),
+            RwLockAsync::new(writer),
+            MpScBytesQueue::new(W::io_slices_buffer_len()),
         )
     }
 
     /// Return `Ok(true)` is atomic write succeeds, `Ok(false)` if non-atomic
     /// write is required.
-    async fn atomic_write_vectored_all(
+    pub(crate) async fn atomic_write_vectored_all(
         &self,
-        bufs: AtomicWriteIoSlices<'_, '_>,
+        bufs: W::AtomicWriteIoSlices,
     ) -> Result<bool, io::Error> {
         #[must_use = "futures do nothing unless you `.await` or poll them"]
-        struct AtomicWrite<'a>(&'a PipeWrite, AtomicWriteIoSlices<'a, 'a>, u16, u16);
+        struct AtomicWrite<'a, W: Writer>(&'a W, W::AtomicWriteIoSlices, u16, u16);
 
-        impl Future for AtomicWrite<'_> {
-            type Output = Option<Result<usize, io::Error>>;
+        impl<W: Writer> Future for AtomicWrite<'_, W> {
+            type Output = Result<bool, io::Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 if self.2 >= self.3 {
-                    return Poll::Ready(None);
+                    return Poll::Ready(Ok(false));
                 }
 
                 self.2 += 1;
@@ -52,74 +52,25 @@ impl Writer {
                 let writer = Pin::new(self.0);
                 let input = self.1;
 
-                writer.poll_write_vectored_atomic(cx, input).map(Some)
+                writer.poll_write_vectored_atomic(cx, input).map(|res| {
+                    res?;
+                    Ok(true)
+                })
             }
         }
 
-        let len = bufs.get_total_len();
-
-        if len == 0 {
-            return Ok(true);
-        }
-
-        let ret = AtomicWrite(
+        AtomicWrite(
             &*self.0.read().await,
             bufs,
             0,
             max(
                 // PIPE_BUF is 4096, less than u16::MAX,
                 // so the result of division must also be less than u16::MAX.
-                (PIPE_BUF / len) as u16,
+                (W::MAX_ATOMIC_WRITE_LEN / bufs.get_total_len()) as u16,
                 MAX_ATOMIC_ATTEMPT,
             ),
         )
         .await
-        .transpose()?;
-
-        if let Some(n) = ret {
-            if n == 0 {
-                Err(io::Error::new(io::ErrorKind::WriteZero, ""))
-            } else {
-                debug_assert_eq!(n, len);
-                Ok(true)
-            }
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub(super) async fn write_vectored_all_direct_atomic(
-        &self,
-        bufs: AtomicWriteIoSlices<'_, '_>,
-    ) -> Result<(), io::Error> {
-        #[must_use = "futures do nothing unless you `.await` or poll them"]
-        struct AtomicWrite<'a>(&'a PipeWrite, AtomicWriteIoSlices<'a, 'a>);
-
-        impl Future for AtomicWrite<'_> {
-            type Output = Result<usize, io::Error>;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let writer = Pin::new(self.0);
-                let bufs = self.1;
-
-                writer.poll_write_vectored_atomic(cx, bufs)
-            }
-        }
-
-        let len = bufs.get_total_len();
-
-        if len == 0 {
-            return Ok(());
-        }
-
-        let n = AtomicWrite(&*self.0.read().await, bufs).await?;
-
-        if n == 0 {
-            Err(io::Error::new(io::ErrorKind::WriteZero, ""))
-        } else {
-            debug_assert_eq!(n, len);
-            Ok(())
-        }
     }
 
     /// * `buf` - Must not be empty
@@ -133,38 +84,22 @@ impl Writer {
         self.0.get_mut().write_all(buf).await
     }
 
-    async fn flush_impl(&self, mut buffers: Buffers<'_>) -> Result<(), io::Error> {
-        if buffers.is_empty() {
-            return Ok(());
-        }
+    async fn flush_impl(&self, buffers: Buffers<'_>) -> Result<(), io::Error> {
+        #[must_use = "futures do nothing unless you `.await` or poll them"]
+        struct FlushBufferFuture<'a, W: Writer>(&'a mut W, Buffers<'a>);
 
-        if let Some(bufs) = AtomicWriteIoSlices::new(buffers.get_io_slices()) {
-            let len = bufs.get_total_len();
+        impl<W: Writer> Future for FlushBufferFuture<'_, W> {
+            type Output = Result<(), io::Error>;
 
-            if self.atomic_write_vectored_all(bufs).await? {
-                let res = !buffers.advance(NonZeroUsize::new(len).unwrap());
-                debug_assert!(res);
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let writer = Pin::new(&mut *self.0);
+                let buffers = &mut self.1;
 
-                return Ok(());
+                writer.poll_flush_buffers(cx, buffers)
             }
         }
 
-        // Acquire the mutex to ensure no interleave write
-        let mut guard = self.0.write().await;
-
-        loop {
-            let n = guard.write_vectored(buffers.get_io_slices()).await?;
-
-            // Since `MpScBytesQueue::get_buffers` guarantees that every `IoSlice`
-            // returned must be non-empty, having `0` bytes written is an error
-            // likely caused by the close of the read end.
-            let n =
-                NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
-
-            if !buffers.advance(n) {
-                break Ok(());
-            }
-        }
+        FlushBufferFuture(&mut *self.0.write().await, buffers).await
     }
 
     /// If another thread is flushing, then `Ok(false)` will be returned.

@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
 
 use super::awaitable_responses::AwaitableResponses;
-use super::writer::Writer;
+use super::writer_buffered::WriterBuffered;
 use super::*;
+use crate::Writer;
 
 use std::fmt::Debug;
 use std::io;
@@ -11,14 +12,14 @@ use std::sync::Arc;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use tokio::sync::Notify;
-use tokio_pipe::{PipeRead, PipeWrite};
+use tokio_pipe::PipeRead;
 
 // TODO:
 //  - Support for zero copy syscalls
 
 #[derive(Debug)]
-struct SharedDataInner<Buffer, Auxiliary> {
-    writer: Writer,
+struct SharedDataInner<W, Buffer, Auxiliary> {
+    writer: WriterBuffered<W>,
     responses: AwaitableResponses<Buffer>,
 
     notify: Notify,
@@ -35,15 +36,15 @@ struct SharedDataInner<Buffer, Auxiliary> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<Buffer, Auxiliary = ()>(Arc<SharedDataInner<Buffer, Auxiliary>>);
+pub struct SharedData<W, Buffer, Auxiliary = ()>(Arc<SharedDataInner<W, Buffer, Auxiliary>>);
 
-impl<Buffer, Auxiliary> Clone for SharedData<Buffer, Auxiliary> {
+impl<W, Buffer, Auxiliary> Clone for SharedData<W, Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<Buffer, Auxiliary> Drop for SharedData<Buffer, Auxiliary> {
+impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
     fn drop(&mut self) {
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
@@ -62,8 +63,8 @@ impl<Buffer, Auxiliary> Drop for SharedData<Buffer, Auxiliary> {
     }
 }
 
-impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
-    pub(crate) fn writer(&self) -> &Writer {
+impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+    pub(crate) fn writer(&self) -> &WriterBuffered<W> {
         &self.0.writer
     }
 
@@ -71,7 +72,7 @@ impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
         &self.0.responses
     }
 
-    pub(crate) fn get_mut_writer(&mut self) -> Option<&mut Writer> {
+    pub(crate) fn get_mut_writer(&mut self) -> Option<&mut WriterBuffered<W>> {
         Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.writer)
     }
 
@@ -126,7 +127,7 @@ impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
     }
 }
 
-impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
+impl<W, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// Create a useable response id.
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
@@ -144,7 +145,9 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
     pub fn reserve_id(&self, new_id_cnt: u32) {
         self.responses().reserve(new_id_cnt);
     }
+}
 
+impl<W: Writer, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// Flush the write buffer.
     ///
     /// If another thread is flushing, then `Ok(false)` will be returned.
@@ -197,10 +200,10 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<Buffer: ToBuffer + Send + Sync + 'static>(
+pub async fn connect<W: Writer, Buffer: ToBuffer + Send + Sync + 'static>(
     reader: PipeRead,
-    writer: PipeWrite,
-) -> Result<(WriteEnd<Buffer>, ReadEnd<Buffer>, Extensions), Error> {
+    writer: W,
+) -> Result<(WriteEnd<W, Buffer>, ReadEnd<W, Buffer>, Extensions), Error> {
     connect_with_auxiliary(reader, writer, ()).await
 }
 
@@ -212,20 +215,24 @@ pub async fn connect<Buffer: ToBuffer + Send + Sync + 'static>(
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect_with_auxiliary<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>(
+pub async fn connect_with_auxiliary<
+    W: Writer,
+    Buffer: ToBuffer + Send + Sync + 'static,
+    Auxiliary,
+>(
     reader: PipeRead,
-    writer: PipeWrite,
+    writer: W,
     auxiliary: Auxiliary,
 ) -> Result<
     (
-        WriteEnd<Buffer, Auxiliary>,
-        ReadEnd<Buffer, Auxiliary>,
+        WriteEnd<W, Buffer, Auxiliary>,
+        ReadEnd<W, Buffer, Auxiliary>,
         Extensions,
     ),
     Error,
 > {
     let shared_data = SharedData(Arc::new(SharedDataInner {
-        writer: Writer::new(writer),
+        writer: WriterBuffered::new(writer),
         responses: AwaitableResponses::new(),
         notify: Notify::new(),
         requests_sent: AtomicU32::new(0),

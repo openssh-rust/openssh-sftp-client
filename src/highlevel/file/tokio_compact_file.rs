@@ -2,6 +2,7 @@ use super::super::{BoxedWaitForCancellationFuture, Buffer, Data};
 use super::lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle};
 use super::utility::take_io_slices;
 use super::{Error, File, Id, WriteEnd, MAX_ATOMIC_WRITE_LEN};
+use crate::utility::ready;
 
 use std::borrow::Cow;
 use std::cmp::{max, min};
@@ -25,15 +26,6 @@ pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(40
 /// The default maximum length of the buffer that can be created in
 /// [`AsyncRead`] implementation of [`TokioCompactFile`].
 pub const DEFAULT_MAX_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096 * 10) };
-
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            Poll::Ready(t) => t,
-            Poll::Pending => return Poll::Pending,
-        }
-    };
-}
 
 fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     match sftp_err {
