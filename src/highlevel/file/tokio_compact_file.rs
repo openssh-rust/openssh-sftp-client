@@ -2,7 +2,6 @@ use super::super::{BoxedWaitForCancellationFuture, Buffer, Data};
 use super::lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle};
 use super::utility::take_io_slices;
 use super::{max_atomic_write_len, Error, File, Id, WriteEnd, Writer};
-use crate::utility::ready;
 
 use std::borrow::Cow;
 use std::cmp::{max, min};
@@ -17,6 +16,7 @@ use std::task::{Context, Poll};
 
 use bytes::{Buf, Bytes, BytesMut};
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+use tokio_io_utility::ready;
 
 use derive_destructure2::destructure;
 

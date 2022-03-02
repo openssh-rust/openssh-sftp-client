@@ -1,14 +1,12 @@
 #![forbid(unsafe_code)]
 
-use crate::utility::ready;
-
 use std::io::{self, IoSlice};
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use tokio::io::AsyncWrite;
-use tokio_io_utility::queue::Buffers;
+use tokio_io_utility::{queue::Buffers, ready};
 
 /// trait for Writer that can be used as output for sftp client.
 pub trait Writer: AsyncWrite + Unpin {
