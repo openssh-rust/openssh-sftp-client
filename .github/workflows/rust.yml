@@ -29,6 +29,8 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: actions/checkout@v2
+      - name: Rm openssh-portable to avoid building it
+        run: rm -r openssh-portable
       - name: cargo check
         uses: actions-rs/cargo@v1
         with:
