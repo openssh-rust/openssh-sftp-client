@@ -13,7 +13,7 @@ pub mod unreleased {}
 ///
 /// ## Changed
 ///  - Replace all use of [`tokio_pipe::PipeRead`] with generic bound
-///    [`AsyncRead`] + [`Unpin`].
+///    [`tokio::io::AsyncRead`] + [`Unpin`].
 ///  - Replace all use of [`tokio_pipe::PipeWrite`] with generic bound
 ///    [`Writer`].
 ///  - Replace constant `highlevel::MAX_ATOMIC_WRITE_LEN` with
@@ -26,7 +26,7 @@ pub mod unreleased {}
 ///    [`highlevel::FileType`].
 ///  - Trait [`std::os::unix::fs::PermissionsExt`] implementation for
 ///    [`highlevel::Permissions`].
-///  - Associated function [`lowlevel::WriteEnd::send_write_request_direct`]
+///  - Associated function `lowlevel::WriteEnd::send_write_request_direct`.
 ///  - Associated function
-///    [`lowlevel::WriteEnd::send_write_request_direct_vectored`]
+///    `lowlevel::WriteEnd::send_write_request_direct_vectored`.
 pub mod v0_8_0 {}
