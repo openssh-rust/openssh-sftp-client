@@ -18,6 +18,10 @@ type AwaitableAttrs = lowlevel::AwaitableAttrs<Buffer>;
 type SendLinkingRequest<W> =
     fn(&mut WriteEnd<W>, Id, Cow<'_, Path>, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
 
+type SendRmRequest<W> = fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
+type SendMetadataRequest<W> =
+    fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableAttrs, Error>;
+
 /// A struct used to perform operations on remote filesystem.
 #[derive(Debug, Clone)]
 pub struct Fs<'s, W> {
@@ -93,11 +97,7 @@ impl<'s, W: Writer> Fs<'s, W> {
         self.dir_builder().create(path).await
     }
 
-    async fn remove_impl(
-        &mut self,
-        path: &Path,
-        f: fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableStatus, Error>,
-    ) -> Result<(), Error> {
+    async fn remove_impl(&mut self, path: &Path, f: SendRmRequest<W>) -> Result<(), Error> {
         let path = self.concat_path_if_needed(path);
 
         self.write_end
@@ -259,7 +259,7 @@ impl<'s, W: Writer> Fs<'s, W> {
     async fn metadata_impl(
         &mut self,
         path: &Path,
-        f: fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableAttrs, Error>,
+        f: SendMetadataRequest<W>,
     ) -> Result<MetaData, Error> {
         let path = self.concat_path_if_needed(path);
 
