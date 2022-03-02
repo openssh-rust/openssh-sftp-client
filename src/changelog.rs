@@ -4,6 +4,10 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// ## Fixed
+///  - Fix possible panic in [`highlevel::max_atomic_write_len`]
+pub mod v0_8_2 {}
+
 /// ## Added
 ///  - Reexport [`highlevel::CancellationToken`].
 pub mod v0_8_1 {}
