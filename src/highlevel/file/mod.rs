@@ -27,7 +27,7 @@ use utility::{take_bytes, take_io_slices};
 pub fn max_atomic_write_len<W: Writer>() -> u32 {
     (W::MAX_ATOMIC_WRITE_LEN - 9 - 4 - 256 - 8 - 4)
         .try_into()
-        .unwrap()
+        .unwrap_or(u32::MAX)
 }
 
 /// Options and flags which can be used to configure how a file is opened.
