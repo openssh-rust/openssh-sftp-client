@@ -21,6 +21,7 @@ mod awaitables;
 mod buffer;
 mod connection;
 mod read_end;
+mod reader_buffered;
 mod write_end;
 mod writer_buffered;
 

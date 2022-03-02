@@ -5,6 +5,7 @@ use crate::Writer;
 use super::awaitable_responses::ArenaArc;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
+use super::reader_buffered::ReaderBuffered;
 use super::Error;
 use super::Extensions;
 use super::ToBuffer;
@@ -13,17 +14,16 @@ use std::fmt::Debug;
 use std::io;
 
 use openssh_sftp_protocol::response::{self, ServerVersion};
-use openssh_sftp_protocol::serde::Deserialize;
+use openssh_sftp_protocol::serde::de::DeserializeOwned;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
+use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 
 /// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
 pub struct ReadEnd<R, W, Buffer, Auxiliary = ()> {
-    reader: BufReader<R>,
-    buffer: Vec<u8>,
+    reader: ReaderBuffered<R>,
     shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
@@ -32,8 +32,7 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
 {
     pub(crate) fn new(reader: R, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
         Self {
-            reader: BufReader::with_capacity(4096, reader),
-            buffer: Vec::with_capacity(64),
+            reader: ReaderBuffered::new(reader),
             shared_data,
         }
     }
@@ -48,8 +47,8 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
             return Err(Error::SftpServerHelloMsgTooLong { len });
         }
 
-        self.read_exact(len as usize).await?;
-        let server_version = ServerVersion::deserialize(&self.buffer)?;
+        let drain = self.reader.read_exact_into_buffer(len as usize).await?;
+        let server_version = ServerVersion::deserialize(&*drain)?;
 
         if server_version.version != version {
             Err(Error::UnsupportedSftpProtocol {
@@ -60,24 +59,9 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
         }
     }
 
-    async fn read_exact(&mut self, size: usize) -> Result<(), Error> {
-        self.buffer.clear();
-        read_exact_to_vec(&mut self.reader, &mut self.buffer, size).await?;
-
-        Ok(())
-    }
-
-    fn deserialize<'a, T: Deserialize<'a>>(&'a self) -> Result<T, Error> {
-        // Ignore any trailing bytes to be forward compatible
-        Ok(from_bytes(&self.buffer)?.0)
-    }
-
-    async fn read_and_deserialize<'a, T>(&'a mut self, size: usize) -> Result<T, Error>
-    where
-        T: Deserialize<'a>,
-    {
-        self.read_exact(size).await?;
-        self.deserialize()
+    async fn read_and_deserialize<T: DeserializeOwned>(&mut self, size: usize) -> Result<T, Error> {
+        let drain = self.reader.read_exact_into_buffer(size).await?;
+        Ok(from_bytes(&*drain)?.0)
     }
 
     async fn consume_packet(&mut self, len: u32, err: Error) -> Result<(), Error> {
@@ -113,7 +97,7 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
         buffer: Option<Buffer>,
     ) -> Result<Response<Buffer>, Error> {
         // Since the data is sent as a string, we need to consume the 4-byte length first.
-        self.reader.read_exact(&mut [0; 4]).await?;
+        self.reader.read_exact_into_buffer(4).await?;
 
         let len = (len - 4) as usize;
 
@@ -141,15 +125,9 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
         }
     }
 
-    /// * `len` - excludes packet_type and request_id.
+    /// * `len` - includes packet_type and request_id.
     async fn read_in_packet(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
-        // Remove the len
-        self.buffer.drain(0..4);
-
-        // read_exact_to_vec does not overwrite any existing data.
-        read_exact_to_vec(&mut self.reader, &mut self.buffer, len as usize).await?;
-
-        let response: response::Response = self.deserialize()?;
+        let response: response::Response = self.read_and_deserialize(len as usize).await?;
 
         Ok(Response::Header(response.response_inner))
     }
@@ -195,7 +173,8 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
     /// Dropping the future might cause the response packet to be partially read,
     /// and the next read would treat the partial response as a new response.
     pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
-        let (len, packet_type, response_id): (u32, u8, u32) = self.read_and_deserialize(9).await?;
+        let drain = self.reader.read_exact_into_buffer(9).await?;
+        let (len, packet_type, response_id): (u32, u8, u32) = from_bytes(&*drain)?.0;
 
         let len = len - 5;
 
@@ -204,6 +183,8 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
 
             // Invalid response_id
             Err(err) => {
+                drop(drain);
+
                 // Consume the invalid data to return self to a valid state
                 // where read_in_one_packet can be called again.
                 return self.consume_packet(len, err).await;
@@ -211,6 +192,8 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
         };
 
         let response = if response::Response::is_data(packet_type) {
+            drop(drain);
+
             let buffer = match callback.take_input() {
                 Ok(buffer) => buffer,
                 Err(err) => {
@@ -221,9 +204,15 @@ impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, 
             };
             self.read_in_data_packet(len, buffer).await?
         } else if response::Response::is_extended_reply(packet_type) {
+            drop(drain);
+
             self.read_in_extended_reply(len).await?
         } else {
-            self.read_in_packet(len).await?
+            // Consumes 4 bytes and put back the rest, since
+            // read_in_packet needs the packet_type and response_id.
+            drain.subdrain(4);
+
+            self.read_in_packet(len + 5).await?
         };
 
         let res = callback.done(response);
