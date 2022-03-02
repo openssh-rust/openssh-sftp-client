@@ -57,7 +57,7 @@ pub use metadata::{FileType, MetaData, MetaDataBuilder, Permissions};
 type Buffer = BytesMut;
 
 type WriteEnd<W> = lowlevel::WriteEnd<W, Buffer, Auxiliary>;
-type ReadEnd<W> = lowlevel::ReadEnd<W, Buffer, Auxiliary>;
+type ReadEnd<R, W> = lowlevel::ReadEnd<R, W, Buffer, Auxiliary>;
 type SharedData<W> = lowlevel::SharedData<W, Buffer, Auxiliary>;
 type Id = lowlevel::Id<Buffer>;
 type Data = lowlevel::Data<Buffer>;

@@ -2,6 +2,7 @@ use super::{Error, ReadEnd, SharedData, Writer};
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use tokio::io::AsyncRead;
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
@@ -70,8 +71,11 @@ pub(super) fn create_flush_task<W: Writer + Send + Sync + 'static>(
     })
 }
 
-pub(super) fn create_read_task<W: Writer + Send + Sync + 'static>(
-    mut read_end: ReadEnd<W>,
+pub(super) fn create_read_task<
+    R: AsyncRead + Unpin + Send + Sync + 'static,
+    W: Writer + Send + Sync + 'static,
+>(
+    mut read_end: ReadEnd<R, W>,
 ) -> JoinHandle<Result<(), Error>> {
     spawn(async move {
         let cancel_guard = read_end

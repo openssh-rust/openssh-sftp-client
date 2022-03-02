@@ -14,8 +14,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
 use derive_destructure2::destructure;
+use tokio::io::AsyncRead;
 use tokio::task::JoinHandle;
-use tokio_pipe::PipeRead;
 use tokio_util::sync::CancellationToken;
 
 /// A file-oriented channel to a remote host.
@@ -28,7 +28,11 @@ pub struct Sftp<W> {
 
 impl<W: Writer + Send + Sync + 'static> Sftp<W> {
     /// Create [`Sftp`].
-    pub async fn new(stdin: W, stdout: PipeRead, options: SftpOptions) -> Result<Self, Error> {
+    pub async fn new<R: AsyncRead + Unpin + Send + Sync + 'static>(
+        stdin: W,
+        stdout: R,
+        options: SftpOptions,
+    ) -> Result<Self, Error> {
         let (write_end, read_end, extensions) = connect_with_auxiliary(
             stdout,
             stdin,

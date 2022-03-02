@@ -16,22 +16,23 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::Deserialize;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
-use tokio_pipe::{PipeRead, PIPE_BUF};
 
 /// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
-pub struct ReadEnd<W, Buffer, Auxiliary = ()> {
-    reader: BufReader<PipeRead>,
+pub struct ReadEnd<R, W, Buffer, Auxiliary = ()> {
+    reader: BufReader<R>,
     buffer: Vec<u8>,
     shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
-impl<W: Writer, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<W, Buffer, Auxiliary> {
-    pub(crate) fn new(reader: PipeRead, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
+impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+    ReadEnd<R, W, Buffer, Auxiliary>
+{
+    pub(crate) fn new(reader: R, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
         Self {
-            reader: BufReader::with_capacity(PIPE_BUF, reader),
+            reader: BufReader::with_capacity(4096, reader),
             buffer: Vec::with_capacity(64),
             shared_data,
         }
@@ -249,22 +250,6 @@ impl<W: Writer, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<W, 
         Ok(res?)
     }
 
-    /// Return number of requests sent (including requests that are still in the write
-    /// buffer and not yet flushed) and number of responses to read in.
-    /// **Read 0 if the connection is closed.**
-    ///
-    /// You must call this function in a loop, break if this function returns
-    /// 0, otherwise call [`ReadEnd::read_in_one_packet`] for `n` times where `n` in the
-    /// return value of this function, then repeat.
-    ///
-    /// # Cancel Safety
-    ///
-    /// It is perfectly safe to cancel this future.
-    #[inline(always)]
-    pub async fn wait_for_new_request(&self) -> u32 {
-        self.shared_data.wait_for_new_request().await
-    }
-
     /// Wait for next packet to be readable.
     ///
     /// Return `Ok(())` if next packet is ready and readable, `Error::IOError(io_error)`
@@ -280,6 +265,24 @@ impl<W: Writer, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary> ReadEnd<W, 
         } else {
             Ok(())
         }
+    }
+}
+
+impl<R, W, Buffer, Auxiliary> ReadEnd<R, W, Buffer, Auxiliary> {
+    /// Return number of requests sent (including requests that are still in the write
+    /// buffer and not yet flushed) and number of responses to read in.
+    /// **Read 0 if the connection is closed.**
+    ///
+    /// You must call this function in a loop, break if this function returns
+    /// 0, otherwise call [`ReadEnd::read_in_one_packet`] for `n` times where `n` in the
+    /// return value of this function, then repeat.
+    ///
+    /// # Cancel Safety
+    ///
+    /// It is perfectly safe to cancel this future.
+    #[inline(always)]
+    pub async fn wait_for_new_request(&self) -> u32 {
+        self.shared_data.wait_for_new_request().await
     }
 
     /// Return the [`SharedData`] held by [`ReadEnd`].

@@ -11,8 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
+use tokio::io::AsyncRead;
 use tokio::sync::Notify;
-use tokio_pipe::PipeRead;
 
 // TODO:
 //  - Support for zero copy syscalls
@@ -200,10 +200,10 @@ impl<W: Writer, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary>
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<W: Writer, Buffer: ToBuffer + Send + Sync + 'static>(
-    reader: PipeRead,
+pub async fn connect<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + Send + Sync + 'static>(
+    reader: R,
     writer: W,
-) -> Result<(WriteEnd<W, Buffer>, ReadEnd<W, Buffer>, Extensions), Error> {
+) -> Result<(WriteEnd<W, Buffer>, ReadEnd<R, W, Buffer>, Extensions), Error> {
     connect_with_auxiliary(reader, writer, ()).await
 }
 
@@ -216,17 +216,18 @@ pub async fn connect<W: Writer, Buffer: ToBuffer + Send + Sync + 'static>(
 ///
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect_with_auxiliary<
+    R: AsyncRead + Unpin,
     W: Writer,
     Buffer: ToBuffer + Send + Sync + 'static,
     Auxiliary,
 >(
-    reader: PipeRead,
+    reader: R,
     writer: W,
     auxiliary: Auxiliary,
 ) -> Result<
     (
         WriteEnd<W, Buffer, Auxiliary>,
-        ReadEnd<W, Buffer, Auxiliary>,
+        ReadEnd<R, W, Buffer, Auxiliary>,
         Extensions,
     ),
     Error,

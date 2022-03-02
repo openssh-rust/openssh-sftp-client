@@ -13,14 +13,14 @@ use std::os::unix::fs::symlink;
 use std::path;
 
 use tokio::process;
-use tokio_pipe::PipeWrite;
+use tokio_pipe::{PipeRead, PipeWrite};
 
 use bytes::Bytes;
 use tempfile::{Builder, TempDir};
 
 type Id = lowlevel::Id<Vec<u8>>;
 type WriteEnd = lowlevel::WriteEnd<PipeWrite, Vec<u8>>;
-type ReadEnd = lowlevel::ReadEnd<PipeWrite, Vec<u8>>;
+type ReadEnd = lowlevel::ReadEnd<PipeRead, PipeWrite, Vec<u8>>;
 
 fn assert_not_found(err: io::Error) {
     assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
