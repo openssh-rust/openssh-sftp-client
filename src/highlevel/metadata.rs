@@ -269,17 +269,4 @@ impl Permissions {
         self.set_write_by_group(writable);
         self.set_write_by_other(writable);
     }
-
-    /// Returns the underlying raw mode bits.
-    pub fn mode(&self) -> u32 {
-        self.0.bits()
-    }
-
-    pub fn set_mode(&mut self, mode: u32) {
-        self.0 = SftpPermissions::from_bits_truncate(mode);
-    }
-
-    pub fn from_mode(mode: u32) -> Self {
-        Self(SftpPermissions::from_bits_truncate(mode))
-    }
 }
