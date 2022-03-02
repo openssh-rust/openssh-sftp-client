@@ -22,7 +22,7 @@ mod buffer;
 mod connection;
 mod read_end;
 mod write_end;
-mod writer;
+mod writer_buffered;
 
 /// Default size of buffer for up/download in openssh-portable
 pub const OPENSSH_PORTABLE_DEFAULT_COPY_BUFLEN: usize = 32768;

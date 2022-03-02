@@ -1,6 +1,7 @@
 use super::lowlevel::{self, CreateFlags, Data, FileAttrs, Handle};
 use super::{
     Auxiliary, Error, Id, MetaData, MetaDataBuilder, OwnedHandle, Permissions, Sftp, WriteEnd,
+    Writer,
 };
 
 use std::borrow::Cow;
@@ -15,7 +16,6 @@ use std::task::{Context, Poll};
 use bytes::{Buf, Bytes, BytesMut};
 use tokio::io::AsyncSeek;
 use tokio_io_utility::IoSliceExt;
-use tokio_pipe::PIPE_BUF;
 
 mod tokio_compact_file;
 pub use tokio_compact_file::{TokioCompactFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN};
@@ -23,27 +23,25 @@ pub use tokio_compact_file::{TokioCompactFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLE
 mod utility;
 use utility::{take_bytes, take_io_slices};
 
-const _ASSERTION: [(); 0 - !{
-    // If `MAX_ATOMIC_WRITE_LEN` == `u32::MAX`, then it ust have overflowed.
-    const ASSERT: bool = MAX_ATOMIC_WRITE_LEN != u32::MAX;
-    ASSERT
-} as usize] = [];
-
 /// Maximum amount of data that can writen atomically.
-pub const MAX_ATOMIC_WRITE_LEN: u32 = (PIPE_BUF - 9 - 4 - 256 - 8 - 4) as u32;
+pub fn max_atomic_write_len<W: Writer>() -> u32 {
+    (W::MAX_ATOMIC_WRITE_LEN - 9 - 4 - 256 - 8 - 4)
+        .try_into()
+        .unwrap()
+}
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Debug, Copy, Clone)]
-pub struct OpenOptions<'s> {
-    sftp: &'s Sftp,
+pub struct OpenOptions<'s, W> {
+    sftp: &'s Sftp<W>,
     options: lowlevel::OpenOptions,
     truncate: bool,
     create: bool,
     create_new: bool,
 }
 
-impl<'s> OpenOptions<'s> {
-    pub(super) fn new(sftp: &'s Sftp) -> Self {
+impl<'s, W> OpenOptions<'s, W> {
+    pub(super) fn new(sftp: &'s Sftp<W>) -> Self {
         Self {
             sftp,
             options: lowlevel::OpenOptions::new(),
@@ -129,8 +127,10 @@ impl<'s> OpenOptions<'s> {
         self.create_new = create_new;
         self
     }
+}
 
-    async fn open_impl(&self, path: &Path) -> Result<File<'s>, Error> {
+impl<'s, W: Writer> OpenOptions<'s, W> {
+    async fn open_impl(&self, path: &Path) -> Result<File<'s, W>, Error> {
         let filename = Cow::Borrowed(path);
 
         let params = if self.create || self.create_new {
@@ -166,7 +166,7 @@ impl<'s> OpenOptions<'s> {
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
-    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'s>, Error> {
+    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'s, W>, Error> {
         self.open_impl(path.as_ref()).await
     }
 }
@@ -179,9 +179,9 @@ impl<'s> OpenOptions<'s> {
 ///
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
 /// [`tokio::io::AsyncWrite`], checkout [`TokioCompactFile`].
-#[derive(Debug, Clone)]
-pub struct File<'s> {
-    inner: OwnedHandle<'s>,
+#[derive(Debug)]
+pub struct File<'s, W: Writer> {
+    inner: OwnedHandle<'s, W>,
 
     is_readable: bool,
     is_writable: bool,
@@ -189,12 +189,24 @@ pub struct File<'s> {
     offset: u64,
 }
 
-impl<'s> File<'s> {
+impl<'s, W: Writer> Clone for File<'s, W> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            is_writable: self.is_writable,
+            is_readable: self.is_readable,
+            need_flush: false,
+            offset: self.offset,
+        }
+    }
+}
+
+impl<'s, W: Writer> File<'s, W> {
     fn get_auxiliary(&self) -> &'s Auxiliary {
         self.inner.get_auxiliary()
     }
 
-    fn get_inner(&mut self) -> (&mut WriteEnd, Cow<'_, Handle>) {
+    fn get_inner(&mut self) -> (&mut WriteEnd<W>, Cow<'_, Handle>) {
         (&mut self.inner.write_end, Cow::Borrowed(&self.inner.handle))
     }
 
@@ -218,7 +230,7 @@ impl<'s> File<'s> {
 
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd<W>, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         if !self.is_writable {
@@ -230,7 +242,7 @@ impl<'s> File<'s> {
 
     async fn send_readable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd<W>, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         if !self.is_readable {
@@ -251,7 +263,7 @@ impl<'s> File<'s> {
     }
 
     /// Return the underlying sftp.
-    pub fn sftp(&self) -> &'s Sftp {
+    pub fn sftp(&self) -> &'s Sftp<W> {
         self.inner.write_end.sftp()
     }
 
@@ -376,9 +388,9 @@ impl<'s> File<'s> {
 
         let max_buffered_write = self.max_buffered_write();
 
-        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // If max_buffered_write is larger than or equal to max_atomic_write_len,
         // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
 
         let n: u32 = buf
             .len()
@@ -427,9 +439,9 @@ impl<'s> File<'s> {
 
         let max_buffered_write = self.max_buffered_write();
 
-        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // If max_buffered_write is larger than or equal to max_atomic_write_len,
         // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
 
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
@@ -622,7 +634,7 @@ impl<'s> File<'s> {
     }
 }
 
-impl AsyncSeek for File<'_> {
+impl<W: Writer> AsyncSeek for File<'_, W> {
     /// start_seek only adjust local offset since sftp protocol
     /// does not provides a seek function.
     ///

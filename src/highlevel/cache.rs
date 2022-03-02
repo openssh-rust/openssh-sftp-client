@@ -1,12 +1,12 @@
-use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd};
+use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd, Writer};
 
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
-pub(super) struct WriteEndWithCachedId<'s> {
-    sftp: &'s Sftp,
-    inner: WriteEnd,
+pub(super) struct WriteEndWithCachedId<'s, W> {
+    sftp: &'s Sftp<W>,
+    inner: WriteEnd<W>,
     id: Option<Id>,
     /// WaitForCancellationFuture adds itself as an entry to the internal
     /// linked list of CancellationToken when `poll`ed.
@@ -25,7 +25,7 @@ pub(super) struct WriteEndWithCachedId<'s> {
     wait_for_cancell_future: BoxedWaitForCancellationFuture<'s>,
 }
 
-impl Clone for WriteEndWithCachedId<'_> {
+impl<W> Clone for WriteEndWithCachedId<'_, W> {
     fn clone(&self) -> Self {
         Self {
             sftp: self.sftp,
@@ -36,22 +36,22 @@ impl Clone for WriteEndWithCachedId<'_> {
     }
 }
 
-impl Deref for WriteEndWithCachedId<'_> {
-    type Target = WriteEnd;
+impl<W> Deref for WriteEndWithCachedId<'_, W> {
+    type Target = WriteEnd<W>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl DerefMut for WriteEndWithCachedId<'_> {
+impl<W> DerefMut for WriteEndWithCachedId<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<'s> WriteEndWithCachedId<'s> {
-    pub(super) fn new(sftp: &'s Sftp, inner: WriteEnd) -> Self {
+impl<'s, W> WriteEndWithCachedId<'s, W> {
+    pub(super) fn new(sftp: &'s Sftp<W>, inner: WriteEnd<W>) -> Self {
         Self {
             sftp,
             inner,
@@ -91,9 +91,19 @@ impl<'s> WriteEndWithCachedId<'s> {
         }
     }
 
+    pub(super) fn get_auxiliary(&self) -> &'s Auxiliary {
+        self.sftp.auxiliary()
+    }
+
+    pub(super) fn sftp(&self) -> &'s Sftp<W> {
+        self.sftp
+    }
+}
+
+impl<'s, W: Writer> WriteEndWithCachedId<'s, W> {
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd<W>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         let id = self.get_id_mut();
@@ -110,13 +120,5 @@ impl<'s> WriteEndWithCachedId<'s> {
         self.cache_id_mut(id);
 
         Ok(ret)
-    }
-
-    pub(super) fn get_auxiliary(&self) -> &'s Auxiliary {
-        self.sftp.auxiliary()
-    }
-
-    pub(super) fn sftp(&self) -> &'s Sftp {
-        self.sftp
     }
 }

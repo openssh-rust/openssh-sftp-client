@@ -1,7 +1,8 @@
 use super::super::{BoxedWaitForCancellationFuture, Buffer, Data};
 use super::lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle};
 use super::utility::take_io_slices;
-use super::{Error, File, Id, WriteEnd, MAX_ATOMIC_WRITE_LEN};
+use super::{max_atomic_write_len, Error, File, Id, WriteEnd, Writer};
+use crate::utility::ready;
 
 use std::borrow::Cow;
 use std::cmp::{max, min};
@@ -26,15 +27,6 @@ pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(40
 /// [`AsyncRead`] implementation of [`TokioCompactFile`].
 pub const DEFAULT_MAX_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096 * 10) };
 
-macro_rules! ready {
-    ($e:expr) => {
-        match $e {
-            Poll::Ready(t) => t,
-            Poll::Pending => return Poll::Pending,
-        }
-    };
-}
-
 fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     match sftp_err {
         Error::IOError(io_error) => io_error,
@@ -42,9 +34,9 @@ fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     }
 }
 
-fn send_request<Func, R>(file: &mut File<'_>, f: Func) -> Result<R, Error>
+fn send_request<Func, R, W: Writer>(file: &mut File<'_, W>, f: Func) -> Result<R, Error>
 where
-    Func: FnOnce(&mut WriteEnd, Id, Cow<'_, Handle>, u64) -> Result<R, Error>,
+    Func: FnOnce(&mut WriteEnd<W>, Id, Cow<'_, Handle>, u64) -> Result<R, Error>,
 {
     // Get id and offset to avoid reference to file.
     let id = file.inner.get_id_mut();
@@ -66,8 +58,8 @@ where
 /// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
-pub struct TokioCompactFile<'s> {
-    inner: File<'s>,
+pub struct TokioCompactFile<'s, W: Writer> {
+    inner: File<'s, W>,
 
     buffer_len: NonZeroUsize,
     max_buffer_len: NonZeroUsize,
@@ -80,9 +72,9 @@ pub struct TokioCompactFile<'s> {
     write_cancellation_future: BoxedWaitForCancellationFuture<'s>,
 }
 
-impl<'s> TokioCompactFile<'s> {
+impl<'s, W: Writer> TokioCompactFile<'s, W> {
     /// Create a [`TokioCompactFile`].
-    pub fn new(inner: File<'s>) -> Self {
+    pub fn new(inner: File<'s, W>) -> Self {
         Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
     }
 
@@ -95,7 +87,7 @@ impl<'s> TokioCompactFile<'s> {
     /// If `max_buffer_len` is less than `buffer_len`, then it will be set to
     /// `buffer_len`.
     pub fn with_capacity(
-        inner: File<'s>,
+        inner: File<'s, W>,
         buffer_len: NonZeroUsize,
         mut max_buffer_len: NonZeroUsize,
     ) -> Self {
@@ -119,7 +111,7 @@ impl<'s> TokioCompactFile<'s> {
     }
 
     /// Return the inner [`File`].
-    pub fn into_inner(self) -> File<'s> {
+    pub fn into_inner(self) -> File<'s, W> {
         self.destructure().0
     }
 
@@ -294,9 +286,9 @@ impl<'s> TokioCompactFile<'s> {
     /// This function does not change the offset into the file.
     pub async fn read_into_buffer(&mut self, amt: NonZeroU32) -> Result<(), Error> {
         #[must_use]
-        struct ReadIntoBuffer<'a, 's>(&'a mut TokioCompactFile<'s>, NonZeroU32);
+        struct ReadIntoBuffer<'a, 's, W: Writer>(&'a mut TokioCompactFile<'s, W>, NonZeroU32);
 
-        impl Future for ReadIntoBuffer<'_, '_> {
+        impl<W: Writer> Future for ReadIntoBuffer<'_, '_, W> {
             type Output = Result<(), Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -309,14 +301,14 @@ impl<'s> TokioCompactFile<'s> {
     }
 }
 
-impl<'s> From<File<'s>> for TokioCompactFile<'s> {
-    fn from(inner: File<'s>) -> Self {
+impl<'s, W: Writer> From<File<'s, W>> for TokioCompactFile<'s, W> {
+    fn from(inner: File<'s, W>) -> Self {
         Self::new(inner)
     }
 }
 
-impl<'s> From<TokioCompactFile<'s>> for File<'s> {
-    fn from(file: TokioCompactFile<'s>) -> Self {
+impl<'s, W: Writer> From<TokioCompactFile<'s, W>> for File<'s, W> {
+    fn from(file: TokioCompactFile<'s, W>) -> Self {
         file.into_inner()
     }
 }
@@ -325,29 +317,27 @@ impl<'s> From<TokioCompactFile<'s>> for File<'s> {
 /// same underlying file handle as the existing File instance.
 ///
 /// Reads, writes, and seeks can be performed independently.
-impl Clone for TokioCompactFile<'_> {
+impl<W: Writer> Clone for TokioCompactFile<'_, W> {
     fn clone(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.need_flush = false;
-        Self::with_capacity(inner, self.buffer_len, self.max_buffer_len)
+        Self::with_capacity(self.inner.clone(), self.buffer_len, self.max_buffer_len)
     }
 }
 
-impl<'s> Deref for TokioCompactFile<'s> {
-    type Target = File<'s>;
+impl<'s, W: Writer> Deref for TokioCompactFile<'s, W> {
+    type Target = File<'s, W>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl DerefMut for TokioCompactFile<'_> {
+impl<W: Writer> DerefMut for TokioCompactFile<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl AsyncSeek for TokioCompactFile<'_> {
+impl<W: Writer> AsyncSeek for TokioCompactFile<'_, W> {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         let prev_offset = self.offset();
         Pin::new(&mut self.inner).start_seek(position)?;
@@ -375,7 +365,7 @@ impl AsyncSeek for TokioCompactFile<'_> {
     }
 }
 
-impl AsyncBufRead for TokioCompactFile<'_> {
+impl<W: Writer> AsyncBufRead for TokioCompactFile<'_, W> {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         if self.buffer.is_empty() {
             let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
@@ -399,7 +389,7 @@ impl AsyncBufRead for TokioCompactFile<'_> {
 
 /// [`TokioCompactFile`] can read in at most [`File::max_read_len`] bytes
 /// at a time.
-impl AsyncRead for TokioCompactFile<'_> {
+impl<W: Writer> AsyncRead for TokioCompactFile<'_, W> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -461,7 +451,7 @@ impl AsyncRead for TokioCompactFile<'_> {
 ///
 /// [`TokioCompactFile`] can write at most [`File::max_write_len`] bytes
 /// at a time.
-impl AsyncWrite for TokioCompactFile<'_> {
+impl<W: Writer> AsyncWrite for TokioCompactFile<'_, W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -483,9 +473,9 @@ impl AsyncWrite for TokioCompactFile<'_> {
 
         let max_buffered_write = self.max_buffered_write();
 
-        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // If max_buffered_write is larger than or equal to max_atomic_write_len,
         // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
 
         let n: u32 = buf
             .len()
@@ -604,9 +594,9 @@ impl AsyncWrite for TokioCompactFile<'_> {
 
         let max_buffered_write = self.max_buffered_write();
 
-        // If max_buffered_write is larger than or equal to MAX_ATOMIC_WRITE_LEN,
+        // If max_buffered_write is larger than or equal to max_atomic_write_len,
         // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < MAX_ATOMIC_WRITE_LEN;
+        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
 
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res

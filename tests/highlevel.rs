@@ -17,10 +17,11 @@ use once_cell::sync::OnceCell;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::process;
 use tokio_io_utility::write_vectored_all;
+use tokio_pipe::PipeWrite;
 
 use pretty_assertions::assert_eq;
 
-async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
+async fn connect(options: SftpOptions) -> (process::Child, Sftp<PipeWrite>) {
     let (child, stdin, stdout) = launch_sftp().await;
 
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
@@ -247,7 +248,7 @@ async fn sftp_tokio_compact_file_basics() {
     let read_entire_file = || async {
         let mut buffer = Vec::with_capacity(content.len());
 
-        let mut file: TokioCompactFile = sftp.open(&path).await.unwrap().into();
+        let mut file: TokioCompactFile<PipeWrite> = sftp.open(&path).await.unwrap().into();
         file.read_to_end(&mut buffer).await.unwrap();
         file.close().await.unwrap();
 

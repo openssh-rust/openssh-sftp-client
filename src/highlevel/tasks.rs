@@ -1,16 +1,17 @@
-use super::{Error, ReadEnd, SharedData};
+use super::{Error, ReadEnd, SharedData, Writer};
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use tokio::io::AsyncRead;
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
-async fn flush(shared_data: &SharedData) -> Result<(), Error> {
+async fn flush<W: Writer>(shared_data: &SharedData<W>) -> Result<(), Error> {
     shared_data.flush().await.map_err(Error::from)
 }
 
-pub(super) fn create_flush_task(
-    shared_data: SharedData,
+pub(super) fn create_flush_task<W: Writer + Send + Sync + 'static>(
+    shared_data: SharedData<W>,
     flush_interval: Duration,
 ) -> JoinHandle<Result<(), Error>> {
     spawn(async move {
@@ -70,7 +71,12 @@ pub(super) fn create_flush_task(
     })
 }
 
-pub(super) fn create_read_task(mut read_end: ReadEnd) -> JoinHandle<Result<(), Error>> {
+pub(super) fn create_read_task<
+    R: AsyncRead + Unpin + Send + Sync + 'static,
+    W: Writer + Send + Sync + 'static,
+>(
+    mut read_end: ReadEnd<R, W>,
+) -> JoinHandle<Result<(), Error>> {
     spawn(async move {
         let cancel_guard = read_end
             .get_shared_data()

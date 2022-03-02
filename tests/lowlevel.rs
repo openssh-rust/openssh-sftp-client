@@ -13,27 +13,27 @@ use std::os::unix::fs::symlink;
 use std::path;
 
 use tokio::process;
+use tokio_pipe::{PipeRead, PipeWrite};
 
 use bytes::Bytes;
 use tempfile::{Builder, TempDir};
+
+type Id = lowlevel::Id<Vec<u8>>;
+type WriteEnd = lowlevel::WriteEnd<PipeWrite, Vec<u8>>;
+type ReadEnd = lowlevel::ReadEnd<PipeRead, PipeWrite, Vec<u8>>;
 
 fn assert_not_found(err: io::Error) {
     assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
 }
 
-async fn connect_with_extensions() -> (
-    WriteEnd<Vec<u8>>,
-    ReadEnd<Vec<u8>>,
-    process::Child,
-    Extensions,
-) {
+async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extensions) {
     let (child, stdin, stdout) = launch_sftp().await;
 
     let (write_end, read_end, extensions) = lowlevel::connect(stdout, stdin).await.unwrap();
     (write_end, read_end, child, extensions)
 }
 
-async fn connect() -> (WriteEnd<Vec<u8>>, ReadEnd<Vec<u8>>, process::Child) {
+async fn connect() -> (WriteEnd, ReadEnd, process::Child) {
     let (write_end, read_end, child, _extensions) = connect_with_extensions().await;
     (write_end, read_end, child)
 }
@@ -51,7 +51,7 @@ fn create_tmpdir() -> TempDir {
         .unwrap()
 }
 
-async fn read_one_packet(read_end: &mut ReadEnd<Vec<u8>>) {
+async fn read_one_packet(read_end: &mut ReadEnd) {
     read_end.get_shared_data().flush().await.unwrap();
 
     eprintln!("Wait for new request");
@@ -148,12 +148,7 @@ async fn test_file_desc() {
 }
 
 async fn test_write_impl(
-    write: impl FnOnce(
-        &mut WriteEnd<Vec<u8>>,
-        Id<Vec<u8>>,
-        Cow<'_, Handle>,
-        &[u8],
-    ) -> AwaitableStatus<Vec<u8>>,
+    write: impl FnOnce(&mut WriteEnd, Id, Cow<'_, Handle>, &[u8]) -> AwaitableStatus<Vec<u8>>,
 ) {
     let (mut write_end, mut read_end, mut child) = connect().await;
 
@@ -222,8 +217,8 @@ macro_rules! gen_test_write_direct {
         #[tokio::test]
         async fn $name() {
             async fn write(
-                $write_end: &mut WriteEnd<Vec<u8>>,
-                $id: Id<Vec<u8>>,
+                $write_end: &mut WriteEnd,
+                $id: Id,
                 $handle: Cow<'_, Handle>,
                 $msg: &[u8],
             ) -> AwaitableStatus<Vec<u8>> {

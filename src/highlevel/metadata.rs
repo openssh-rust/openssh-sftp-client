@@ -1,8 +1,6 @@
 use super::lowlevel::{FileAttrs, FileType as SftpFileType, Permissions as SftpPermissions};
 use super::UnixTimeStamp;
 
-use std::os::unix::fs::{FileTypeExt, PermissionsExt};
-
 /// Builder of [`MetaData`].
 #[derive(Debug, Default, Copy, Clone)]
 pub struct MetaDataBuilder(FileAttrs);
@@ -135,24 +133,24 @@ impl FileType {
     pub fn is_symlink(&self) -> bool {
         self.0 == SftpFileType::Symlink
     }
-}
 
-/// Implement [`FileTypeExt`] just to be compatible with [`std::fs::FileType`].
-impl FileTypeExt for FileType {
-    fn is_fifo(&self) -> bool {
+    /// Tests whether this file type represents a fifo.
+    pub fn is_fifo(&self) -> bool {
         self.0 == SftpFileType::FIFO
     }
 
     /// Tests whether this file type represents a socket.
-    fn is_socket(&self) -> bool {
+    pub fn is_socket(&self) -> bool {
         self.0 == SftpFileType::Socket
     }
 
-    fn is_block_device(&self) -> bool {
+    /// Tests whether this file type represents a block device.
+    pub fn is_block_device(&self) -> bool {
         self.0 == SftpFileType::BlockDevice
     }
 
-    fn is_char_device(&self) -> bool {
+    /// Tests whether this file type represents a character device.
+    pub fn is_char_device(&self) -> bool {
         self.0 == SftpFileType::CharacterDevice
     }
 }
@@ -270,19 +268,5 @@ impl Permissions {
         self.set_write_by_owner(writable);
         self.set_write_by_group(writable);
         self.set_write_by_other(writable);
-    }
-}
-
-impl PermissionsExt for Permissions {
-    fn mode(&self) -> u32 {
-        self.0.bits()
-    }
-
-    fn set_mode(&mut self, mode: u32) {
-        self.0 = SftpPermissions::from_bits_truncate(mode);
-    }
-
-    fn from_mode(mode: u32) -> Self {
-        Self(SftpPermissions::from_bits_truncate(mode))
     }
 }

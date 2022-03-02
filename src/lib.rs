@@ -24,5 +24,10 @@
 mod error;
 pub use error::Error;
 
+mod writer;
+pub use writer::Writer;
+
+mod utility;
+
 pub mod highlevel;
 pub mod lowlevel;
