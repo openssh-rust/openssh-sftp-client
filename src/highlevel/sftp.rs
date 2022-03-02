@@ -10,7 +10,7 @@ use tasks::{create_flush_task, create_read_task};
 use std::cmp::min;
 use std::convert::TryInto;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use derive_destructure2::destructure;
@@ -230,12 +230,10 @@ impl<W: Writer> Sftp<W> {
         self.options().read(true).open(path).await
     }
 
-    /// * `cwd` - The current working dir for the [`Fs`].
-    ///           If `cwd` is empty, then it is set to use
-    ///           the default directory set by the remote
-    ///           `sftp-server`.
-    pub fn fs(&self, cwd: impl Into<PathBuf>) -> Fs<'_, W> {
-        Fs::new(self.write_end(), cwd.into())
+    /// [`Fs`] defaults to the current working dir set by remote `sftp-server`,
+    /// which usually is the home directory.
+    pub fn fs(&self) -> Fs<'_, W> {
+        Fs::new(self.write_end(), "".into())
     }
 }
 

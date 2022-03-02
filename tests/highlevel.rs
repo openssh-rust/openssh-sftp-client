@@ -65,7 +65,7 @@ async fn sftp_file_basics() {
     let content = &content[..min(sftp.max_write_len() as usize, content.len())];
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         // Create new file (fail if already exists) and write to it.
         debug_assert_eq!(
@@ -170,7 +170,7 @@ macro_rules! def_write_all_test {
 
                 // remove the file
                 drop(file);
-                sftp.fs("").remove_file(&path).await.unwrap();
+                sftp.fs().remove_file(&path).await.unwrap();
 
                 eprintln!("Closing sftp and child");
                 sftp.close().await.unwrap();
@@ -256,7 +256,7 @@ async fn sftp_tokio_compact_file_basics() {
     };
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         let mut file = sftp
             .options()
@@ -384,7 +384,7 @@ async fn sftp_dir_basics() {
     let (mut child, sftp) = connect(Default::default()).await;
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         fs.create_dir(&path).await.unwrap();
 
@@ -426,7 +426,7 @@ async fn sftp_fs_symlink() {
     let (mut child, sftp) = connect(Default::default()).await;
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         fs.write(&filename, content).await.unwrap();
         fs.symlink(&filename, &symlink).await.unwrap();
@@ -456,7 +456,7 @@ async fn sftp_fs_hardlink() {
     let (mut child, sftp) = connect(Default::default()).await;
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         fs.write(&filename, content).await.unwrap();
         fs.hard_link(&filename, &hardlink).await.unwrap();
@@ -485,7 +485,7 @@ async fn sftp_fs_rename() {
     let (mut child, sftp) = connect(Default::default()).await;
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         fs.write(&filename, content).await.unwrap();
         fs.rename(&filename, &renamed).await.unwrap();
@@ -512,7 +512,7 @@ async fn sftp_fs_metadata() {
     let (mut child, sftp) = connect(sftp_options_with_max_rw_len()).await;
 
     {
-        let mut fs = sftp.fs("");
+        let mut fs = sftp.fs();
 
         fs.write(&path, content).await.unwrap();
         assert_eq!(
