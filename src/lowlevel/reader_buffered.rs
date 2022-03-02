@@ -4,22 +4,33 @@ use std::io;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use bytes::{Buf, BytesMut};
+
 use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
-use tokio_io_utility::{read_exact_to_vec, read_to_vec, ready};
+use tokio_io_utility::{read_exact_to_bytes, read_to_bytes_rng, ready};
 
 const BUFFER_LEN: usize = 4096;
 
 #[derive(Debug)]
 pub(super) struct ReaderBuffered<R> {
     reader: R,
-    buffer: Vec<u8>,
+
+    /// Use `BytesMut` here to avoid frequent copy when consuming.
+    ///
+    /// If we use `Vec<u8>` here, then every consume would have to
+    /// copy the buffer back to the start, which is very inefficient.
+    ///
+    /// `BytesMut` avoids this as consuming is simply bumping the start
+    /// counter, and the content is still stored continously.
+    buffer: BytesMut,
 }
 
 impl<R: AsyncRead + Unpin> ReaderBuffered<R> {
     pub(super) fn new(reader: R) -> Self {
         Self {
             reader,
-            buffer: Vec::with_capacity(BUFFER_LEN),
+            buffer: BytesMut::with_capacity(BUFFER_LEN),
         }
     }
 
@@ -28,19 +39,14 @@ impl<R: AsyncRead + Unpin> ReaderBuffered<R> {
 
         if len < size {
             if size < BUFFER_LEN {
-                loop {
-                    read_to_vec(&mut self.reader, &mut self.buffer).await?;
-                    if self.buffer.len() >= size {
-                        break;
-                    }
-                }
+                read_to_bytes_rng(&mut self.reader, &mut self.buffer, size..BUFFER_LEN).await?;
             } else {
-                read_exact_to_vec(&mut self.reader, &mut self.buffer, size - len).await?;
+                read_exact_to_bytes(&mut self.reader, &mut self.buffer, size - len).await?;
             }
         }
 
         Ok(Drain {
-            vec: &mut self.buffer,
+            buffer: &mut self.buffer,
             n: size,
         })
     }
@@ -58,7 +64,7 @@ impl<R: AsyncRead + Unpin> AsyncBufRead for ReaderBuffered<R> {
         // Branch using `>=` instead of the more correct `==`
         // to tell the compiler that the pos..cap slice is always valid.
         if buffer.is_empty() {
-            let mut future = read_to_vec(reader, buffer);
+            let mut future = read_to_bytes_rng(reader, buffer, ..BUFFER_LEN);
             let future = Pin::new(&mut future);
             match ready!(future.poll(cx)) {
                 Ok(()) => (),
@@ -78,7 +84,7 @@ impl<R: AsyncRead + Unpin> AsyncBufRead for ReaderBuffered<R> {
         let len = buffer.len();
         let amt = min(len, amt);
 
-        buffer.drain(..amt);
+        buffer.advance(amt);
     }
 }
 
@@ -114,7 +120,7 @@ impl<R: AsyncRead + Unpin> AsyncRead for ReaderBuffered<R> {
 /// or create a sub[`Drain`].
 #[derive(Debug)]
 pub(super) struct Drain<'a> {
-    vec: &'a mut Vec<u8>,
+    buffer: &'a mut BytesMut,
     /// Number of bytes to remove on drop
     n: usize,
 }
@@ -131,12 +137,12 @@ impl Deref for Drain<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.vec[..self.n]
+        &self.buffer[..self.n]
     }
 }
 
 impl Drop for Drain<'_> {
     fn drop(&mut self) {
-        self.vec.drain(..self.n);
+        self.buffer.advance(self.n);
     }
 }
