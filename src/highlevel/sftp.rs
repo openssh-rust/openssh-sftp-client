@@ -16,7 +16,9 @@ use std::sync::atomic::Ordering;
 use derive_destructure2::destructure;
 use tokio::io::AsyncRead;
 use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
+
+/// CancellationToken
+pub use tokio_util::sync::CancellationToken;
 
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]

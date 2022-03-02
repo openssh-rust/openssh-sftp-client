@@ -21,6 +21,7 @@ pub use lowlevel::{UnixTimeStamp, UnixTimeStampError};
 use bytes::BytesMut;
 
 mod sftp;
+pub use sftp::CancellationToken;
 pub use sftp::Sftp;
 
 mod cancel_utility;
