@@ -444,9 +444,6 @@ impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
-    ///
-    /// For writing large data, it is recommended to use
-    /// [`WriteEnd::send_write_request_direct`].
     pub fn send_write_request_buffered(
         &mut self,
         id: Id<Buffer>,
@@ -495,9 +492,6 @@ impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
-    ///
-    /// For writing large data, it is recommended to use
-    /// [`WriteEnd::send_write_request_direct`].
     pub fn send_write_request_buffered_vectored(
         &mut self,
         id: Id<Buffer>,
@@ -522,9 +516,6 @@ impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
-    ///
-    /// For writing large data, it is recommended to use
-    /// [`WriteEnd::send_write_request_direct`].
     pub fn send_write_request_buffered_vectored2(
         &mut self,
         id: Id<Buffer>,
