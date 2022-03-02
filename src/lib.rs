@@ -21,6 +21,10 @@
     unreachable_pub
 )]
 
+#[cfg(doc)]
+/// Changelog for this crate.
+pub mod changelog;
+
 mod error;
 pub use error::Error;
 
