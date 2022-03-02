@@ -3,7 +3,7 @@
 //! All `async` functions in this module are cancel safe.
 //!
 //! Internally, this is archived by first writing requests into a write buffer
-//! containing `bytes::Bytes` and then flush all buffers at once periodically
+//! containing [`bytes::Bytes`] and then flush all buffers at once periodically
 //! to archive cancel safety and improve efficiencies.
 //!
 //! However, cancelling the future does not actually has any effect,
