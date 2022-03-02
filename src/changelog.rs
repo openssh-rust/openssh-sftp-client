@@ -5,6 +5,10 @@ use crate::*;
 pub mod unreleased {}
 
 /// ## Added
+///  - Reexport [`highlevel::CancellationToken`].
+pub mod v0_8_1 {}
+
+/// ## Added
 ///  - Associated function [`highlevel::FileType::is_fifo`].
 ///  - Associated function [`highlevel::FileType::is_socket`].
 ///  - Associated function [`highlevel::FileType::is_block_device`].
