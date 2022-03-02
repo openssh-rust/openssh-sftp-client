@@ -16,7 +16,6 @@ use std::task::{Context, Poll};
 use bytes::{Buf, Bytes, BytesMut};
 use tokio::io::AsyncSeek;
 use tokio_io_utility::IoSliceExt;
-use tokio_pipe::PIPE_BUF;
 
 mod tokio_compact_file;
 pub use tokio_compact_file::{TokioCompactFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN};
@@ -26,15 +25,9 @@ use utility::{take_bytes, take_io_slices};
 
 /// Maximum amount of data that can writen atomically.
 pub fn max_atomic_write_len<W: Writer>() -> u32 {
-    const _ASSERTION: [(); 0 - !{
-        // If `max_atomic_write_len` == `u32::MAX`, then it ust have overflowed.
-        const ASSERT: bool = MAX_ATOMIC_WRITE_LEN != u32::MAX;
-        ASSERT
-    } as usize] = [];
-
-    const MAX_ATOMIC_WRITE_LEN: u32 = (PIPE_BUF - 9 - 4 - 256 - 8 - 4) as u32;
-
-    MAX_ATOMIC_WRITE_LEN
+    (W::MAX_ATOMIC_WRITE_LEN - 9 - 4 - 256 - 8 - 4)
+        .try_into()
+        .unwrap()
 }
 
 /// Options and flags which can be used to configure how a file is opened.
