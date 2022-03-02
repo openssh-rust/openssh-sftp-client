@@ -154,16 +154,8 @@ impl<W: Writer, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary>
     ///
     /// # Cancel Safety
     ///
-    /// This function is only cancel safe if [`WriteEnd::send_write_request_direct`] or
-    /// [`WriteEnd::send_write_request_direct_vectored`] is not called when this
-    /// future is cancelled.
-    ///
     /// Upon cancel, it might only partially flushed out the data, which can be
     /// restarted by another thread.
-    ///
-    /// However, if [`WriteEnd::send_write_request_direct`] or
-    /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
-    /// will be interleaved and thus produce undefined behavior.
     #[inline(always)]
     pub async fn try_flush(&self) -> Result<bool, io::Error> {
         self.writer().try_flush().await
@@ -176,16 +168,8 @@ impl<W: Writer, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary>
     ///
     /// # Cancel Safety
     ///
-    /// This function is only cancel safe if [`WriteEnd::send_write_request_direct`] or
-    /// [`WriteEnd::send_write_request_direct_vectored`] is not called when this
-    /// future is cancelled.
-    ///
     /// Upon cancel, it might only partially flushed out the data, which can be
     /// restarted by another thread.
-    ///
-    /// However, if [`WriteEnd::send_write_request_direct`] or
-    /// [`WriteEnd::send_write_request_direct_vectored`] is called, then the write data
-    /// will be interleaved and thus produce undefined behavior.
     #[inline(always)]
     pub async fn flush(&self) -> Result<(), io::Error> {
         self.writer().flush().await
