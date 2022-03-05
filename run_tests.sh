@@ -14,4 +14,4 @@ fi
 mkdir -p $XDG_RUNTIME_DIR/openssh_sftp_client/
 rm -rf $XDG_RUNTIME_DIR/openssh_sftp_client/*
 
-exec cargo test $@
+exec cargo test "$@"
