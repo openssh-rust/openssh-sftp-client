@@ -1,4 +1,8 @@
-#!/bin/bash -ex
+#!/bin/bash
+
+set -euxo pipefail
+
+cd "$(dirname "$(realpath "$0")")"
 
 git submodule update --init --depth 1 --recursive
 
