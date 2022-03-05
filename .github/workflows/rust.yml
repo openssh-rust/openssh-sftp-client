@@ -61,7 +61,7 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ github.event.repository.name }}-${{ runner.os }}-cargo-check-v2
+        key: ${{ github.event.repository.name }}-${{ runner.os }}-cargo-check-v3
     - name: Run check
       run: |
         cargo check --all
