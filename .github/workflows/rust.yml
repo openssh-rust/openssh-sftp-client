@@ -64,7 +64,6 @@ jobs:
         key: ${{ github.event.repository.name }}-${{ runner.os }}-cargo-check-v3
     - name: Run check
       run: |
-        cargo check --all
         cargo doc
 
   check_format_and_clippy:
