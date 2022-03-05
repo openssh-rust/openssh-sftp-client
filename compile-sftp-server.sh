@@ -1,6 +1,8 @@
 #!/bin/bash -ex
 
-openssh="$(dirname `realpath $0`)/openssh-portable"
+set -euxo pipefail
+
+openssh="$(dirname "$(realpath "$0")")/openssh-portable"
 
 rsync -aHAX --inplace --sparse --preallocate  "$openssh/" .
 
@@ -16,4 +18,4 @@ if [ ! -e configured ]; then
     touch configured
 fi
 
-exec make sftp-server -j $(nproc)
+exec make sftp-server -j "$(nproc)"
