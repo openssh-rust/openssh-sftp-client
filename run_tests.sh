@@ -6,7 +6,7 @@ cd "$(dirname "$(realpath "$0")")"
 
 git submodule update --init --depth 1 --recursive
 
-if [ -z "$XDG_RUNTIME_DIR" ]; then
+if [ -z ${XDG_RUNTIME_DIR+x} ]; then
     export XDG_RUNTIME_DIR=/tmp
 fi
 
