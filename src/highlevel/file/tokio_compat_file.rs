@@ -20,11 +20,11 @@ use tokio_io_utility::ready;
 
 use derive_destructure2::destructure;
 
-/// The default length of the buffer used in [`TokioCompactFile`].
+/// The default length of the buffer used in [`TokioCompatFile`].
 pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };
 
 /// The default maximum length of the buffer that can be created in
-/// [`AsyncRead`] implementation of [`TokioCompactFile`].
+/// [`AsyncRead`] implementation of [`TokioCompatFile`].
 pub const DEFAULT_MAX_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096 * 10) };
 
 fn sftp_to_io_error(sftp_err: Error) -> io::Error {
@@ -58,7 +58,7 @@ where
 /// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
-pub struct TokioCompactFile<'s, W: Writer> {
+pub struct TokioCompatFile<'s, W: Writer> {
     inner: File<'s, W>,
 
     buffer_len: NonZeroUsize,
@@ -72,13 +72,13 @@ pub struct TokioCompactFile<'s, W: Writer> {
     write_cancellation_future: BoxedWaitForCancellationFuture<'s>,
 }
 
-impl<'s, W: Writer> TokioCompactFile<'s, W> {
-    /// Create a [`TokioCompactFile`].
+impl<'s, W: Writer> TokioCompatFile<'s, W> {
+    /// Create a [`TokioCompatFile`].
     pub fn new(inner: File<'s, W>) -> Self {
         Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
     }
 
-    /// Create a [`TokioCompactFile`].
+    /// Create a [`TokioCompatFile`].
     ///
     /// * `buffer_len` - buffer len to be used in [`AsyncBufRead`]
     ///   and the minimum length to read in [`AsyncRead`].
@@ -141,7 +141,7 @@ impl<'s, W: Writer> TokioCompactFile<'s, W> {
     /// This function is a lower-level call.
     ///
     /// It needs to be paired with the `consume` method or
-    /// [`TokioCompactFile::consume_and_return_buffer`] to function properly.
+    /// [`TokioCompatFile::consume_and_return_buffer`] to function properly.
     ///
     /// When calling this method, none of the contents will be "read" in the
     /// sense that later calling read may return the same contents.
@@ -164,8 +164,8 @@ impl<'s, W: Writer> TokioCompactFile<'s, W> {
     }
 
     /// This can be used together with [`AsyncBufRead`] implementation for
-    /// [`TokioCompactFile`] or [`TokioCompactFile::fill_buf`] or
-    /// [`TokioCompactFile::read_into_buffer`] to avoid copying data.
+    /// [`TokioCompatFile`] or [`TokioCompatFile::fill_buf`] or
+    /// [`TokioCompatFile::read_into_buffer`] to avoid copying data.
     ///
     /// Return empty [`Bytes`] on EOF.
     ///
@@ -185,7 +185,7 @@ impl<'s, W: Writer> TokioCompactFile<'s, W> {
     /// This function is a lower-level call.
     ///
     /// It needs to be paired with the `consume` method or
-    /// [`TokioCompactFile::consume_and_return_buffer`] to function properly.
+    /// [`TokioCompatFile::consume_and_return_buffer`] to function properly.
     ///
     /// When calling this method, none of the contents will be "read" in the
     /// sense that later calling read may return the same contents.
@@ -273,7 +273,7 @@ impl<'s, W: Writer> TokioCompactFile<'s, W> {
     /// This function is a lower-level call.
     ///
     /// It needs to be paired with the `consume` method or
-    /// [`TokioCompactFile::consume_and_return_buffer`] to function properly.
+    /// [`TokioCompatFile::consume_and_return_buffer`] to function properly.
     ///
     /// When calling this method, none of the contents will be "read" in the
     /// sense that later calling read may return the same contents.
@@ -286,7 +286,7 @@ impl<'s, W: Writer> TokioCompactFile<'s, W> {
     /// This function does not change the offset into the file.
     pub async fn read_into_buffer(&mut self, amt: NonZeroU32) -> Result<(), Error> {
         #[must_use]
-        struct ReadIntoBuffer<'a, 's, W: Writer>(&'a mut TokioCompactFile<'s, W>, NonZeroU32);
+        struct ReadIntoBuffer<'a, 's, W: Writer>(&'a mut TokioCompatFile<'s, W>, NonZeroU32);
 
         impl<W: Writer> Future for ReadIntoBuffer<'_, '_, W> {
             type Output = Result<(), Error>;
@@ -301,29 +301,29 @@ impl<'s, W: Writer> TokioCompactFile<'s, W> {
     }
 }
 
-impl<'s, W: Writer> From<File<'s, W>> for TokioCompactFile<'s, W> {
+impl<'s, W: Writer> From<File<'s, W>> for TokioCompatFile<'s, W> {
     fn from(inner: File<'s, W>) -> Self {
         Self::new(inner)
     }
 }
 
-impl<'s, W: Writer> From<TokioCompactFile<'s, W>> for File<'s, W> {
-    fn from(file: TokioCompactFile<'s, W>) -> Self {
+impl<'s, W: Writer> From<TokioCompatFile<'s, W>> for File<'s, W> {
+    fn from(file: TokioCompatFile<'s, W>) -> Self {
         file.into_inner()
     }
 }
 
-/// Creates a new [`TokioCompactFile`] instance that shares the
+/// Creates a new [`TokioCompatFile`] instance that shares the
 /// same underlying file handle as the existing File instance.
 ///
 /// Reads, writes, and seeks can be performed independently.
-impl<W: Writer> Clone for TokioCompactFile<'_, W> {
+impl<W: Writer> Clone for TokioCompatFile<'_, W> {
     fn clone(&self) -> Self {
         Self::with_capacity(self.inner.clone(), self.buffer_len, self.max_buffer_len)
     }
 }
 
-impl<'s, W: Writer> Deref for TokioCompactFile<'s, W> {
+impl<'s, W: Writer> Deref for TokioCompatFile<'s, W> {
     type Target = File<'s, W>;
 
     fn deref(&self) -> &Self::Target {
@@ -331,13 +331,13 @@ impl<'s, W: Writer> Deref for TokioCompactFile<'s, W> {
     }
 }
 
-impl<W: Writer> DerefMut for TokioCompactFile<'_, W> {
+impl<W: Writer> DerefMut for TokioCompatFile<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<W: Writer> AsyncSeek for TokioCompactFile<'_, W> {
+impl<W: Writer> AsyncSeek for TokioCompatFile<'_, W> {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         let prev_offset = self.offset();
         Pin::new(&mut self.inner).start_seek(position)?;
@@ -365,7 +365,7 @@ impl<W: Writer> AsyncSeek for TokioCompactFile<'_, W> {
     }
 }
 
-impl<W: Writer> AsyncBufRead for TokioCompactFile<'_, W> {
+impl<W: Writer> AsyncBufRead for TokioCompatFile<'_, W> {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         if self.buffer.is_empty() {
             let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
@@ -387,9 +387,9 @@ impl<W: Writer> AsyncBufRead for TokioCompactFile<'_, W> {
     }
 }
 
-/// [`TokioCompactFile`] can read in at most [`File::max_read_len`] bytes
+/// [`TokioCompatFile`] can read in at most [`File::max_read_len`] bytes
 /// at a time.
-impl<W: Writer> AsyncRead for TokioCompactFile<'_, W> {
+impl<W: Writer> AsyncRead for TokioCompatFile<'_, W> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -424,10 +424,10 @@ impl<W: Writer> AsyncRead for TokioCompactFile<'_, W> {
     }
 }
 
-/// [`TokioCompactFile::poll_write`] only writes data to the buffer.
+/// [`TokioCompatFile::poll_write`] only writes data to the buffer.
 ///
-/// [`TokioCompactFile::poll_write`] and
-/// [`TokioCompactFile::poll_write_vectored`] would send at most one
+/// [`TokioCompatFile::poll_write`] and
+/// [`TokioCompatFile::poll_write_vectored`] would send at most one
 /// sftp request.
 ///
 /// It is perfectly safe to buffer requests and send them in one go,
@@ -443,15 +443,15 @@ impl<W: Writer> AsyncRead for TokioCompactFile<'_, W> {
 ///
 /// This can be done by concatenating strings before passing them to
 /// [`AsyncWrite::poll_write`] or [`AsyncWrite::poll_write_vectored`] and
-/// calling [`AsyncWrite::poll_flush`] on [`TokioCompactFile`] when the message
+/// calling [`AsyncWrite::poll_flush`] on [`TokioCompatFile`] when the message
 /// is complete.
 ///
-/// Calling [`AsyncWrite::poll_flush`] on [`TokioCompactFile`] would wait on
+/// Calling [`AsyncWrite::poll_flush`] on [`TokioCompatFile`] would wait on
 /// writes in the order they are sent.
 ///
-/// [`TokioCompactFile`] can write at most [`File::max_write_len`] bytes
+/// [`TokioCompatFile`] can write at most [`File::max_write_len`] bytes
 /// at a time.
-impl<W: Writer> AsyncWrite for TokioCompactFile<'_, W> {
+impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

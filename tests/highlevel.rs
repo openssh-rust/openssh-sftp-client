@@ -235,7 +235,7 @@ def_write_all_test!(
 );
 
 #[tokio::test]
-/// Test creating new TokioCompactFile, truncating and opening existing file,
+/// Test creating new TokioCompatFile, truncating and opening existing file,
 /// basic read, write and removal.
 async fn sftp_tokio_compact_file_basics() {
     let path = gen_path("sftp_tokio_compact_file_basics");
@@ -248,7 +248,7 @@ async fn sftp_tokio_compact_file_basics() {
     let read_entire_file = || async {
         let mut buffer = Vec::with_capacity(content.len());
 
-        let mut file: TokioCompactFile<PipeWrite> = sftp.open(&path).await.unwrap().into();
+        let mut file: TokioCompatFile<PipeWrite> = sftp.open(&path).await.unwrap().into();
         file.read_to_end(&mut buffer).await.unwrap();
         file.close().await.unwrap();
 
@@ -264,7 +264,7 @@ async fn sftp_tokio_compact_file_basics() {
             .create_new(true)
             .open(&path)
             .await
-            .map(TokioCompactFile::new)
+            .map(TokioCompatFile::new)
             .unwrap();
 
         // Create new file (fail if already exists) and write to it.
@@ -278,11 +278,11 @@ async fn sftp_tokio_compact_file_basics() {
         // Create new file with Trunc and write to it.
         //
         // Sftp::Create opens the file truncated.
-        let mut file = sftp.create(&path).await.map(TokioCompactFile::new).unwrap();
+        let mut file = sftp.create(&path).await.map(TokioCompatFile::new).unwrap();
         debug_assert_eq!(file.write(content).await.unwrap(), content.len());
 
         // close also flush the internal future buffers, but using a
-        // different implementation from `TokioCompactFile::poll_flush`
+        // different implementation from `TokioCompatFile::poll_flush`
         // since it is executed in async context.
         //
         // Call `close` without calling `flush` first would force
@@ -303,7 +303,7 @@ async fn sftp_tokio_compact_file_basics() {
 def_write_all_test!(
     sftp_tokio_compact_file_write_all,
     sftp_options_with_max_rw_len(),
-    TokioCompactFile::new,
+    TokioCompatFile::new,
     file,
     content,
     {
@@ -314,7 +314,7 @@ def_write_all_test!(
 def_write_all_test!(
     sftp_tokio_compact_file_write_vectored_all,
     sftp_options_with_max_rw_len(),
-    TokioCompactFile::new,
+    TokioCompatFile::new,
     file,
     content,
     {

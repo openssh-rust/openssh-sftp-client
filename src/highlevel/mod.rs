@@ -42,7 +42,9 @@ mod handle;
 use handle::OwnedHandle;
 
 mod file;
+#[allow(deprecated)]
 pub use file::TokioCompactFile;
+pub use file::TokioCompatFile;
 pub use file::DEFAULT_BUFLEN;
 pub use file::DEFAULT_MAX_BUFLEN;
 pub use file::{max_atomic_write_len, File, OpenOptions};
