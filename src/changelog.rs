@@ -4,6 +4,11 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// ## Added
+///  - Type [`highlevel::TokioCompatFile`] to Replace
+///    [`highlevel::TokioCompactFile`].
+pub mod v0_8_3 {}
+
 /// ## Fixed
 ///  - Fix possible panic in [`highlevel::max_atomic_write_len`]
 pub mod v0_8_2 {}
