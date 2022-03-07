@@ -210,20 +210,25 @@ impl<'s, W: Writer> File<'s, W> {
         (&mut self.inner.write_end, Cow::Borrowed(&self.inner.handle))
     }
 
-    /// Get maximum amount of bytes that one single write requests
-    /// can write.
+    /// The maximum amount of bytes that can be written in one request.
+    /// Writing more than that, then your write will be split into multiple requests
+    ///
+    /// If [`File::max_buffered_write`] is less than [`max_atomic_write_len`],
+    /// then the direct write is enabled and [`File::max_write_len`] must be
+    /// less than [`max_atomic_write_len`].
     pub fn max_write_len(&self) -> u32 {
         self.get_auxiliary().limits().write_len
     }
 
-    /// Get maximum amount of bytes that one single read requests
-    /// can read.
+    /// The maximum amount of bytes that can be read in one request.
+    /// Reading more than that, then your read will be split into multiple requests
     pub fn max_read_len(&self) -> u32 {
         self.get_auxiliary().limits().read_len
     }
 
     /// Get maximum amount of bytes that [`File`] and [`TokioCompactFile`]
-    /// would write in a buffered manner.
+    /// can write in one request.
+    /// Writing more than that, then your write will be split into multiple requests
     pub fn max_buffered_write(&self) -> u32 {
         self.get_auxiliary().max_buffered_write
     }
