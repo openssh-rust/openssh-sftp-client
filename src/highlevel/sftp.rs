@@ -244,8 +244,8 @@ impl<W> Sftp<W> {
         WriteEndWithCachedId::new(self, WriteEnd::new(self.shared_data.clone()))
     }
 
-    /// Get maximum amount of bytes that one single write requests
-    /// can write.
+    /// The maximum amount of bytes that can be written in one request.
+    /// Writing more than that, then your write will be split into multiple requests
     ///
     /// If [`Sftp::max_buffered_write`] is less than [`max_atomic_write_len`],
     /// then the direct write is enabled and [`Sftp::max_write_len`] must be
@@ -254,8 +254,8 @@ impl<W> Sftp<W> {
         self.shared_data.get_auxiliary().limits().write_len
     }
 
-    /// Get maximum amount of bytes that one single read requests
-    /// can read.
+    /// The maximum amount of bytes that can be read in one request.
+    /// Reading more than that, then your read will be split into multiple requests
     pub fn max_read_len(&self) -> u32 {
         self.shared_data.get_auxiliary().limits().read_len
     }
@@ -270,7 +270,7 @@ impl<W> Sftp<W> {
         self.shared_data.get_auxiliary()
     }
 
-    /// Trigger flushing in the `flush_task`.
+    /// Triggers the flushing of the internal buffer in `flush_task`.
     ///
     /// If there are pending requests, then flushing would happen immediately.
     ///
