@@ -287,15 +287,6 @@ impl<W> Sftp<W> {
     pub fn max_buffered_write(&self) -> u32 {
         self.shared_data.get_auxiliary().max_buffered_write
     }
-
-    /// Return a cancellation token that will be cancelled if the `flush_task`
-    /// or `read_task` failed is called.
-    ///
-    /// Cancelling this returned token has no effect on any function in this
-    /// module.
-    pub fn get_cancellation_token(&self) -> CancellationToken {
-        self.auxiliary().cancel_token.child_token()
-    }
 }
 
 impl<W> Drop for Sftp<W> {
