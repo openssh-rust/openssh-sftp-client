@@ -37,17 +37,6 @@ impl<'s> BoxedWaitForCancellationFuture<'s> {
             .as_mut()
     }
 
-    /// * `f` - the future must be cancel safe.
-    ///
-    /// Wait for task cancellation.
-    pub(super) async fn wait(&mut self, auxiliary: &'s Auxiliary) {
-        if !auxiliary.cancel_token.is_cancelled() {
-            self.get_future(auxiliary).await;
-            // Drop future since a completed future cannot be polled again.
-            self.0 = None;
-        }
-    }
-
     /// Return `Ok(())` if the task hasn't failed yet and the context has
     /// already been registered.
     pub(super) fn poll_for_task_failure(
