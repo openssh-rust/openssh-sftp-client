@@ -27,17 +27,31 @@ async fn connect(options: SftpOptions) -> (process::Child, Sftp<PipeWrite>) {
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
 }
 
+#[cfg(target_os = "linux")]
+fn get_tmp_path() -> &'static Path {
+    Path::new("/tmp")
+}
+
+#[cfg(target_os = "macos")]
+fn get_tmp_path() -> &'static Path {
+    Path::new("/private/tmp")
+}
+
 fn gen_path(func: &str) -> PathBuf {
     static XDG_RUNTIME_DIR: OnceCell<Option<Box<Path>>> = OnceCell::new();
 
     let mut path = XDG_RUNTIME_DIR
         .get_or_init(|| {
-            env::var_os("XDG_RUNTIME_DIR")
-                .map(From::from)
-                .map(PathBuf::into_boxed_path)
+            env::var_os("XDG_RUNTIME_DIR").map(|os_str| {
+                let pathbuf: PathBuf = os_str.into();
+                pathbuf
+                    .canonicalize()
+                    .expect("Failed to canonicalize XDG_RUNTIME_DIR")
+                    .into_boxed_path()
+            })
         })
         .as_deref()
-        .unwrap_or_else(|| Path::new("/tmp"))
+        .unwrap_or_else(get_tmp_path)
         .join("openssh_sftp_client");
 
     path.push(func);
