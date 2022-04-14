@@ -12,4 +12,6 @@ export RUNTIME_DIR=${XDG_RUNTIME_DIR:-/tmp}
 mkdir -p $RUNTIME_DIR/openssh_sftp_client/
 rm -rf $RUNTIME_DIR/openssh_sftp_client/*
 
+cargo check "$@"
+
 exec cargo test "$@" --all-features
