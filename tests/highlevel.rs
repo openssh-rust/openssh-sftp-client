@@ -42,11 +42,11 @@ fn gen_path(func: &str) -> PathBuf {
 
     let mut path = XDG_RUNTIME_DIR
         .get_or_init(|| {
-            env::var_os("XDG_RUNTIME_DIR").map(|os_str| {
+            env::var_os("RUNTIME_DIR").map(|os_str| {
                 let pathbuf: PathBuf = os_str.into();
                 pathbuf
                     .canonicalize()
-                    .expect("Failed to canonicalize XDG_RUNTIME_DIR")
+                    .expect("Failed to canonicalize $RUNTIME_DIR")
                     .into_boxed_path()
             })
         })
