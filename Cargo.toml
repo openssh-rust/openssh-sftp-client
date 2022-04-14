@@ -14,6 +14,10 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 
 exclude = ["openssh-portable"]
 
+[features]
+# This feature is for internal testing only!!!
+ci-tests = []
+
 [dependencies]
 thiserror = "1.0.29"
 awaitable = "0.3.3"

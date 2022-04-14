@@ -244,6 +244,13 @@ impl<W> Sftp<W> {
         WriteEndWithCachedId::new(self, WriteEnd::new(self.shared_data.clone()))
     }
 
+    pub(super) fn auxiliary(&self) -> &Auxiliary {
+        self.shared_data.get_auxiliary()
+    }
+}
+
+#[cfg(feature = "ci-tests")]
+impl<W> Sftp<W> {
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests
     ///
@@ -264,10 +271,6 @@ impl<W> Sftp<W> {
     /// [`crate::highlevel::TokioCompactFile`] would write in a buffered manner.
     pub fn max_buffered_write(&self) -> u32 {
         self.shared_data.get_auxiliary().max_buffered_write
-    }
-
-    pub(super) fn auxiliary(&self) -> &Auxiliary {
-        self.shared_data.get_auxiliary()
     }
 
     /// Triggers the flushing of the internal buffer in `flush_task`.
