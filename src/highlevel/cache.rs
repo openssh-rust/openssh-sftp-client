@@ -8,21 +8,6 @@ pub(super) struct WriteEndWithCachedId<'s, W> {
     sftp: &'s Sftp<W>,
     inner: WriteEnd<W>,
     id: Option<Id>,
-    /// WaitForCancellationFuture adds itself as an entry to the internal
-    /// linked list of CancellationToken when `poll`ed.
-    ///
-    /// Thus, in its `Drop::drop` implementation, it is removed from the
-    /// linked list.
-    ///
-    /// However, rust does not guarantee on 'no leaking', thus it is possible
-    /// and safe for user to `mem::forget` the future returned, and thus
-    /// causing the linked list to point to invalid memory locations.
-    ///
-    /// To avoid this, we have to box this future.
-    ///
-    /// However, allocate a new box each time a future is called is super
-    /// expensive, thus we keep it cached so that we can reuse it.
-    wait_for_cancell_future: BoxedWaitForCancellationFuture<'s>,
 }
 
 impl<W> Clone for WriteEndWithCachedId<'_, W> {
@@ -31,7 +16,6 @@ impl<W> Clone for WriteEndWithCachedId<'_, W> {
             sftp: self.sftp,
             inner: self.inner.clone(),
             id: None,
-            wait_for_cancell_future: BoxedWaitForCancellationFuture::new(),
         }
     }
 }
@@ -56,7 +40,6 @@ impl<'s, W> WriteEndWithCachedId<'s, W> {
             sftp,
             inner,
             id: None,
-            wait_for_cancell_future: BoxedWaitForCancellationFuture::new(),
         }
     }
 

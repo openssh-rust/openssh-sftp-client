@@ -4,7 +4,7 @@ set -euxo pipefail
 
 openssh="$(dirname "$(realpath "$0")")/openssh-portable"
 
-rsync -aHAX --inplace --sparse --preallocate  "$openssh/" .
+rsync -aHAX --inplace --sparse "$openssh/" .
 
 if [ ! -e configured ]; then
     autoreconf
