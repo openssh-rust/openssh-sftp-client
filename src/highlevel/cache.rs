@@ -64,13 +64,15 @@ impl<'s, W> WriteEndWithCachedId<'s, W> {
         let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
         let auxiliary = self.sftp.auxiliary();
 
-        if auxiliary.cancel_token.is_cancelled() {
+        let cancel_token = &auxiliary.cancel_token;
+
+        if cancel_token.is_cancelled() {
             return cancel_err();
         }
 
         tokio::select! {
             res = future => res.map_err(Into::into),
-            _ = self.wait_for_cancell_future.wait(auxiliary) => cancel_err(),
+            _ = cancel_token.cancelled() => cancel_err(),
         }
     }
 
