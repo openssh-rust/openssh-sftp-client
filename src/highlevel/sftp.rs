@@ -247,6 +247,21 @@ impl<W> Sftp<W> {
     pub(super) fn auxiliary(&self) -> &Auxiliary {
         self.shared_data.get_auxiliary()
     }
+
+    /// Triggers the flushing of the internal buffer in `flush_task`.
+    ///
+    /// If there are pending requests, then flushing would happen immediately.
+    ///
+    /// If not, then the next time a request is queued in the write buffer, it
+    /// will be immediately flushed.
+    pub(super) fn trigger_flushing(&self) {
+        self.auxiliary().flush_immediately.notify_one();
+    }
+
+    /// Return number of pending requests in the write buffer.
+    pub(super) fn get_pending_requests(&self) -> u32 {
+        self.auxiliary().pending_requests.load(Ordering::Relaxed)
+    }
 }
 
 #[cfg(feature = "ci-tests")]
@@ -271,21 +286,6 @@ impl<W> Sftp<W> {
     /// [`crate::highlevel::TokioCompactFile`] would write in a buffered manner.
     pub fn max_buffered_write(&self) -> u32 {
         self.shared_data.get_auxiliary().max_buffered_write
-    }
-
-    /// Triggers the flushing of the internal buffer in `flush_task`.
-    ///
-    /// If there are pending requests, then flushing would happen immediately.
-    ///
-    /// If not, then the next time a request is queued in the write buffer, it
-    /// will be immediately flushed.
-    pub fn trigger_flushing(&self) {
-        self.auxiliary().flush_immediately.notify_one();
-    }
-
-    /// Return number of pending requests in the write buffer.
-    pub fn get_pending_requests(&self) -> u32 {
-        self.auxiliary().pending_requests.load(Ordering::Relaxed)
     }
 
     /// Return a cancellation token that will be cancelled if the `flush_task`
