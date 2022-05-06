@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 
 use super::*;
-use crate::Writer;
 
 use awaitable_responses::ArenaArc;
 use connection::SharedData;
-use writer_buffered::{AtomicWriteIoSlices, WriteBuffer};
+use writer_buffered::WriteBuffer;
 
 use std::borrow::Cow;
 use std::convert::TryInto;
@@ -20,6 +19,8 @@ use openssh_sftp_protocol::request::*;
 use openssh_sftp_protocol::serde::Serialize;
 use openssh_sftp_protocol::ssh_format::Serializer;
 use openssh_sftp_protocol::Handle;
+
+use tokio::io::AsyncWrite;
 
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
@@ -64,7 +65,7 @@ impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: Writer, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .get_mut_writer()
@@ -427,7 +428,7 @@ impl<W: Writer, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
+impl<W: AsyncWrite + Unpin, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     WriteEnd<W, Buffer, Auxiliary>
 {
     /// Write will extend the file if writing beyond the end of the file.
@@ -629,153 +630,6 @@ impl<W: Writer, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         }
 
         id.0.reset(None);
-        self.shared_data.notify_new_packet_event();
-
-        Ok(AwaitableStatus::new(id.into_inner()))
-    }
-
-    /// Write will extend the file if writing beyond the end of the file.
-    ///
-    /// It is legal to write way beyond the end of the file, the semantics
-    /// are to write zeroes from the end of the file to the specified offset
-    /// and then the data.
-    ///
-    /// On most operating systems, such writes do not allocate disk space but
-    /// instead leave "holes" in the file.
-    ///
-    /// Return [`Error::WriteTooLargeToBeAtomic`] if the write is too large.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_write_request_direct_atomic(
-        &mut self,
-        id: Id<Buffer>,
-        handle: Cow<'_, Handle>,
-        offset: u64,
-        data: &[u8],
-    ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let header = Request::serialize_write_request(
-            &mut self.serializer,
-            ArenaArc::slot(&id.0),
-            handle,
-            offset,
-            data.len().try_into()?,
-        )?
-        .split();
-
-        let io_slices = [IoSlice::new(&*header), IoSlice::new(data)];
-        let bufs = AtomicWriteIoSlices::new(&io_slices)?;
-
-        id.0.reset(None);
-        self.shared_data
-            .writer()
-            .atomic_write_vectored_all(bufs)
-            .await?;
-
-        self.shared_data.notify_new_packet_event();
-
-        Ok(AwaitableStatus::new(id.into_inner()))
-    }
-
-    /// Write will extend the file if writing beyond the end of the file.
-    ///
-    /// It is legal to write way beyond the end of the file, the semantics
-    /// are to write zeroes from the end of the file to the specified offset
-    /// and then the data.
-    ///
-    /// On most operating systems, such writes do not allocate disk space but
-    /// instead leave "holes" in the file.
-    ///
-    /// Return [`Error::WriteTooLargeToBeAtomic`] if the write is too large.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_write_request_direct_atomic_vectored(
-        &mut self,
-        id: Id<Buffer>,
-        handle: Cow<'_, Handle>,
-        offset: u64,
-        data: &[IoSlice<'_>],
-    ) -> Result<AwaitableStatus<Buffer>, Error> {
-        self.send_write_request_direct_atomic_vectored2(id, handle, offset, &[data])
-            .await
-    }
-
-    /// Write will extend the file if writing beyond the end of the file.
-    ///
-    /// It is legal to write way beyond the end of the file, the semantics
-    /// are to write zeroes from the end of the file to the specified offset
-    /// and then the data.
-    ///
-    /// On most operating systems, such writes do not allocate disk space but
-    /// instead leave "holes" in the file.
-    ///
-    /// Return [`Error::WriteTooLargeToBeAtomic`] if the write is too large.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn send_write_request_direct_atomic_vectored2(
-        &mut self,
-        id: Id<Buffer>,
-        handle: Cow<'_, Handle>,
-        offset: u64,
-        data: &[&[IoSlice<'_>]],
-    ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let data_iter = data.iter().flat_map(Deref::deref);
-
-        let len: usize = data_iter.clone().map(|io_slice| io_slice.len()).sum();
-        let len: u32 = len.try_into()?;
-
-        let header = Request::serialize_write_request(
-            &mut self.serializer,
-            ArenaArc::slot(&id.0),
-            handle,
-            offset,
-            len,
-        )?
-        .split();
-
-        if data.len() <= 29 {
-            let mut io_slices = [IoSlice::new(&[]); 30];
-
-            io_slices[0] = IoSlice::new(&*header);
-            io_slices[1..]
-                .iter_mut()
-                .zip(data_iter)
-                .for_each(|(dst, src)| {
-                    *dst = *src;
-                });
-
-            self.send_write_request_direct_atomic_vectored_impl(id, &io_slices)
-                .await
-        } else {
-            let mut vec = Vec::with_capacity(1 + data.len());
-            vec.push(IoSlice::new(&*header));
-            for io_slices in data {
-                vec.extend_from_slice(io_slices);
-            }
-
-            self.send_write_request_direct_atomic_vectored_impl(id, &vec)
-                .await
-        }
-    }
-
-    async fn send_write_request_direct_atomic_vectored_impl(
-        &mut self,
-        id: Id<Buffer>,
-        io_slices: &[IoSlice<'_>],
-    ) -> Result<AwaitableStatus<Buffer>, Error> {
-        let bufs = AtomicWriteIoSlices::new(io_slices)?;
-
-        id.0.reset(None);
-        self.shared_data
-            .writer()
-            .atomic_write_vectored_all(bufs)
-            .await?;
-
         self.shared_data.notify_new_packet_event();
 
         Ok(AwaitableStatus::new(id.into_inner()))

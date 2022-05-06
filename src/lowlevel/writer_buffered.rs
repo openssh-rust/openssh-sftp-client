@@ -1,72 +1,25 @@
 #![forbid(unsafe_code)]
 
-use crate::{Error, Writer};
-
 use std::convert::TryInto;
-use std::future::Future;
 use std::io::{self, IoSlice};
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::num::NonZeroUsize;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use openssh_sftp_protocol::ssh_format::SerBacker;
 
-use tokio::io::AsyncWriteExt;
-use tokio::sync::RwLock as RwLockAsync;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::sync::Mutex as MutexAsync;
 use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
 
-#[derive(Debug, Copy, Clone)]
-pub(super) struct AtomicWriteIoSlices<'a, W: Writer>(&'a [IoSlice<'a>], PhantomData<W>);
-
-impl<'a, W: Writer> AtomicWriteIoSlices<'a, W> {
-    pub(super) fn new(buffers: &'a [io::IoSlice<'a>]) -> Result<Self, Error> {
-        let mut total_len = 0;
-
-        for buffer in buffers {
-            total_len += buffer.len();
-
-            if total_len > W::MAX_ATOMIC_WRITE_LEN {
-                return Err(Error::WriteTooLargeToBeAtomic);
-            }
-        }
-
-        Ok(Self(buffers, PhantomData))
-    }
-}
-
 #[derive(Debug)]
-pub(crate) struct WriterBuffered<W>(RwLockAsync<W>, MpScBytesQueue);
+pub(crate) struct WriterBuffered<W>(MutexAsync<W>, MpScBytesQueue);
 
-impl<W: Writer> WriterBuffered<W> {
+impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
     pub(crate) fn new(writer: W) -> Self {
         Self(
-            RwLockAsync::new(writer),
-            MpScBytesQueue::new(W::io_slices_buffer_len()),
+            MutexAsync::new(writer),
+            MpScBytesQueue::new(NonZeroUsize::new(4096).unwrap()),
         )
-    }
-
-    /// Return `Ok(true)` is atomic write succeeds, `Ok(false)` if non-atomic
-    /// write is required.
-    pub(super) async fn atomic_write_vectored_all(
-        &self,
-        bufs: AtomicWriteIoSlices<'_, W>,
-    ) -> Result<(), io::Error> {
-        #[must_use = "futures do nothing unless you `.await` or poll them"]
-        struct AtomicWrite<'a, W: Writer>(&'a W, &'a [IoSlice<'a>]);
-
-        impl<W: Writer> Future for AtomicWrite<'_, W> {
-            type Output = Result<(), io::Error>;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let writer = Pin::new(self.0);
-                let input = self.1;
-
-                writer.poll_write_vectored_atomic(cx, input)
-            }
-        }
-
-        AtomicWrite(&*self.0.read().await, bufs.0).await
     }
 
     /// * `buf` - Must not be empty
@@ -80,24 +33,29 @@ impl<W: Writer> WriterBuffered<W> {
         self.0.get_mut().write_all(buf).await
     }
 
-    async fn flush_impl(&self, buffers: Buffers<'_>) -> Result<(), io::Error> {
-        #[must_use = "futures do nothing unless you `.await` or poll them"]
-        struct FlushBufferFuture<'a, W: Writer>(&'a mut W, Buffers<'a>);
-
-        impl<W: Writer> Future for FlushBufferFuture<'_, W> {
-            type Output = Result<(), io::Error>;
-
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let this = &mut *self;
-
-                let writer = &mut this.0;
-                let buffers = &mut this.1;
-
-                writer.poll_flush_buffers(cx, buffers)
-            }
+    async fn flush_impl(&self, mut buffers: Buffers<'_>) -> Result<(), io::Error> {
+        if buffers.is_empty() {
+            return Ok(());
         }
 
-        FlushBufferFuture(&mut *self.0.write().await, buffers).await
+        loop {
+            let n = self
+                .0
+                .lock()
+                .await
+                .write_vectored(buffers.get_io_slices())
+                .await?;
+
+            // Since `MpScBytesQueue::get_buffers` guarantees that every `IoSlice`
+            // returned must be non-empty, having `0` bytes written is an error
+            // likely caused by the close of the read end.
+            let n =
+                NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
+
+            if !buffers.advance(n) {
+                break Ok(());
+            }
+        }
     }
 
     /// If another thread is flushing, then `Ok(false)` will be returned.

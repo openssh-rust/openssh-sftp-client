@@ -28,8 +28,5 @@ pub mod changelog;
 mod error;
 pub use error::Error;
 
-mod writer;
-pub use writer::Writer;
-
 pub mod highlevel;
 pub mod lowlevel;

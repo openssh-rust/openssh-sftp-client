@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-use crate::Writer;
-
 use super::awaitable_responses::ArenaArc;
 use super::awaitable_responses::Response;
 use super::connection::SharedData;
@@ -17,7 +15,7 @@ use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::de::DeserializeOwned;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
-use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt};
+use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 
 /// The ReadEnd for the lowlevel API.
@@ -27,8 +25,12 @@ pub struct ReadEnd<R, W, Buffer, Auxiliary = ()> {
     shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
-impl<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
-    ReadEnd<R, W, Buffer, Auxiliary>
+impl<
+        R: AsyncRead + Unpin,
+        W: AsyncWrite + Unpin,
+        Buffer: ToBuffer + 'static + Send + Sync,
+        Auxiliary,
+    > ReadEnd<R, W, Buffer, Auxiliary>
 {
     pub(crate) fn new(reader: R, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
         Self {

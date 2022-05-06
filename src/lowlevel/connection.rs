@@ -3,7 +3,6 @@
 use super::awaitable_responses::AwaitableResponses;
 use super::writer_buffered::WriterBuffered;
 use super::*;
-use crate::Writer;
 
 use std::fmt::Debug;
 use std::io;
@@ -11,7 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::Notify;
 
 // TODO:
@@ -147,7 +146,7 @@ impl<W, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: Writer, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// Flush the write buffer.
     ///
     /// If another thread is flushing, then `Ok(false)` will be returned.
@@ -184,7 +183,11 @@ impl<W: Writer, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary>
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + Send + Sync + 'static>(
+pub async fn connect<
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+    Buffer: ToBuffer + Send + Sync + 'static,
+>(
     reader: R,
     writer: W,
 ) -> Result<(WriteEnd<W, Buffer>, ReadEnd<R, W, Buffer>, Extensions), Error> {
@@ -201,7 +204,7 @@ pub async fn connect<R: AsyncRead + Unpin, W: Writer, Buffer: ToBuffer + Send + 
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect_with_auxiliary<
     R: AsyncRead + Unpin,
-    W: Writer,
+    W: AsyncWrite + Unpin,
     Buffer: ToBuffer + Send + Sync + 'static,
     Auxiliary,
 >(

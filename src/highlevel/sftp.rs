@@ -1,6 +1,6 @@
 use super::{
-    auxiliary, lowlevel, max_atomic_write_len, tasks, Error, File, Fs, OpenOptions, SftpOptions,
-    SharedData, WriteEnd, WriteEndWithCachedId, Writer,
+    auxiliary, lowlevel, tasks, Error, File, Fs, OpenOptions, SftpOptions, SharedData, WriteEnd,
+    WriteEndWithCachedId,
 };
 
 use auxiliary::Auxiliary;
@@ -14,7 +14,7 @@ use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use derive_destructure2::destructure;
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::JoinHandle;
 
 /// CancellationToken
@@ -28,7 +28,7 @@ pub struct Sftp<W> {
     read_task: JoinHandle<Result<(), Error>>,
 }
 
-impl<W: Writer + Send + Sync + 'static> Sftp<W> {
+impl<W: AsyncWrite + Unpin + Send + Sync + 'static> Sftp<W> {
     /// Create [`Sftp`].
     pub async fn new<R: AsyncRead + Unpin + Send + Sync + 'static>(
         stdin: W,
@@ -72,7 +72,7 @@ impl<W: Writer + Send + Sync + 'static> Sftp<W> {
     }
 }
 
-impl<W: Writer> Sftp<W> {
+impl<W: AsyncWrite + Unpin> Sftp<W> {
     async fn set_limits(
         &self,
         write_end: WriteEnd<W>,
@@ -128,17 +128,10 @@ impl<W: Writer> Sftp<W> {
             .unwrap_or(read_len);
 
         let write_len = write_len.try_into().unwrap_or(packet_len - 300);
-        let mut write_len = options
+        let write_len = options
             .get_max_write_len()
             .map(|v| min(v, write_len))
             .unwrap_or(write_len);
-
-        // If max_buffered_write is less than max_atomic_write_len,
-        // then the direct write is enabled and max_atomic_write_len
-        // applies.
-        if write_end.get_auxiliary().max_buffered_write < max_atomic_write_len::<W>() {
-            write_len = min(write_len, max_atomic_write_len::<W>());
-        }
 
         let limits = auxiliary::Limits {
             read_len,

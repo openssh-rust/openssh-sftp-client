@@ -12,8 +12,6 @@
 //! Thus, if you cancel a future that changes the remote filesystem in any way,
 //! then the change would still happen regardless.
 
-use crate::Writer;
-
 use super::{lowlevel, Error};
 
 pub use lowlevel::{UnixTimeStamp, UnixTimeStampError};
@@ -47,7 +45,7 @@ pub use file::TokioCompactFile;
 pub use file::TokioCompatFile;
 pub use file::DEFAULT_BUFLEN;
 pub use file::DEFAULT_MAX_BUFLEN;
-pub use file::{max_atomic_write_len, File, OpenOptions};
+pub use file::{File, OpenOptions};
 
 mod fs;
 pub use fs::DirEntry;

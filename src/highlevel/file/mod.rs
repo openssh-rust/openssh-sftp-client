@@ -1,7 +1,6 @@
 use super::lowlevel::{self, CreateFlags, Data, FileAttrs, Handle};
 use super::{
     Auxiliary, Error, Id, MetaData, MetaDataBuilder, OwnedHandle, Permissions, Sftp, WriteEnd,
-    Writer,
 };
 
 use std::borrow::Cow;
@@ -14,7 +13,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::{Buf, Bytes, BytesMut};
-use tokio::io::AsyncSeek;
+use tokio::io::{AsyncSeek, AsyncWrite};
 use tokio_io_utility::IoSliceExt;
 
 mod tokio_compat_file;
@@ -26,13 +25,6 @@ pub type TokioCompactFile<'s, W> = TokioCompatFile<'s, W>;
 
 mod utility;
 use utility::{take_bytes, take_io_slices};
-
-/// Maximum amount of data that can writen atomically.
-pub fn max_atomic_write_len<W: Writer>() -> u32 {
-    (W::MAX_ATOMIC_WRITE_LEN - 9 - 4 - 256 - 8 - 4)
-        .try_into()
-        .unwrap_or(u32::MAX)
-}
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Debug, Copy, Clone)]
@@ -133,7 +125,7 @@ impl<'s, W> OpenOptions<'s, W> {
     }
 }
 
-impl<'s, W: Writer> OpenOptions<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> OpenOptions<'s, W> {
     async fn open_impl(&self, path: &Path) -> Result<File<'s, W>, Error> {
         let filename = Cow::Borrowed(path);
 
@@ -184,7 +176,7 @@ impl<'s, W: Writer> OpenOptions<'s, W> {
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
 /// [`tokio::io::AsyncWrite`], checkout [`TokioCompactFile`].
 #[derive(Debug)]
-pub struct File<'s, W: Writer> {
+pub struct File<'s, W: AsyncWrite + Unpin> {
     inner: OwnedHandle<'s, W>,
 
     is_readable: bool,
@@ -193,7 +185,7 @@ pub struct File<'s, W: Writer> {
     offset: u64,
 }
 
-impl<'s, W: Writer> Clone for File<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> Clone for File<'s, W> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -205,7 +197,7 @@ impl<'s, W: Writer> Clone for File<'s, W> {
     }
 }
 
-impl<'s, W: Writer> File<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> File<'s, W> {
     fn get_auxiliary(&self) -> &'s Auxiliary {
         self.inner.get_auxiliary()
     }
@@ -395,12 +387,6 @@ impl<'s, W: Writer> File<'s, W> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let max_write_len = self.max_write_len();
 
-        let max_buffered_write = self.max_buffered_write();
-
-        // If max_buffered_write is larger than or equal to max_atomic_write_len,
-        // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
-
         let n: u32 = buf
             .len()
             .try_into()
@@ -410,25 +396,12 @@ impl<'s, W: Writer> File<'s, W> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let buf = &buf[..(n as usize)];
 
-        if n <= max_buffered_write || !is_direct_write_enabled {
-            self.send_writable_request(|write_end, handle, id| {
-                Ok(write_end
-                    .send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))?
-                    .wait())
-            })
-            .await?;
-        } else {
-            let id = self.inner.get_id_mut();
-            let write_end = &mut self.inner.write_end;
-            let handle = &self.inner.handle;
-
-            let awaitable = write_end
-                .send_write_request_direct_atomic(id, Cow::Borrowed(handle), offset, buf)
-                .await?
-                .wait();
-
-            write_end.cancel_if_task_failed(awaitable).await?;
-        }
+        self.send_writable_request(|write_end, handle, id| {
+            Ok(write_end
+                .send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))?
+                .wait())
+        })
+        .await?;
 
         // Adjust offset
         Pin::new(self).start_seek(io::SeekFrom::Current(n as i64))?;
@@ -446,12 +419,6 @@ impl<'s, W: Writer> File<'s, W> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let max_write_len = self.max_write_len();
 
-        let max_buffered_write = self.max_buffered_write();
-
-        // If max_buffered_write is larger than or equal to max_atomic_write_len,
-        // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
-
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
         } else {
@@ -464,30 +431,12 @@ impl<'s, W: Writer> File<'s, W> {
 
         let offset = self.offset;
 
-        if n <= max_buffered_write || !is_direct_write_enabled {
-            self.send_writable_request(|write_end, handle, id| {
-                Ok(write_end
-                    .send_write_request_buffered_vectored2(id, handle, offset, &buffers)?
-                    .wait())
-            })
-            .await?;
-        } else {
-            let id = self.inner.get_id_mut();
-            let write_end = &mut self.inner.write_end;
-            let handle = &self.inner.handle;
-
-            let awaitable = write_end
-                .send_write_request_direct_atomic_vectored2(
-                    id,
-                    Cow::Borrowed(handle),
-                    offset,
-                    &buffers,
-                )
-                .await?
-                .wait();
-
-            write_end.cancel_if_task_failed(awaitable).await?;
-        }
+        self.send_writable_request(|write_end, handle, id| {
+            Ok(write_end
+                .send_write_request_buffered_vectored2(id, handle, offset, &buffers)?
+                .wait())
+        })
+        .await?;
 
         // Adjust offset
         Pin::new(self).start_seek(io::SeekFrom::Current(n as i64))?;
@@ -643,7 +592,7 @@ impl<'s, W: Writer> File<'s, W> {
     }
 }
 
-impl<W: Writer> AsyncSeek for File<'_, W> {
+impl<W: AsyncWrite + Unpin> AsyncSeek for File<'_, W> {
     /// start_seek only adjust local offset since sftp protocol
     /// does not provides a seek function.
     ///

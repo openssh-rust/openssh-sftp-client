@@ -1,6 +1,6 @@
 use super::{
     lowlevel, Auxiliary, Buffer, Error, Id, MetaData, MetaDataBuilder, OwnedHandle, Permissions,
-    Sftp, WriteEnd, WriteEndWithCachedId, Writer,
+    Sftp, WriteEnd, WriteEndWithCachedId,
 };
 
 use std::borrow::Cow;
@@ -9,6 +9,7 @@ use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
+use tokio::io::AsyncWrite;
 
 mod dir;
 pub use dir::{DirEntry, ReadDir};
@@ -69,7 +70,7 @@ impl<'s, W> Fs<'s, W> {
     }
 }
 
-impl<'s, W: Writer> Fs<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> Fs<'s, W> {
     async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_, W>, Error> {
         let path = self.concat_path_if_needed(path);
 
@@ -354,9 +355,9 @@ impl<'s, W: Writer> Fs<'s, W> {
 /// Remote Directory
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Dir<'s, W: Writer>(OwnedHandle<'s, W>);
+pub struct Dir<'s, W: AsyncWrite + Unpin>(OwnedHandle<'s, W>);
 
-impl<W: Writer> Dir<'_, W> {
+impl<W: AsyncWrite + Unpin> Dir<'_, W> {
     /// Read dir.
     pub async fn read_dir(&mut self) -> Result<ReadDir, Error> {
         self.0
@@ -400,7 +401,7 @@ impl<W> DirBuilder<'_, '_, W> {
     }
 }
 
-impl<W: Writer> DirBuilder<'_, '_, W> {
+impl<W: AsyncWrite + Unpin> DirBuilder<'_, '_, W> {
     async fn create_impl(&mut self, path: &Path) -> Result<(), Error> {
         let fs = &mut self.fs;
 
