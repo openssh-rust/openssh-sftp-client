@@ -75,6 +75,8 @@ jobs:
         cargo clippy --all --no-deps
         cargo +nightly clippy --all --no-deps
         cargo doc --no-deps
+      env:
+        RUSTDOCFLAGS: -Dwarnings
 
   build:
     runs-on: ubuntu-latest
