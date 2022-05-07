@@ -1,6 +1,8 @@
 use super::{
-    auxiliary, lowlevel, tasks, Error, File, Fs, OpenOptions, SftpOptions, SharedData, WriteEnd,
-    WriteEndWithCachedId,
+    auxiliary,
+    file::{File, OpenOptions},
+    fs::Fs,
+    lowlevel, tasks, Error, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
 };
 
 use auxiliary::Auxiliary;

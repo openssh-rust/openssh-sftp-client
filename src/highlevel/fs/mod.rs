@@ -1,6 +1,7 @@
 use super::{
-    lowlevel, Auxiliary, Buffer, Error, Id, MetaData, MetaDataBuilder, OwnedHandle, Permissions,
-    Sftp, WriteEnd, WriteEndWithCachedId,
+    lowlevel,
+    metadata::{MetaData, MetaDataBuilder, Permissions},
+    Auxiliary, Buffer, Error, Id, OwnedHandle, Sftp, WriteEnd, WriteEndWithCachedId,
 };
 
 use std::borrow::Cow;

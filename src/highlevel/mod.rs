@@ -39,21 +39,14 @@ use cache::WriteEndWithCachedId;
 mod handle;
 use handle::OwnedHandle;
 
-mod file;
-#[allow(deprecated)]
-pub use file::TokioCompactFile;
-pub use file::TokioCompatFile;
-pub use file::DEFAULT_BUFLEN;
-pub use file::DEFAULT_MAX_BUFLEN;
-pub use file::{File, OpenOptions};
+/// Module contains types for manipulating files.
+pub mod file;
 
-mod fs;
-pub use fs::DirEntry;
-pub use fs::ReadDir;
-pub use fs::{Dir, DirBuilder, Fs};
+/// Module contains types for manipulating directories.
+pub mod fs;
 
-mod metadata;
-pub use metadata::{FileType, MetaData, MetaDataBuilder, Permissions};
+/// Module contains types for manipulating metadata of files or directories.
+pub mod metadata;
 
 type Buffer = BytesMut;
 

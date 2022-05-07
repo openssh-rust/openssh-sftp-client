@@ -1,4 +1,4 @@
-use super::super::{FileType, MetaData};
+use super::super::metadata::{FileType, MetaData};
 use super::lowlevel::NameEntry;
 
 use std::ops::{Deref, DerefMut};

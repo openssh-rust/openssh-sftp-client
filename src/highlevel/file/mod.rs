@@ -1,6 +1,7 @@
 use super::lowlevel::{self, CreateFlags, Data, FileAttrs, Handle};
 use super::{
-    Auxiliary, Error, Id, MetaData, MetaDataBuilder, OwnedHandle, Permissions, Sftp, WriteEnd,
+    metadata::{MetaData, MetaDataBuilder, Permissions},
+    Auxiliary, Error, Id, OwnedHandle, Sftp, WriteEnd,
 };
 
 use std::borrow::Cow;

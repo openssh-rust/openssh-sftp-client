@@ -262,7 +262,7 @@ async fn sftp_tokio_compact_file_basics() {
     let read_entire_file = || async {
         let mut buffer = Vec::with_capacity(content.len());
 
-        let mut file: TokioCompatFile<PipeWrite> = sftp.open(&path).await.unwrap().into();
+        let mut file: file::TokioCompatFile<PipeWrite> = sftp.open(&path).await.unwrap().into();
         file.read_to_end(&mut buffer).await.unwrap();
         file.close().await.unwrap();
 
@@ -278,7 +278,7 @@ async fn sftp_tokio_compact_file_basics() {
             .create_new(true)
             .open(&path)
             .await
-            .map(TokioCompatFile::new)
+            .map(file::TokioCompatFile::new)
             .unwrap();
 
         // Create new file (fail if already exists) and write to it.
@@ -292,7 +292,11 @@ async fn sftp_tokio_compact_file_basics() {
         // Create new file with Trunc and write to it.
         //
         // Sftp::Create opens the file truncated.
-        let mut file = sftp.create(&path).await.map(TokioCompatFile::new).unwrap();
+        let mut file = sftp
+            .create(&path)
+            .await
+            .map(file::TokioCompatFile::new)
+            .unwrap();
         debug_assert_eq!(file.write(content).await.unwrap(), content.len());
 
         // close also flush the internal future buffers, but using a
@@ -317,7 +321,7 @@ async fn sftp_tokio_compact_file_basics() {
 def_write_all_test!(
     sftp_tokio_compact_file_write_all,
     sftp_options_with_max_rw_len(),
-    TokioCompatFile::new,
+    file::TokioCompatFile::new,
     file,
     content,
     {
@@ -328,7 +332,7 @@ def_write_all_test!(
 def_write_all_test!(
     sftp_tokio_compact_file_write_vectored_all,
     sftp_options_with_max_rw_len(),
-    TokioCompatFile::new,
+    file::TokioCompatFile::new,
     file,
     content,
     {
@@ -534,7 +538,7 @@ async fn sftp_fs_metadata() {
             content.len().try_into().unwrap()
         );
 
-        fs.set_metadata(&path, MetaDataBuilder::new().len(2834).create())
+        fs.set_metadata(&path, metadata::MetaDataBuilder::new().len(2834).create())
             .await
             .unwrap();
         assert_eq!(fs.metadata(&path).await.unwrap().len().unwrap(), 2834);
