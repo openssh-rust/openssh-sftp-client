@@ -24,17 +24,21 @@ use crate::*;
 ///  - `lowlevel::WriteEnd::send_write_request_direct_atomic`
 ///  - `lowlevel::WriteEnd::send_write_request_direct_atomic_vectored`
 ///  - `lowlevel::WriteEnd::send_write_request_direct_atomic_vectored2`
-///  - export of `highlevel::file::TokioCompactFile`
-///  - export of `highlevel::file::TokioCompatFile`
-///  - export of `highlevel::file::DEFAULT_BUFLEN`
-///  - export of `highlevel::file::DEFAULT_MAX_BUFLEN`
-///  - export of `highlevel::file::File`
-///  - export of `highlevel::file::OpenOptions`
-///  - export of `highlevel::fs::DirEntry`
-///  - export of `highlevel::fs::ReadDir`
-///  - export of `highlevel::fs::Dir`
-///  - export of `highlevel::fs::DirBuilder`
-///  - export of `highlevel::fs::Fs`
+///  - Export of `highlevel::file::TokioCompactFile`
+///  - Export of `highlevel::file::TokioCompatFile`
+///  - Export of `highlevel::file::DEFAULT_BUFLEN`
+///  - Export of `highlevel::file::DEFAULT_MAX_BUFLEN`
+///  - Export of `highlevel::file::File`
+///  - Export of `highlevel::file::OpenOptions`
+///  - Export of `highlevel::fs::DirEntry`
+///  - Export of `highlevel::fs::ReadDir`
+///  - Export of `highlevel::fs::Dir`
+///  - Export of `highlevel::fs::DirBuilder`
+///  - Export of `highlevel::fs::Fs`
+///  - Export of `highlevel::metadata::FileType`
+///  - Export of `highlevel::metadata::MetaData`
+///  - Export of `highlevel::metadata::MetaDataBuilder`
+///  - Export of `highlevel::metadata::Permissions`
 #[doc(hidden)]
 pub mod unreleased {}
 
