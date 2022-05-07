@@ -74,7 +74,7 @@ jobs:
         cargo +nightly fmt --all -- --check
         cargo clippy --all --no-deps
         cargo +nightly clippy --all --no-deps
-        cargo doc
+        cargo doc --no-deps
 
   build:
     runs-on: ubuntu-latest
