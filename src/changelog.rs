@@ -1,6 +1,44 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - Export mod [`highlevel::file`]
+///  - Export mod [`highlevel::fs`]
+///  - Export mod [`highlevel::metadata`]
+///
+/// ## Changed
+///  - [`lowlevel::WriteEnd`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::SharedData`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::ReadEnd`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::connect`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::connect_with_auxiliary`] now requires `W: AsyncWrite + Unpin`
+///  - All types in [`highlevel`] now requires `W: AsyncWrite + Unpin`
+///    except for
+///     - the re-exported type [`highlevel::CancellationToken`]
+///     - [`highlevel::SftpOptions`]
+///     - [`highlevel::fs::DirEntry`]
+///     - [`highlevel::fs::ReadDir`]
+///
+/// ## Removed
+///  - Trait `Writer`.
+///  - `lowlevel::WriteEnd::send_write_request_direct_atomic`
+///  - `lowlevel::WriteEnd::send_write_request_direct_atomic_vectored`
+///  - `lowlevel::WriteEnd::send_write_request_direct_atomic_vectored2`
+///  - Export of `highlevel::file::TokioCompactFile`
+///  - Export of `highlevel::file::TokioCompatFile`
+///  - Export of `highlevel::file::DEFAULT_BUFLEN`
+///  - Export of `highlevel::file::DEFAULT_MAX_BUFLEN`
+///  - Export of `highlevel::file::File`
+///  - Export of `highlevel::file::OpenOptions`
+///  - Export of `highlevel::fs::DirEntry`
+///  - Export of `highlevel::fs::ReadDir`
+///  - Export of `highlevel::fs::Dir`
+///  - Export of `highlevel::fs::DirBuilder`
+///  - Export of `highlevel::fs::Fs`
+///  - Export of `highlevel::metadata::FileType`
+///  - Export of `highlevel::metadata::MetaData`
+///  - Export of `highlevel::metadata::MetaDataBuilder`
+///  - Export of `highlevel::metadata::Permissions`
 #[doc(hidden)]
 pub mod unreleased {}
 

@@ -1,6 +1,14 @@
 //! openssh sftp client, implements [sftp v3] accodring to
 //! [`openssh-portable/sftp-client.c`].
 //!
+//! ## Usage
+//!
+//! It is recommended that you use this crate with [openssh].
+//!
+//! You can also use this crate directly by using whatever ssh library
+//! to launch the `sftp` subsystem, then pass the stdin/stdout to
+//! [`highlevel::Sftp::new`].
+//!
 //! ## Extensions
 //!
 //! This crate support the following extensions:
@@ -10,6 +18,7 @@
 //!  - hardlink
 //!  - posix rename
 //!
+//! [openssh]: https://crates.io/crates/openssh
 //! [sftp v3]: https://www.openssh.com/txt/draft-ietf-secsh-filexfer-02.txt
 //! [`openssh-portable/sftp-client.c`]: https://github.com/openssh/openssh-portable/blob/19b3d846f06697c85957ab79a63454f57f8e22d6/sftp-client.c
 
@@ -27,9 +36,6 @@ pub mod changelog;
 
 mod error;
 pub use error::Error;
-
-mod writer;
-pub use writer::Writer;
 
 pub mod highlevel;
 pub mod lowlevel;

@@ -1,7 +1,9 @@
-use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd, Writer};
+use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd};
 
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
+
+use tokio::io::AsyncWrite;
 
 #[derive(Debug)]
 pub(super) struct WriteEndWithCachedId<'s, W> {
@@ -85,7 +87,7 @@ impl<'s, W> WriteEndWithCachedId<'s, W> {
     }
 }
 
-impl<'s, W: Writer> WriteEndWithCachedId<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> WriteEndWithCachedId<'s, W> {
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
         Func: FnOnce(&mut WriteEnd<W>, Id) -> Result<F, Error>,

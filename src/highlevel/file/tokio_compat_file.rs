@@ -1,7 +1,7 @@
 use super::super::{BoxedWaitForCancellationFuture, Buffer, Data};
 use super::lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle};
 use super::utility::take_io_slices;
-use super::{max_atomic_write_len, Error, File, Id, WriteEnd, Writer};
+use super::{Error, File, Id, WriteEnd};
 
 use std::borrow::Cow;
 use std::cmp::{max, min};
@@ -34,7 +34,7 @@ fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     }
 }
 
-fn send_request<Func, R, W: Writer>(file: &mut File<'_, W>, f: Func) -> Result<R, Error>
+fn send_request<Func, R, W: AsyncWrite + Unpin>(file: &mut File<'_, W>, f: Func) -> Result<R, Error>
 where
     Func: FnOnce(&mut WriteEnd<W>, Id, Cow<'_, Handle>, u64) -> Result<R, Error>,
 {
@@ -58,7 +58,7 @@ where
 /// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
-pub struct TokioCompatFile<'s, W: Writer> {
+pub struct TokioCompatFile<'s, W: AsyncWrite + Unpin> {
     inner: File<'s, W>,
 
     buffer_len: NonZeroUsize,
@@ -72,7 +72,7 @@ pub struct TokioCompatFile<'s, W: Writer> {
     write_cancellation_future: BoxedWaitForCancellationFuture<'s>,
 }
 
-impl<'s, W: Writer> TokioCompatFile<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> TokioCompatFile<'s, W> {
     /// Create a [`TokioCompatFile`].
     pub fn new(inner: File<'s, W>) -> Self {
         Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
@@ -286,9 +286,12 @@ impl<'s, W: Writer> TokioCompatFile<'s, W> {
     /// This function does not change the offset into the file.
     pub async fn read_into_buffer(&mut self, amt: NonZeroU32) -> Result<(), Error> {
         #[must_use]
-        struct ReadIntoBuffer<'a, 's, W: Writer>(&'a mut TokioCompatFile<'s, W>, NonZeroU32);
+        struct ReadIntoBuffer<'a, 's, W: AsyncWrite + Unpin>(
+            &'a mut TokioCompatFile<'s, W>,
+            NonZeroU32,
+        );
 
-        impl<W: Writer> Future for ReadIntoBuffer<'_, '_, W> {
+        impl<W: AsyncWrite + Unpin> Future for ReadIntoBuffer<'_, '_, W> {
             type Output = Result<(), Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -301,13 +304,13 @@ impl<'s, W: Writer> TokioCompatFile<'s, W> {
     }
 }
 
-impl<'s, W: Writer> From<File<'s, W>> for TokioCompatFile<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> From<File<'s, W>> for TokioCompatFile<'s, W> {
     fn from(inner: File<'s, W>) -> Self {
         Self::new(inner)
     }
 }
 
-impl<'s, W: Writer> From<TokioCompatFile<'s, W>> for File<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> From<TokioCompatFile<'s, W>> for File<'s, W> {
     fn from(file: TokioCompatFile<'s, W>) -> Self {
         file.into_inner()
     }
@@ -317,13 +320,13 @@ impl<'s, W: Writer> From<TokioCompatFile<'s, W>> for File<'s, W> {
 /// same underlying file handle as the existing File instance.
 ///
 /// Reads, writes, and seeks can be performed independently.
-impl<W: Writer> Clone for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite + Unpin> Clone for TokioCompatFile<'_, W> {
     fn clone(&self) -> Self {
         Self::with_capacity(self.inner.clone(), self.buffer_len, self.max_buffer_len)
     }
 }
 
-impl<'s, W: Writer> Deref for TokioCompatFile<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> Deref for TokioCompatFile<'s, W> {
     type Target = File<'s, W>;
 
     fn deref(&self) -> &Self::Target {
@@ -331,13 +334,13 @@ impl<'s, W: Writer> Deref for TokioCompatFile<'s, W> {
     }
 }
 
-impl<W: Writer> DerefMut for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite + Unpin> DerefMut for TokioCompatFile<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<W: Writer> AsyncSeek for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite + Unpin> AsyncSeek for TokioCompatFile<'_, W> {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         let prev_offset = self.offset();
         Pin::new(&mut self.inner).start_seek(position)?;
@@ -365,7 +368,7 @@ impl<W: Writer> AsyncSeek for TokioCompatFile<'_, W> {
     }
 }
 
-impl<W: Writer> AsyncBufRead for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite + Unpin> AsyncBufRead for TokioCompatFile<'_, W> {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         if self.buffer.is_empty() {
             let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
@@ -389,7 +392,7 @@ impl<W: Writer> AsyncBufRead for TokioCompatFile<'_, W> {
 
 /// [`TokioCompatFile`] can read in at most [`File::max_read_len`] bytes
 /// at a time.
-impl<W: Writer> AsyncRead for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite + Unpin> AsyncRead for TokioCompatFile<'_, W> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -451,10 +454,10 @@ impl<W: Writer> AsyncRead for TokioCompatFile<'_, W> {
 ///
 /// [`TokioCompatFile`] can write at most [`File::max_write_len`] bytes
 /// at a time.
-impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite + Unpin> AsyncWrite for TokioCompatFile<'_, W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
+        _cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         if !self.is_writable {
@@ -471,12 +474,6 @@ impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let max_write_len = self.max_write_len();
 
-        let max_buffered_write = self.max_buffered_write();
-
-        // If max_buffered_write is larger than or equal to max_atomic_write_len,
-        // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
-
         let n: u32 = buf
             .len()
             .try_into()
@@ -492,28 +489,14 @@ impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
 
         let file = &mut this.inner;
 
-        let future = if n <= max_buffered_write || !is_direct_write_enabled {
-            let future = send_request(file, |write_end, id, handle, offset| {
-                write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
-            })
-            .map_err(sftp_to_io_error)?
-            .wait();
+        let future = send_request(file, |write_end, id, handle, offset| {
+            write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
+        })
+        .map_err(sftp_to_io_error)?
+        .wait();
 
-            // Since a new request is buffered, flushing is required.
-            self.need_flush = true;
-
-            future
-        } else {
-            let id = file.inner.get_id_mut();
-            let offset = file.offset;
-
-            let (write_end, handle) = file.get_inner();
-
-            let future = write_end.send_write_request_direct_atomic(id, handle, offset, buf);
-            tokio::pin!(future);
-
-            ready!(future.poll(cx)).map_err(sftp_to_io_error)?.wait()
-        };
+        // Since a new request is buffered, flushing is required.
+        self.need_flush = true;
 
         self.write_futures.push_back(future);
 
@@ -576,7 +559,7 @@ impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
 
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
+        _cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         if !self.is_writable {
@@ -591,12 +574,6 @@ impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
         }
 
         let max_write_len = self.max_write_len();
-
-        let max_buffered_write = self.max_buffered_write();
-
-        // If max_buffered_write is larger than or equal to max_atomic_write_len,
-        // then the direct write is disabled.
-        let is_direct_write_enabled = max_buffered_write < max_atomic_write_len::<W>();
 
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
@@ -614,29 +591,14 @@ impl<W: Writer> AsyncWrite for TokioCompatFile<'_, W> {
 
         let file = &mut this.inner;
 
-        let future = if n <= max_buffered_write || !is_direct_write_enabled {
-            let future = send_request(file, |write_end, id, handle, offset| {
-                write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
-            })
-            .map_err(sftp_to_io_error)?
-            .wait();
+        let future = send_request(file, |write_end, id, handle, offset| {
+            write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
+        })
+        .map_err(sftp_to_io_error)?
+        .wait();
 
-            // Since a new request is buffered, flushing is required.
-            self.need_flush = true;
-
-            future
-        } else {
-            let id = file.inner.get_id_mut();
-            let offset = file.offset;
-
-            let (write_end, handle) = file.get_inner();
-
-            let future =
-                write_end.send_write_request_direct_atomic_vectored2(id, handle, offset, &buffers);
-            tokio::pin!(future);
-
-            ready!(future.poll(cx)).map_err(sftp_to_io_error)?.wait()
-        };
+        // Since a new request is buffered, flushing is required.
+        self.need_flush = true;
 
         self.write_futures.push_back(future);
 

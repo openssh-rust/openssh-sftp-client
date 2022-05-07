@@ -1,5 +1,5 @@
 use super::lowlevel::{Handle, HandleOwned};
-use super::{Error, Id, WriteEnd, WriteEndWithCachedId, Writer};
+use super::{Error, Id, WriteEnd, WriteEndWithCachedId};
 
 use std::borrow::Cow;
 use std::future::Future;
@@ -7,15 +7,16 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use derive_destructure2::destructure;
+use tokio::io::AsyncWrite;
 
 /// Remote Directory
 #[derive(Debug, destructure)]
-pub(super) struct OwnedHandle<'s, W: Writer> {
+pub(super) struct OwnedHandle<'s, W: AsyncWrite + Unpin> {
     pub(super) write_end: WriteEndWithCachedId<'s, W>,
     pub(super) handle: Arc<HandleOwned>,
 }
 
-impl<W: Writer> Clone for OwnedHandle<'_, W> {
+impl<W: AsyncWrite + Unpin> Clone for OwnedHandle<'_, W> {
     fn clone(&self) -> Self {
         Self {
             write_end: self.write_end.clone(),
@@ -24,7 +25,7 @@ impl<W: Writer> Clone for OwnedHandle<'_, W> {
     }
 }
 
-impl<W: Writer> Drop for OwnedHandle<'_, W> {
+impl<W: AsyncWrite + Unpin> Drop for OwnedHandle<'_, W> {
     fn drop(&mut self) {
         let write_end = &mut self.write_end;
         let handle = &self.handle;
@@ -37,7 +38,7 @@ impl<W: Writer> Drop for OwnedHandle<'_, W> {
     }
 }
 
-impl<'s, W: Writer> OwnedHandle<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> OwnedHandle<'s, W> {
     pub(super) fn new(write_end: WriteEndWithCachedId<'s, W>, handle: HandleOwned) -> Self {
         Self {
             write_end,
@@ -83,7 +84,7 @@ impl<'s, W: Writer> OwnedHandle<'s, W> {
     }
 }
 
-impl<'s, W: Writer> Deref for OwnedHandle<'s, W> {
+impl<'s, W: AsyncWrite + Unpin> Deref for OwnedHandle<'s, W> {
     type Target = WriteEndWithCachedId<'s, W>;
 
     fn deref(&self) -> &Self::Target {
@@ -91,7 +92,7 @@ impl<'s, W: Writer> Deref for OwnedHandle<'s, W> {
     }
 }
 
-impl<W: Writer> DerefMut for OwnedHandle<'_, W> {
+impl<W: AsyncWrite + Unpin> DerefMut for OwnedHandle<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.write_end
     }

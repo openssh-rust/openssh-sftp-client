@@ -12,8 +12,6 @@
 //! Thus, if you cancel a future that changes the remote filesystem in any way,
 //! then the change would still happen regardless.
 
-use crate::Writer;
-
 use super::{lowlevel, Error};
 
 pub use lowlevel::{UnixTimeStamp, UnixTimeStampError};
@@ -41,21 +39,14 @@ use cache::WriteEndWithCachedId;
 mod handle;
 use handle::OwnedHandle;
 
-mod file;
-#[allow(deprecated)]
-pub use file::TokioCompactFile;
-pub use file::TokioCompatFile;
-pub use file::DEFAULT_BUFLEN;
-pub use file::DEFAULT_MAX_BUFLEN;
-pub use file::{max_atomic_write_len, File, OpenOptions};
+/// Module contains types for manipulating files.
+pub mod file;
 
-mod fs;
-pub use fs::DirEntry;
-pub use fs::ReadDir;
-pub use fs::{Dir, DirBuilder, Fs};
+/// Module contains types for manipulating directories.
+pub mod fs;
 
-mod metadata;
-pub use metadata::{FileType, MetaData, MetaDataBuilder, Permissions};
+/// Module contains types for manipulating metadata of files or directories.
+pub mod metadata;
 
 type Buffer = BytesMut;
 
