@@ -1,6 +1,24 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Changed
+///  - [`lowlevel::WriteEnd`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::SharedData`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::ReadEnd`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::connect`] now requires `W: AsyncWrite + Unpin`
+///  - [`lowlevel::connect_with_auxiliary`] now requires `W: AsyncWrite + Unpin`
+///  - All types in [`highlevel`] now requires `W: AsyncWrite + Unpin`
+///    except for
+///     - the re-exported type [`highlevel::CancellationToken`]
+///     - [`highlevel::SftpOptions`]
+///     - [`highlevel::DirEntry`]
+///     - [`highlevel::ReadDir`]
+///
+/// ## Removed
+///  - Trait `Writer`.
+///  - `lowlevel::WriteEnd::send_write_request_direct_atomic`
+///  - `lowlevel::WriteEnd::send_write_request_direct_atomic_vectored`
+///  - `lowlevel::WriteEnd::send_write_request_direct_atomic_vectored2`
 #[doc(hidden)]
 pub mod unreleased {}
 
