@@ -260,8 +260,8 @@ impl Permissions {
     ///
     /// This operation does not modify the filesystem.
     ///
-    /// To modify the filesystem use the [`super::Fs::set_permissions`] or
-    /// the [`super::File::set_permissions`] function.
+    /// To modify the filesystem use the [`super::fs::Fs::set_permissions`] or
+    /// the [`super::file::File::set_permissions`] function.
     pub fn set_readonly(&mut self, readonly: bool) {
         let writable = !readonly;
 

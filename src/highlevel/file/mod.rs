@@ -209,10 +209,6 @@ impl<'s, W: AsyncWrite + Unpin> File<'s, W> {
 
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests
-    ///
-    /// If [`File::max_buffered_write`] is less than [`max_atomic_write_len`],
-    /// then the direct write is enabled and [`File::max_write_len`] must be
-    /// less than [`max_atomic_write_len`].
     pub fn max_write_len(&self) -> u32 {
         self.get_auxiliary().limits().write_len
     }
