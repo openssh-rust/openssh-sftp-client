@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
 pub mod unreleased {}
 
 /// ## Fixed
