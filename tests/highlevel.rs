@@ -6,14 +6,11 @@ use openssh_sftp_client::highlevel::*;
 use std::cmp::{max, min};
 use std::convert::identity;
 use std::convert::TryInto;
-use std::env;
 use std::io::IoSlice;
 use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
 use std::stringify;
 
 use bytes::BytesMut;
-use once_cell::sync::OnceCell;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::process;
 use tokio_io_utility::write_vectored_all;
@@ -25,37 +22,6 @@ async fn connect(options: SftpOptions) -> (process::Child, Sftp<PipeWrite>) {
     let (child, stdin, stdout) = launch_sftp().await;
 
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
-}
-
-#[cfg(target_os = "linux")]
-fn get_tmp_path() -> &'static Path {
-    Path::new("/tmp")
-}
-
-#[cfg(target_os = "macos")]
-fn get_tmp_path() -> &'static Path {
-    Path::new("/private/tmp")
-}
-
-fn gen_path(func: &str) -> PathBuf {
-    static XDG_RUNTIME_DIR: OnceCell<Option<Box<Path>>> = OnceCell::new();
-
-    let mut path = XDG_RUNTIME_DIR
-        .get_or_init(|| {
-            env::var_os("RUNTIME_DIR").map(|os_str| {
-                let pathbuf: PathBuf = os_str.into();
-                pathbuf
-                    .canonicalize()
-                    .expect("Failed to canonicalize $RUNTIME_DIR")
-                    .into_boxed_path()
-            })
-        })
-        .as_deref()
-        .unwrap_or_else(get_tmp_path)
-        .join("openssh_sftp_client");
-
-    path.push(func);
-    path
 }
 
 #[tokio::test]
