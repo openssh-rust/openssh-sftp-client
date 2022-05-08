@@ -4,6 +4,10 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// ## Fixed
+///  - Changelog of v0.10.2
+pub mod v_0_10_3 {}
+
 /// ## Added
 ///  - Async fn [`lowlevel::WriteEnd::send_copy_data_request`]
 ///  - Async fn [`highlevel::file::File::copy_to`]
