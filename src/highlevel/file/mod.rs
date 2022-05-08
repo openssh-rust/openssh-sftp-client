@@ -9,7 +9,6 @@ use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::io::{self, IoSlice};
-use std::num::NonZeroU64;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
