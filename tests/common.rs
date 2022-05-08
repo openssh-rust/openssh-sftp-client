@@ -2,7 +2,6 @@ use std::convert::TryInto;
 use std::env;
 use std::io::Error;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::path;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
@@ -37,11 +36,11 @@ fn child_stdout_to_pipewrite(stdon: ChildStdout) -> Result<PipeRead, Error> {
     fd.try_into()
 }
 
-pub fn get_sftp_path() -> &'static path::Path {
-    static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
+pub fn get_sftp_path() -> &'static Path {
+    static SFTP_PATH: OnceCell<PathBuf> = OnceCell::new();
 
     SFTP_PATH.get_or_init(|| {
-        let mut sftp_path: path::PathBuf = env::var("OUT_DIR").unwrap().into();
+        let mut sftp_path: PathBuf = env::var("OUT_DIR").unwrap().into();
         sftp_path.push("openssh-portable");
         sftp_path.push("sftp-server");
 
@@ -93,8 +92,4 @@ pub fn get_path_for_tmp_files() -> PathBuf {
         .as_deref()
         .unwrap_or_else(get_tmp_path)
         .join("openssh_sftp_client")
-}
-
-pub fn gen_path(func: &str) -> PathBuf {
-    get_path_for_tmp_files().join(func)
 }

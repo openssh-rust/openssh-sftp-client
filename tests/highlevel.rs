@@ -8,6 +8,7 @@ use std::convert::identity;
 use std::convert::TryInto;
 use std::io::IoSlice;
 use std::num::NonZeroU32;
+use std::path::PathBuf;
 use std::stringify;
 
 use bytes::BytesMut;
@@ -22,6 +23,10 @@ async fn connect(options: SftpOptions) -> (process::Child, Sftp<PipeWrite>) {
     let (child, stdin, stdout) = launch_sftp().await;
 
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
+}
+
+fn gen_path(func: &str) -> PathBuf {
+    get_path_for_tmp_files().join(func)
 }
 
 #[tokio::test]
