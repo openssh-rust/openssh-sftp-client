@@ -426,6 +426,61 @@ impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, 
         self.send_request(id, RequestInner::PosixRename { oldpath, newpath }, None)
             .map(AwaitableStatus::new)
     }
+
+    /// NOTE that this merely add the request to the buffer, you need to call
+    /// [`SharedData::flush`] to actually send the requests.
+    ///
+    /// The server MUST copy the data exactly as if the client had issued a
+    /// series of [`RequestInner::Read`] requests on the `read_from_handle`
+    /// starting at `read_from_offset` and totaling `read_data_length` bytes,
+    /// and issued a series of [`RequestInner::Write`] packets on the
+    /// `write_to_handle`, starting at the `write_from_offset`, and totaling
+    /// the total number of bytes read by the [`RequestInner::Read`] packets.
+    ///
+    /// The server SHOULD allow `read_from_handle` and `write_to_handle` to
+    /// be the same handle as long as the range of data is not overlapping.
+    /// This allows data to efficiently be moved within a file.
+    ///
+    /// If `data_length` is `0`, this imples data should be read until EOF is
+    /// encountered.
+    ///
+    /// There are no protocol restictions on this operation; however, the
+    /// server MUST ensure that the user does not exceed quota, etc.  The
+    /// server is, as always, free to complete this operation out of order if
+    /// it is too large to complete immediately, or to refuse a request that
+    /// is too large.
+    ///
+    /// # Precondition
+    ///
+    /// Requires [`Extensions::copy_data`] to be true.
+    ///
+    /// For [openssh-portable], this is available from V_9_0_P1.
+    ///
+    /// [openssh-portable]: https://github.com/openssh/openssh-portable
+    pub fn send_copy_data_request(
+        &mut self,
+        id: Id<Buffer>,
+
+        read_from_handle: Cow<'_, Handle>,
+        read_from_offset: u64,
+        read_data_length: u64,
+
+        write_to_handle: Cow<'_, Handle>,
+        write_to_offset: u64,
+    ) -> Result<AwaitableStatus<Buffer>, Error> {
+        self.send_request(
+            id,
+            RequestInner::Cp {
+                read_from_handle,
+                read_from_offset,
+                read_data_length,
+                write_to_handle,
+                write_to_offset,
+            },
+            None,
+        )
+        .map(AwaitableStatus::new)
+    }
 }
 
 impl<W: AsyncWrite + Unpin, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>

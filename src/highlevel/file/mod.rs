@@ -587,6 +587,66 @@ impl<'s, W: AsyncWrite + Unpin> File<'s, W> {
     pub fn offset(&self) -> u64 {
         self.offset
     }
+
+    /// Copy `n` bytes of data from `self` to `dst`.
+    ///
+    /// The server MUST copy the data exactly as if the data is copied
+    /// using a series of read and write.
+    ///
+    /// If `n` is `0`, this imples data should be read until EOF is
+    /// encountered.
+    ///
+    /// There are no protocol restictions on this operation; however, the
+    /// server MUST ensure that the user does not exceed quota, etc.  The
+    /// server is, as always, free to complete this operation out of order if
+    /// it is too large to complete immediately, or to refuse a request that
+    /// is too large.
+    ///
+    /// After a successful function call, the offset of `self` and `dst`
+    /// are increased by `n`.
+    ///
+    /// # Precondition
+    ///
+    /// Requires extension copy_data.
+    /// For [openssh-portable], this is available from V_9_0_P1.
+    ///
+    /// If the extension is not supported by the server, this function
+    /// would fail with [`Error::UnsupportedExtension`].
+    ///
+    /// [openssh-portable]: https://github.com/openssh/openssh-portable
+    pub async fn copy_to(&mut self, dst: &mut Self, n: u64) -> Result<(), Error> {
+        if !self.inner.get_auxiliary().extensions().copy_data {
+            return Err(Error::UnsupportedExtension(&"copy_data"));
+        }
+
+        if !dst.is_writable {
+            return Err(
+                io::Error::new(io::ErrorKind::Other, "dst is not opened for writing").into(),
+            );
+        }
+
+        let offset = self.offset;
+
+        self.send_readable_request(|write_end, handle, id| {
+            Ok(write_end
+                .send_copy_data_request(
+                    id,
+                    handle,
+                    offset,
+                    n,
+                    Cow::Borrowed(&dst.inner.handle),
+                    dst.offset,
+                )?
+                .wait())
+        })
+        .await?;
+
+        // Adjust offset
+        Pin::new(self).start_seek(io::SeekFrom::Current(n.try_into().unwrap()))?;
+        Pin::new(dst).start_seek(io::SeekFrom::Current(n.try_into().unwrap()))?;
+
+        Ok(())
+    }
 }
 
 impl<W: AsyncWrite + Unpin> AsyncSeek for File<'_, W> {

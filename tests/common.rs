@@ -1,10 +1,11 @@
-use once_cell::sync::OnceCell;
 use std::convert::TryInto;
 use std::env;
 use std::io::Error;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
+
+use once_cell::sync::OnceCell;
 use tokio::process::{self, ChildStdin, ChildStdout};
 use tokio_pipe::{PipeRead, PipeWrite};
 
@@ -35,11 +36,11 @@ fn child_stdout_to_pipewrite(stdon: ChildStdout) -> Result<PipeRead, Error> {
     fd.try_into()
 }
 
-pub fn get_sftp_path() -> &'static path::Path {
-    static SFTP_PATH: OnceCell<path::PathBuf> = OnceCell::new();
+pub fn get_sftp_path() -> &'static Path {
+    static SFTP_PATH: OnceCell<PathBuf> = OnceCell::new();
 
     SFTP_PATH.get_or_init(|| {
-        let mut sftp_path: path::PathBuf = env::var("OUT_DIR").unwrap().into();
+        let mut sftp_path: PathBuf = env::var("OUT_DIR").unwrap().into();
         sftp_path.push("openssh-portable");
         sftp_path.push("sftp-server");
 
@@ -63,4 +64,32 @@ pub async fn launch_sftp() -> (process::Child, PipeWrite, PipeRead) {
     let stdout = child_stdout_to_pipewrite(child.stdout.take().unwrap()).unwrap();
 
     (child, stdin, stdout)
+}
+
+#[cfg(target_os = "linux")]
+fn get_tmp_path() -> &'static Path {
+    Path::new("/tmp")
+}
+
+#[cfg(target_os = "macos")]
+fn get_tmp_path() -> &'static Path {
+    Path::new("/private/tmp")
+}
+
+pub fn get_path_for_tmp_files() -> PathBuf {
+    static XDG_RUNTIME_DIR: OnceCell<Option<Box<Path>>> = OnceCell::new();
+
+    XDG_RUNTIME_DIR
+        .get_or_init(|| {
+            env::var_os("RUNTIME_DIR").map(|os_str| {
+                let pathbuf: PathBuf = os_str.into();
+                pathbuf
+                    .canonicalize()
+                    .expect("Failed to canonicalize $RUNTIME_DIR")
+                    .into_boxed_path()
+            })
+        })
+        .as_deref()
+        .unwrap_or_else(get_tmp_path)
+        .join("openssh_sftp_client")
 }

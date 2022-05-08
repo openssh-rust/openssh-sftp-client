@@ -6,14 +6,12 @@ use openssh_sftp_client::highlevel::*;
 use std::cmp::{max, min};
 use std::convert::identity;
 use std::convert::TryInto;
-use std::env;
 use std::io::IoSlice;
 use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::stringify;
 
 use bytes::BytesMut;
-use once_cell::sync::OnceCell;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::process;
 use tokio_io_utility::write_vectored_all;
@@ -27,35 +25,8 @@ async fn connect(options: SftpOptions) -> (process::Child, Sftp<PipeWrite>) {
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
 }
 
-#[cfg(target_os = "linux")]
-fn get_tmp_path() -> &'static Path {
-    Path::new("/tmp")
-}
-
-#[cfg(target_os = "macos")]
-fn get_tmp_path() -> &'static Path {
-    Path::new("/private/tmp")
-}
-
 fn gen_path(func: &str) -> PathBuf {
-    static XDG_RUNTIME_DIR: OnceCell<Option<Box<Path>>> = OnceCell::new();
-
-    let mut path = XDG_RUNTIME_DIR
-        .get_or_init(|| {
-            env::var_os("RUNTIME_DIR").map(|os_str| {
-                let pathbuf: PathBuf = os_str.into();
-                pathbuf
-                    .canonicalize()
-                    .expect("Failed to canonicalize $RUNTIME_DIR")
-                    .into_boxed_path()
-            })
-        })
-        .as_deref()
-        .unwrap_or_else(get_tmp_path)
-        .join("openssh_sftp_client");
-
-    path.push(func);
-    path
+    get_path_for_tmp_files().join(func)
 }
 
 #[tokio::test]
@@ -542,6 +513,58 @@ async fn sftp_fs_metadata() {
             .await
             .unwrap();
         assert_eq!(fs.metadata(&path).await.unwrap().len().unwrap(), 2834);
+    }
+
+    // close sftp and child
+    sftp.close().await.unwrap();
+    assert!(child.wait().await.unwrap().success());
+}
+
+#[tokio::test]
+/// Test File::copy_to
+async fn sftp_file_copy_to() {
+    let path = gen_path("sftp_file_copy_to");
+    let content = b"hello, world!\n";
+
+    let (mut child, sftp) = connect(sftp_options_with_max_rw_len()).await;
+
+    sftp.fs().create_dir(&path).await.unwrap();
+
+    {
+        let mut file0 = sftp
+            .options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path.join("file0"))
+            .await
+            .unwrap();
+
+        file0.write_all(content).await.unwrap();
+        file0.rewind().await.unwrap();
+
+        let mut file1 = sftp
+            .options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path.join("file1"))
+            .await
+            .unwrap();
+
+        file0
+            .copy_to(&mut file1, content.len().try_into().unwrap())
+            .await
+            .unwrap();
+
+        file1.rewind().await.unwrap();
+        assert_eq!(
+            &*file1
+                .read_all(content.len(), BytesMut::new())
+                .await
+                .unwrap(),
+            content
+        );
     }
 
     // close sftp and child
