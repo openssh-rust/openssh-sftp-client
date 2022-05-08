@@ -608,7 +608,7 @@ impl<'s, W: AsyncWrite + Unpin> File<'s, W> {
     ///
     /// # Precondition
     ///
-    /// Requires [`Extensions::copy_data`] to be true.
+    /// Requires extension copy_data.
     /// For [openssh-portable], this is available from V_9_0_P1.
     ///
     /// If the extension is not supported by the server, this function
