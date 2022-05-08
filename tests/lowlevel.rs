@@ -46,8 +46,8 @@ async fn test_connect() {
 
 fn create_tmpdir() -> TempDir {
     Builder::new()
-        .prefix("openssh-sftp-client-lowlevel-test")
-        .tempdir_in("/tmp/openssh_sftp_client")
+        .prefix("lowlevel-test")
+        .tempdir_in(get_path_for_tmp_files())
         .unwrap()
 }
 
