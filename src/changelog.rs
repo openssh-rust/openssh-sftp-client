@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - Async fn [`lowlevel::WriteEnd::send_copy_data_request`]
+///  - Async fn [`highlevel::file::File::copy_to`]
 #[doc(hidden)]
 pub mod unreleased {}
 
