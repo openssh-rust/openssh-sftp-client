@@ -46,8 +46,8 @@ async fn test_connect() {
 
 fn create_tmpdir() -> TempDir {
     Builder::new()
-        .prefix(".openssh-sftp-client-test")
-        .tempdir_in("/tmp")
+        .prefix("openssh-sftp-client-lowlevel-test")
+        .tempdir_in("/tmp/openssh_sftp_client")
         .unwrap()
 }
 
@@ -961,6 +961,73 @@ async fn test_posix_rename() {
 
     assert!(metadata.is_file());
     assert_eq!(metadata.len(), 2000);
+
+    drop(id);
+    drop(write_end);
+
+    assert_eq!(read_end.wait_for_new_request().await, 0);
+
+    drop(read_end);
+
+    assert!(child.wait().await.unwrap().success());
+}
+
+#[tokio::test]
+async fn test_ext_copy_data() {
+    let content = "Hello, World!\n";
+
+    let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+    assert!(extensions.copy_data);
+
+    let id = write_end.create_response_id();
+
+    let tempdir = create_tmpdir();
+    let filename = tempdir.path().join("test_ext_copy_data");
+    fs::write(&filename, content).unwrap();
+
+    let awaitable = write_end
+        .send_open_file_request(
+            id,
+            OpenOptions::new().read(true).open(Cow::Borrowed(&filename)),
+        )
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let (id, handle) = awaitable.wait().await.unwrap();
+
+    // copy it
+    let new_filename = tempdir.path().join("test_ext_copy_data_file2");
+
+    let awaitable = write_end
+        .send_open_file_request(
+            id,
+            OpenOptions::new().read(true).write(true).create(
+                Cow::Borrowed(&new_filename),
+                CreateFlags::None,
+                FileAttrs::default(),
+            ),
+        )
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let (id, new_handle) = awaitable.wait().await.unwrap();
+
+    let awaitable = write_end
+        .send_copy_data_request(
+            id,
+            Cow::Borrowed(&handle),
+            0,
+            0,
+            Cow::Borrowed(&new_handle),
+            0,
+        )
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let id = awaitable.wait().await.unwrap().0;
+
+    // Open the new name and old name again
+    assert_eq!(fs::read_to_string(&new_filename).unwrap(), content);
 
     drop(id);
     drop(write_end);
