@@ -519,3 +519,55 @@ async fn sftp_fs_metadata() {
     sftp.close().await.unwrap();
     assert!(child.wait().await.unwrap().success());
 }
+
+#[tokio::test]
+/// Test File::copy_to
+async fn sftp_file_copy_to() {
+    let path = gen_path("sftp_file_copy_to");
+    let content = b"hello, world!\n";
+
+    let (mut child, sftp) = connect(sftp_options_with_max_rw_len()).await;
+
+    sftp.fs().create_dir(&path).await.unwrap();
+
+    {
+        let mut file0 = sftp
+            .options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path.join("file0"))
+            .await
+            .unwrap();
+
+        file0.write_all(content).await.unwrap();
+        file0.rewind().await.unwrap();
+
+        let mut file1 = sftp
+            .options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path.join("file1"))
+            .await
+            .unwrap();
+
+        file0
+            .copy_to(&mut file1, content.len().try_into().unwrap())
+            .await
+            .unwrap();
+
+        file1.rewind().await.unwrap();
+        assert_eq!(
+            &*file1
+                .read_all(content.len(), BytesMut::new())
+                .await
+                .unwrap(),
+            content
+        );
+    }
+
+    // close sftp and child
+    sftp.close().await.unwrap();
+    assert!(child.wait().await.unwrap().success());
+}
