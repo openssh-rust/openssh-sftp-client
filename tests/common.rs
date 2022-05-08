@@ -77,10 +77,10 @@ pub fn get_tmp_path() -> &'static Path {
     Path::new("/private/tmp")
 }
 
-pub fn gen_path(func: &str) -> PathBuf {
+pub fn get_path_for_tmp_files() -> PathBuf {
     static XDG_RUNTIME_DIR: OnceCell<Option<Box<Path>>> = OnceCell::new();
 
-    let mut path = XDG_RUNTIME_DIR
+    XDG_RUNTIME_DIR
         .get_or_init(|| {
             env::var_os("RUNTIME_DIR").map(|os_str| {
                 let pathbuf: PathBuf = os_str.into();
@@ -92,8 +92,9 @@ pub fn gen_path(func: &str) -> PathBuf {
         })
         .as_deref()
         .unwrap_or_else(get_tmp_path)
-        .join("openssh_sftp_client");
+        .join("openssh_sftp_client")
+}
 
-    path.push(func);
-    path
+pub fn gen_path(func: &str) -> PathBuf {
+    get_path_for_tmp_files().join(func)
 }
