@@ -1,6 +1,13 @@
 #[allow(unused_imports)]
 use crate::*;
 
+pub mod unreleased {}
+
+/// ## Fixed
+///  - Changelog of v0.10.0
+///  - Changelog of v0.9.0
+pub mod v0_10_1 {}
+
 /// ## Added
 ///  - Export mod [`highlevel::file`]
 ///  - Export mod [`highlevel::fs`]
@@ -39,8 +46,14 @@ use crate::*;
 ///  - Export of `highlevel::metadata::MetaData`
 ///  - Export of `highlevel::metadata::MetaDataBuilder`
 ///  - Export of `highlevel::metadata::Permissions`
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v0_10_0 {}
+
+/// ## Removed
+///  - `highlevel::Sftp::get_cancellation_token`
+///  - `highlevel::Sftp::max_write_len`
+///  - `highlevel::Sftp::max_read_len`
+///  - `highlevel::Sftp::max_buffered_write`
+pub mod v_0_9_0 {}
 
 /// ## Added
 ///  - Type `highlevel::TokioCompatFile` to Replace
