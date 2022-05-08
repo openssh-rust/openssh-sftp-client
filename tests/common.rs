@@ -67,12 +67,12 @@ pub async fn launch_sftp() -> (process::Child, PipeWrite, PipeRead) {
 }
 
 #[cfg(target_os = "linux")]
-pub fn get_tmp_path() -> &'static Path {
+fn get_tmp_path() -> &'static Path {
     Path::new("/tmp")
 }
 
 #[cfg(target_os = "macos")]
-pub fn get_tmp_path() -> &'static Path {
+fn get_tmp_path() -> &'static Path {
     Path::new("/private/tmp")
 }
 
