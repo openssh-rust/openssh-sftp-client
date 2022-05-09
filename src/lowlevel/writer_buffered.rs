@@ -18,7 +18,7 @@ use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
 #[pin_project]
 pub(crate) struct WriterBuffered<W>(#[pin] PinnedMutexAsync<W>, MpScBytesQueue);
 
-impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
+impl<W: AsyncWrite> WriterBuffered<W> {
     pub(crate) fn new(writer: W) -> Self {
         Self(
             PinnedMutexAsync::new(writer),
