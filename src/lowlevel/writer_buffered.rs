@@ -42,12 +42,10 @@ impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
             return Ok(());
         }
 
-        let mutex = self.project_ref().0;
+        let mut guard = self.project_ref().0.lock().await;
 
         loop {
-            let n = mutex
-                .lock()
-                .await
+            let n = guard
                 .deref_mut_pinned()
                 .write_vectored(buffers.get_io_slices())
                 .await?;
