@@ -34,7 +34,7 @@ fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     }
 }
 
-fn send_request<Func, R, W: AsyncWrite + Unpin>(file: &mut File<'_, W>, f: Func) -> Result<R, Error>
+fn send_request<Func, R, W: AsyncWrite>(file: &mut File<'_, W>, f: Func) -> Result<R, Error>
 where
     Func: FnOnce(&mut WriteEnd<W>, Id, Cow<'_, Handle>, u64) -> Result<R, Error>,
 {
@@ -58,7 +58,7 @@ where
 /// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
-pub struct TokioCompatFile<'s, W: AsyncWrite + Unpin> {
+pub struct TokioCompatFile<'s, W: AsyncWrite> {
     inner: File<'s, W>,
 
     buffer_len: NonZeroUsize,
@@ -72,7 +72,7 @@ pub struct TokioCompatFile<'s, W: AsyncWrite + Unpin> {
     write_cancellation_future: BoxedWaitForCancellationFuture<'s>,
 }
 
-impl<'s, W: AsyncWrite + Unpin> TokioCompatFile<'s, W> {
+impl<'s, W: AsyncWrite> TokioCompatFile<'s, W> {
     /// Create a [`TokioCompatFile`].
     pub fn new(inner: File<'s, W>) -> Self {
         Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
@@ -286,12 +286,9 @@ impl<'s, W: AsyncWrite + Unpin> TokioCompatFile<'s, W> {
     /// This function does not change the offset into the file.
     pub async fn read_into_buffer(&mut self, amt: NonZeroU32) -> Result<(), Error> {
         #[must_use]
-        struct ReadIntoBuffer<'a, 's, W: AsyncWrite + Unpin>(
-            &'a mut TokioCompatFile<'s, W>,
-            NonZeroU32,
-        );
+        struct ReadIntoBuffer<'a, 's, W: AsyncWrite>(&'a mut TokioCompatFile<'s, W>, NonZeroU32);
 
-        impl<W: AsyncWrite + Unpin> Future for ReadIntoBuffer<'_, '_, W> {
+        impl<W: AsyncWrite> Future for ReadIntoBuffer<'_, '_, W> {
             type Output = Result<(), Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -304,13 +301,13 @@ impl<'s, W: AsyncWrite + Unpin> TokioCompatFile<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> From<File<'s, W>> for TokioCompatFile<'s, W> {
+impl<'s, W: AsyncWrite> From<File<'s, W>> for TokioCompatFile<'s, W> {
     fn from(inner: File<'s, W>) -> Self {
         Self::new(inner)
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> From<TokioCompatFile<'s, W>> for File<'s, W> {
+impl<'s, W: AsyncWrite> From<TokioCompatFile<'s, W>> for File<'s, W> {
     fn from(file: TokioCompatFile<'s, W>) -> Self {
         file.into_inner()
     }
@@ -320,13 +317,13 @@ impl<'s, W: AsyncWrite + Unpin> From<TokioCompatFile<'s, W>> for File<'s, W> {
 /// same underlying file handle as the existing File instance.
 ///
 /// Reads, writes, and seeks can be performed independently.
-impl<W: AsyncWrite + Unpin> Clone for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite> Clone for TokioCompatFile<'_, W> {
     fn clone(&self) -> Self {
         Self::with_capacity(self.inner.clone(), self.buffer_len, self.max_buffer_len)
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> Deref for TokioCompatFile<'s, W> {
+impl<'s, W: AsyncWrite> Deref for TokioCompatFile<'s, W> {
     type Target = File<'s, W>;
 
     fn deref(&self) -> &Self::Target {
@@ -334,13 +331,13 @@ impl<'s, W: AsyncWrite + Unpin> Deref for TokioCompatFile<'s, W> {
     }
 }
 
-impl<W: AsyncWrite + Unpin> DerefMut for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite> DerefMut for TokioCompatFile<'_, W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<W: AsyncWrite + Unpin> AsyncSeek for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite> AsyncSeek for TokioCompatFile<'_, W> {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
         let prev_offset = self.offset();
         Pin::new(&mut self.inner).start_seek(position)?;
@@ -368,7 +365,7 @@ impl<W: AsyncWrite + Unpin> AsyncSeek for TokioCompatFile<'_, W> {
     }
 }
 
-impl<W: AsyncWrite + Unpin> AsyncBufRead for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite> AsyncBufRead for TokioCompatFile<'_, W> {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         if self.buffer.is_empty() {
             let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
@@ -392,7 +389,7 @@ impl<W: AsyncWrite + Unpin> AsyncBufRead for TokioCompatFile<'_, W> {
 
 /// [`TokioCompatFile`] can read in at most [`File::max_read_len`] bytes
 /// at a time.
-impl<W: AsyncWrite + Unpin> AsyncRead for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite> AsyncRead for TokioCompatFile<'_, W> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -454,7 +451,7 @@ impl<W: AsyncWrite + Unpin> AsyncRead for TokioCompatFile<'_, W> {
 ///
 /// [`TokioCompatFile`] can write at most [`File::max_write_len`] bytes
 /// at a time.
-impl<W: AsyncWrite + Unpin> AsyncWrite for TokioCompatFile<'_, W> {
+impl<W: AsyncWrite> AsyncWrite for TokioCompatFile<'_, W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
