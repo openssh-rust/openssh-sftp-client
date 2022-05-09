@@ -20,6 +20,7 @@ mod awaitable_responses;
 mod awaitables;
 mod buffer;
 mod connection;
+mod pin_util;
 mod read_end;
 mod reader_buffered;
 mod write_end;
