@@ -1,23 +1,27 @@
 #![forbid(unsafe_code)]
 
+use super::pin_util::PinnedMutexAsync;
+
 use std::convert::TryInto;
 use std::io::{self, IoSlice};
 use std::num::NonZeroUsize;
+use std::pin::Pin;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use openssh_sftp_protocol::ssh_format::SerBacker;
 
+use pin_project::pin_project;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio::sync::Mutex as MutexAsync;
 use tokio_io_utility::queue::{Buffers, MpScBytesQueue, QueuePusher};
 
 #[derive(Debug)]
-pub(crate) struct WriterBuffered<W>(MutexAsync<W>, MpScBytesQueue);
+#[pin_project]
+pub(crate) struct WriterBuffered<W>(#[pin] PinnedMutexAsync<W>, MpScBytesQueue);
 
 impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
     pub(crate) fn new(writer: W) -> Self {
         Self(
-            MutexAsync::new(writer),
+            PinnedMutexAsync::new(writer),
             MpScBytesQueue::new(NonZeroUsize::new(4096).unwrap()),
         )
     }
@@ -29,20 +33,22 @@ impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_all(&mut self, buf: &[u8]) -> Result<(), io::Error> {
-        self.0.get_mut().write_all(buf).await
+    pub(crate) async fn write_all(self: Pin<&mut Self>, buf: &[u8]) -> Result<(), io::Error> {
+        self.project().0.get_pinned_mut().write_all(buf).await
     }
 
-    async fn flush_impl(&self, mut buffers: Buffers<'_>) -> Result<(), io::Error> {
+    async fn flush_impl(self: Pin<&Self>, mut buffers: Buffers<'_>) -> Result<(), io::Error> {
         if buffers.is_empty() {
             return Ok(());
         }
 
+        let mutex = self.project_ref().0;
+
         loop {
-            let n = self
-                .0
+            let n = mutex
                 .lock()
                 .await
+                .deref_mut_pinned()
                 .write_vectored(buffers.get_io_slices())
                 .await?;
 
@@ -66,7 +72,7 @@ impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    pub(crate) async fn try_flush(&self) -> Result<bool, io::Error> {
+    pub(crate) async fn try_flush(self: Pin<&Self>) -> Result<bool, io::Error> {
         // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
         // to be non-empty
         match self.1.try_get_buffers() {
@@ -84,7 +90,7 @@ impl<W: AsyncWrite + Unpin> WriterBuffered<W> {
     ///
     /// While it is true that it might only partially flushed out the data,
     /// it can be restarted by another thread.
-    pub(crate) async fn flush(&self) -> Result<(), io::Error> {
+    pub(crate) async fn flush(self: Pin<&Self>) -> Result<(), io::Error> {
         // Every io_slice in the slice returned by buffers.get_io_slices() is guaranteed
         // to be non-empty
         self.flush_impl(self.1.get_buffers_blocked().await).await
