@@ -150,7 +150,7 @@ impl<W, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// Flush the write buffer.
     ///
     /// If another thread is flushing, then `Ok(false)` will be returned.
@@ -189,7 +189,7 @@ impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect<
     R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    W: AsyncWrite,
     Buffer: ToBuffer + Send + Sync + 'static,
 >(
     reader: R,
@@ -208,7 +208,7 @@ pub async fn connect<
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect_with_auxiliary<
     R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    W: AsyncWrite,
     Buffer: ToBuffer + Send + Sync + 'static,
     Auxiliary,
 >(
