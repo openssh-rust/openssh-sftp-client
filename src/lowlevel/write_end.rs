@@ -65,7 +65,7 @@ impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .get_mut_writer()
@@ -483,7 +483,7 @@ impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, 
     }
 }
 
-impl<W: AsyncWrite + Unpin, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
+impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     WriteEnd<W, Buffer, Auxiliary>
 {
     /// Write will extend the file if writing beyond the end of the file.
