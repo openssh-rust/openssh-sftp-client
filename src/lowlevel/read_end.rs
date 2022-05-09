@@ -25,12 +25,8 @@ pub struct ReadEnd<R, W, Buffer, Auxiliary = ()> {
     shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
-impl<
-        R: AsyncRead + Unpin,
-        W: AsyncWrite + Unpin,
-        Buffer: ToBuffer + 'static + Send + Sync,
-        Auxiliary,
-    > ReadEnd<R, W, Buffer, Auxiliary>
+impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+    ReadEnd<R, W, Buffer, Auxiliary>
 {
     pub(crate) fn new(reader: R, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
         Self {
