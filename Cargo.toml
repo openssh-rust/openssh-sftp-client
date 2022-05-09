@@ -35,6 +35,7 @@ tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync", "tim
 bytes = "1"
 tokio-io-utility = { version = "0.6.6", features = ["mpsc", "read-exact-to-bytes"] }
 tokio-util = { version = "0.7.0" }
+pin-project = { version = "1.0.10" }
 
 [target.'cfg(unix)'.dependencies]
 tokio-pipe = "0.2.10"
