@@ -87,7 +87,7 @@ impl<'s, W> WriteEndWithCachedId<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> WriteEndWithCachedId<'s, W> {
+impl<'s, W: AsyncWrite> WriteEndWithCachedId<'s, W> {
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
         Func: FnOnce(&mut WriteEnd<W>, Id) -> Result<F, Error>,
