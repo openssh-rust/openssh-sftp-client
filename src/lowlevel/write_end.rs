@@ -678,7 +678,9 @@ impl<W: AsyncWrite + Unpin, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         .split();
 
         // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
-        let mut queue_pusher = self.shared_data.writer().get_pusher();
+        let writer = self.shared_data.writer();
+
+        let mut queue_pusher = writer.get_pusher();
         queue_pusher.push(header);
         for data in data_slice {
             queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
