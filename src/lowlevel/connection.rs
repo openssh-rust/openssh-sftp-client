@@ -94,7 +94,7 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
 
     /// Return the auxiliary data.
     pub fn get_auxiliary_mut(&mut self) -> Option<&mut Auxiliary> {
-        PinnedArc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.auxiliary)
+        PinnedArc::get_pinned_mut(&mut self.0).map(|shared_data| shared_data.project().auxiliary)
     }
 
     #[inline(always)]
