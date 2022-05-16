@@ -22,10 +22,6 @@ impl<T> PinnedArc<T> {
         Arc::strong_count(&arc.0)
     }
 
-    pub(super) fn get_mut(arc: &mut Self) -> Option<&mut T> {
-        Arc::get_mut(&mut arc.0)
-    }
-
     pub(super) fn get_pinned_mut(arc: &mut Self) -> Option<Pin<&mut T>> {
         // Safety:
         //
