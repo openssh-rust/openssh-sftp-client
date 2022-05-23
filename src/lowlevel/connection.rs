@@ -1,14 +1,17 @@
 #![forbid(unsafe_code)]
 
 use super::awaitable_responses::AwaitableResponses;
-use super::pin_util::PinnedArc;
+use super::pin_util::pinned_arc_strong_count;
 use super::writer_buffered::WriterBuffered;
 use super::*;
 
 use std::fmt::Debug;
 use std::io;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU32, Ordering},
+    Arc,
+};
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use pin_project::pin_project;
@@ -39,7 +42,7 @@ struct SharedDataInner<W, Buffer, Auxiliary> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<W, Buffer, Auxiliary = ()>(PinnedArc<SharedDataInner<W, Buffer, Auxiliary>>);
+pub struct SharedData<W, Buffer, Auxiliary = ()>(Pin<Arc<SharedDataInner<W, Buffer, Auxiliary>>>);
 
 impl<W, Buffer, Auxiliary> Clone for SharedData<W, Buffer, Auxiliary> {
     fn clone(&self) -> Self {
@@ -68,7 +71,7 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
 
 impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     pub(crate) fn writer(&self) -> Pin<&WriterBuffered<W>> {
-        PinnedArc::deref_pinned(&self.0).project_ref().writer
+        self.0.as_ref().project_ref().writer
     }
 
     pub(crate) fn responses(&self) -> &AwaitableResponses<Buffer> {
@@ -80,7 +83,7 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// to the shared data.
     #[inline(always)]
     pub fn strong_count(&self) -> usize {
-        PinnedArc::strong_count(&self.0)
+        pinned_arc_strong_count(&self.0)
     }
 
     /// Returned the auxiliary data.
@@ -214,7 +217,7 @@ pub async fn connect_with_auxiliary<
     ),
     Error,
 > {
-    let shared_data = SharedData(PinnedArc::new(SharedDataInner {
+    let shared_data = SharedData(Arc::pin(SharedDataInner {
         writer: WriterBuffered::new(writer),
         responses: AwaitableResponses::new(),
         notify: Notify::new(),

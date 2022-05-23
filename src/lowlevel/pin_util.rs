@@ -1,50 +1,21 @@
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 
 use tokio::sync::{Mutex as MutexAsync, MutexGuard as MutexAsyncGuard};
 
-#[derive(Debug)]
-pub(super) struct PinnedArc<T>(Arc<T>);
+pub(super) fn pinned_arc_strong_count<T>(arc: &Pin<Arc<T>>) -> usize {
+    let arc_ptr = arc as *const Pin<Arc<T>> as *const Arc<T>;
 
-impl<T> Clone for PinnedArc<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
+    // Safety:
+    //
+    // Pin is a transparent new type of Arc.
+    //
+    // Pin<Arc<T>> prevent users from moving from/into arc,
+    // however since we hold a immutable reference here,
+    // it is ok to dereference arc_ptr and holds a &Arc<T>.
+    let arc = unsafe { &*arc_ptr };
 
-impl<T> PinnedArc<T> {
-    pub(super) fn new(val: T) -> Self {
-        Self(Arc::new(val))
-    }
-
-    pub(super) fn strong_count(arc: &Self) -> usize {
-        Arc::strong_count(&arc.0)
-    }
-
-    pub(super) fn get_pinned_mut(arc: &mut Self) -> Option<Pin<&mut T>> {
-        // Safety:
-        //
-        // Arc is essentially ref-counted box, which provides stable address for T,
-        // moving the arc does not change the address of T.
-        Arc::get_mut(&mut arc.0).map(|val| unsafe { Pin::new_unchecked(val) })
-    }
-
-    pub(super) fn deref_pinned(arc: &Self) -> Pin<&T> {
-        // Safety:
-        //
-        // Arc is essentially ref-counted box, which provides stable address for T,
-        // moving the arc does not change the address of T.
-        unsafe { Pin::new_unchecked(&*arc.0) }
-    }
-}
-
-impl<T> Deref for PinnedArc<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
+    Arc::strong_count(arc)
 }
 
 #[derive(Debug)]
