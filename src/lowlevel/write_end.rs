@@ -68,8 +68,7 @@ impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
 impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
-            .get_mut_writer()
-            .unwrap()
+            .writer()
             .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
             .await?;
 

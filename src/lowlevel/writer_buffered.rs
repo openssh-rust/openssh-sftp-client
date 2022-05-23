@@ -33,8 +33,14 @@ impl<W: AsyncWrite> WriterBuffered<W> {
     /// # Cancel Safety
     ///
     /// This function is cancel safe, but it might cause the data to be partially written.
-    pub(crate) async fn write_all(self: Pin<&mut Self>, buf: &[u8]) -> Result<(), io::Error> {
-        self.project().0.get_pinned_mut().write_all(buf).await
+    pub(crate) async fn write_all(self: Pin<&Self>, buf: &[u8]) -> Result<(), io::Error> {
+        self.project_ref()
+            .0
+            .lock()
+            .await
+            .deref_mut_pinned()
+            .write_all(buf)
+            .await
     }
 
     async fn flush_impl(self: Pin<&Self>, mut buffers: Buffers<'_>) -> Result<(), io::Error> {
