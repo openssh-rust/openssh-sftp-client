@@ -55,13 +55,6 @@ impl<T> PinnedMutexAsync<T> {
         Self(MutexAsync::new(val))
     }
 
-    pub(super) fn get_pinned_mut(self: Pin<&mut Self>) -> Pin<&mut T> {
-        // Safety:
-        //
-        // If `self` is pinned, then `T` is also pinned as it is stored inline.
-        unsafe { self.map_unchecked_mut(|this| this.0.get_mut()) }
-    }
-
     pub(super) async fn lock(self: Pin<&Self>) -> PinnedMutexAsyncGuard<'_, T> {
         let this = self.get_ref();
         let guard = this.0.lock().await;

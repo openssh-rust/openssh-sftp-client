@@ -75,10 +75,6 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
         &self.0.responses
     }
 
-    pub(crate) fn get_mut_writer(&mut self) -> Option<Pin<&mut WriterBuffered<W>>> {
-        PinnedArc::get_pinned_mut(&mut self.0).map(|shared_data| shared_data.project().writer)
-    }
-
     /// `SharedData` is a newtype wrapper for `Arc<SharedDataInner>`,
     /// so this function returns how many `Arc` there are that referred
     /// to the shared data.
