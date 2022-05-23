@@ -13,6 +13,9 @@ use crate::*;
 ///     - [`highlevel::SftpOptions`]
 ///     - [`highlevel::fs::DirEntry`]
 ///     - [`highlevel::fs::ReadDir`]
+///
+/// ## Removed
+///  - `SharedData::get_auxiliary_mut`
 #[doc(hidden)]
 pub mod unreleased {}
 

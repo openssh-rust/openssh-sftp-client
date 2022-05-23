@@ -88,11 +88,6 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
         &self.0.auxiliary
     }
 
-    /// Return the auxiliary data.
-    pub fn get_auxiliary_mut(&mut self) -> Option<&mut Auxiliary> {
-        PinnedArc::get_pinned_mut(&mut self.0).map(|shared_data| shared_data.project().auxiliary)
-    }
-
     #[inline(always)]
     fn notify_read_end(&self) {
         // We only have one waiting task, that is `ReadEnd`.
