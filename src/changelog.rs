@@ -16,6 +16,7 @@ use crate::*;
 ///
 /// ## Removed
 ///  - `SharedData::get_auxiliary_mut`
+///  - `SharedData::strong_count`
 #[doc(hidden)]
 pub mod unreleased {}
 
