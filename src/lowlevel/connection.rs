@@ -82,7 +82,7 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// so this function returns how many `Arc` there are that referred
     /// to the shared data.
     #[inline(always)]
-    pub fn strong_count(&self) -> usize {
+    pub(crate) fn strong_count(&self) -> usize {
         pinned_arc_strong_count(&self.0)
     }
 
