@@ -10,22 +10,26 @@ use super::ToBuffer;
 
 use std::fmt::Debug;
 use std::io;
+use std::pin::Pin;
 
 use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::de::DeserializeOwned;
 use openssh_sftp_protocol::ssh_format::from_bytes;
 
+use pin_project::pin_project;
 use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 
 /// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
+#[pin_project]
 pub struct ReadEnd<R, W, Buffer, Auxiliary = ()> {
+    #[pin]
     reader: ReaderBuffered<R>,
     shared_data: SharedData<W, Buffer, Auxiliary>,
 }
 
-impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     ReadEnd<R, W, Buffer, Auxiliary>
 {
     pub(crate) fn new(reader: R, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
@@ -36,16 +40,20 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
     }
 
     pub(crate) async fn receive_server_version(
-        &mut self,
+        mut self: Pin<&mut Self>,
         version: u32,
     ) -> Result<Extensions, Error> {
         // Receive server version
-        let len: u32 = self.read_and_deserialize(4).await?;
+        let len: u32 = self.as_mut().read_and_deserialize(4).await?;
         if (len as usize) > 4096 {
             return Err(Error::SftpServerHelloMsgTooLong { len });
         }
 
-        let drain = self.reader.read_exact_into_buffer(len as usize).await?;
+        let drain = self
+            .project()
+            .reader
+            .read_exact_into_buffer(len as usize)
+            .await?;
         let server_version = ServerVersion::deserialize(&*drain)?;
 
         if server_version.version != version {
@@ -57,13 +65,16 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
         }
     }
 
-    async fn read_and_deserialize<T: DeserializeOwned>(&mut self, size: usize) -> Result<T, Error> {
-        let drain = self.reader.read_exact_into_buffer(size).await?;
+    async fn read_and_deserialize<T: DeserializeOwned>(
+        self: Pin<&mut Self>,
+        size: usize,
+    ) -> Result<T, Error> {
+        let drain = self.project().reader.read_exact_into_buffer(size).await?;
         Ok(from_bytes(&*drain)?.0)
     }
 
-    async fn consume_packet(&mut self, len: u32, err: Error) -> Result<(), Error> {
-        let reader = &mut self.reader;
+    async fn consume_packet(self: Pin<&mut Self>, len: u32, err: Error) -> Result<(), Error> {
+        let reader = self.project().reader;
         if let Err(consumption_err) = copy_buf(&mut reader.take(len as u64), &mut sink()).await {
             Err(Error::RecursiveErrors(Box::new((
                 err,
@@ -74,15 +85,15 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
         }
     }
 
-    async fn read_into_box(&mut self, len: usize) -> Result<Box<[u8]>, Error> {
+    async fn read_into_box(self: Pin<&mut Self>, len: usize) -> Result<Box<[u8]>, Error> {
         let mut vec = Vec::new();
-        read_exact_to_vec(&mut self.reader, &mut vec, len as usize).await?;
+        read_exact_to_vec(&mut self.project().reader, &mut vec, len as usize).await?;
 
         Ok(vec.into_boxed_slice())
     }
 
     async fn read_in_data_packet_fallback(
-        &mut self,
+        self: Pin<&mut Self>,
         len: usize,
     ) -> Result<Response<Buffer>, Error> {
         self.read_into_box(len).await.map(Response::AllocatedBox)
@@ -90,31 +101,35 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
 
     /// * `len` - excludes packet_type and request_id.
     async fn read_in_data_packet(
-        &mut self,
+        mut self: Pin<&mut Self>,
         len: u32,
         buffer: Option<Buffer>,
     ) -> Result<Response<Buffer>, Error> {
         // Since the data is sent as a string, we need to consume the 4-byte length first.
-        self.reader.read_exact_into_buffer(4).await?;
+        self.as_mut()
+            .project()
+            .reader
+            .read_exact_into_buffer(4)
+            .await?;
 
         let len = (len - 4) as usize;
 
         if let Some(mut buffer) = buffer {
             match buffer.get_buffer() {
                 super::Buffer::Vector(vec) => {
-                    read_exact_to_vec(&mut self.reader, vec, len).await?;
+                    read_exact_to_vec(&mut self.project().reader, vec, len).await?;
                     Ok(Response::Buffer(buffer))
                 }
                 super::Buffer::Slice(slice) => {
                     if slice.len() >= len {
-                        self.reader.read_exact(slice).await?;
+                        self.project().reader.read_exact(slice).await?;
                         Ok(Response::Buffer(buffer))
                     } else {
                         self.read_in_data_packet_fallback(len).await
                     }
                 }
                 super::Buffer::Bytes(bytes) => {
-                    read_exact_to_bytes(&mut self.reader, bytes, len).await?;
+                    read_exact_to_bytes(&mut self.project().reader, bytes, len).await?;
                     Ok(Response::Buffer(buffer))
                 }
             }
@@ -124,14 +139,17 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
     }
 
     /// * `len` - includes packet_type and request_id.
-    async fn read_in_packet(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
+    async fn read_in_packet(self: Pin<&mut Self>, len: u32) -> Result<Response<Buffer>, Error> {
         let response: response::Response = self.read_and_deserialize(len as usize).await?;
 
         Ok(Response::Header(response.response_inner))
     }
 
     /// * `len` - excludes packet_type and request_id.
-    async fn read_in_extended_reply(&mut self, len: u32) -> Result<Response<Buffer>, Error> {
+    async fn read_in_extended_reply(
+        self: Pin<&mut Self>,
+        len: u32,
+    ) -> Result<Response<Buffer>, Error> {
         self.read_into_box(len as usize)
             .await
             .map(Response::ExtendedReply)
@@ -170,13 +188,16 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
     ///
     /// Dropping the future might cause the response packet to be partially read,
     /// and the next read would treat the partial response as a new response.
-    pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
-        let drain = self.reader.read_exact_into_buffer(9).await?;
+    pub async fn read_in_one_packet_pinned(mut self: Pin<&mut Self>) -> Result<(), Error> {
+        let this = self.as_mut().project();
+        let drain = this.reader.read_exact_into_buffer(9).await?;
         let (len, packet_type, response_id): (u32, u8, u32) = from_bytes(&*drain)?.0;
 
         let len = len - 5;
 
-        let callback = match self.shared_data.responses().get(response_id) {
+        let res = this.shared_data.responses().get(response_id);
+
+        let callback = match res {
             Ok(callback) => callback,
 
             // Invalid response_id
@@ -245,13 +266,66 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
-    pub async fn ready_for_read(&mut self) -> Result<(), io::Error> {
-        if self.reader.fill_buf().await?.is_empty() {
+    pub async fn ready_for_read_pinned(self: Pin<&mut Self>) -> Result<(), io::Error> {
+        if self.project().reader.fill_buf().await?.is_empty() {
             // Empty buffer means EOF
             Err(io::Error::new(io::ErrorKind::UnexpectedEof, ""))
         } else {
             Ok(())
         }
+    }
+}
+
+impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+    ReadEnd<R, W, Buffer, Auxiliary>
+{
+    /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
+    ///
+    /// # Restart on Error
+    ///
+    /// Only when the returned error is [`Error::InvalidResponseId`] or
+    /// [`Error::AwaitableError`], can the function be restarted.
+    ///
+    /// Upon other errors [`Error::IOError`], [`Error::FormatError`] and
+    /// [`Error::RecursiveErrors`], the sftp session has to be discarded.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let readend = ...;
+    /// loop {
+    ///     let new_requests_submit = readend.wait_for_new_request().await;
+    ///     if new_requests_submit == 0 {
+    ///         break;
+    ///     }
+    ///
+    ///     // If attempt to read in more than new_requests_submit, then
+    ///     // `read_in_one_packet` might block forever.
+    ///     for _ in 0..new_requests_submit {
+    ///         readend.read_in_one_packet().await.unwrap();
+    ///     }
+    /// }
+    /// ```
+    /// # Cancel Safety
+    ///
+    /// This function is not cancel safe.
+    ///
+    /// Dropping the future might cause the response packet to be partially read,
+    /// and the next read would treat the partial response as a new response.
+    pub async fn read_in_one_packet(&mut self) -> Result<(), Error> {
+        Pin::new(self).read_in_one_packet_pinned().await
+    }
+
+    /// Wait for next packet to be readable.
+    ///
+    /// Return `Ok(())` if next packet is ready and readable, `Error::IOError(io_error)`
+    /// where `io_error.kind() == ErrorKind::UnexpectedEof` if `EOF` is met.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This function is cancel safe.
+    pub async fn ready_for_read(&mut self) -> Result<(), io::Error> {
+        Pin::new(self).ready_for_read_pinned().await
     }
 }
 
