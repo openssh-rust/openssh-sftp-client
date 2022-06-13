@@ -74,6 +74,20 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
     }
 }
 
+impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+    fn new(writer: W, auxiliary: Auxiliary) -> Self {
+        SharedData(Arc::pin(SharedDataInner {
+            writer: WriterBuffered::new(writer),
+            responses: AwaitableResponses::new(),
+            notify: Notify::new(),
+            requests_sent: AtomicU32::new(0),
+            is_conn_closed: AtomicBool::new(false),
+
+            auxiliary,
+        }))
+    }
+}
+
 impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     pub(crate) fn writer(&self) -> Pin<&WriterBuffered<W>> {
         self.0.as_ref().project_ref().writer
@@ -222,15 +236,7 @@ pub async fn connect_with_auxiliary<
     ),
     Error,
 > {
-    let shared_data = SharedData(Arc::pin(SharedDataInner {
-        writer: WriterBuffered::new(writer),
-        responses: AwaitableResponses::new(),
-        notify: Notify::new(),
-        requests_sent: AtomicU32::new(0),
-        is_conn_closed: AtomicBool::new(false),
-
-        auxiliary,
-    }));
+    let shared_data = SharedData::new(writer, auxiliary);
 
     // Send hello message
     let version = SSH2_FILEXFER_VERSION;
