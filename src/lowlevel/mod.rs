@@ -59,7 +59,10 @@ pub use openssh_sftp_protocol::response::{
 pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
 pub use super::Error;
+
+pub(crate) use connection::connect_with_auxiliary_relaxed_unpin;
 pub use connection::{connect, connect_with_auxiliary, SharedData};
+
 pub use read_end::ReadEnd;
 pub use write_end::WriteEnd;
 

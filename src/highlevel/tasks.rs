@@ -1,8 +1,13 @@
 use super::{Error, ReadEnd, SharedData};
+use crate::lowlevel::Extensions;
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+
+use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::pin;
+use tokio::sync::oneshot;
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
@@ -72,12 +77,14 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
 }
 
 pub(super) fn create_read_task<
-    R: AsyncRead + Unpin + Send + Sync + 'static,
+    R: AsyncRead + Send + Sync + 'static,
     W: AsyncWrite + Send + Sync + 'static,
 >(
-    mut read_end: ReadEnd<R, W>,
-) -> JoinHandle<Result<(), Error>> {
-    spawn(async move {
+    read_end: ReadEnd<R, W>,
+) -> (oneshot::Receiver<Extensions>, JoinHandle<Result<(), Error>>) {
+    let (tx, rx) = oneshot::channel();
+
+    let handle = spawn(async move {
         let cancel_guard = read_end
             .get_shared_data()
             .get_auxiliary()
@@ -85,8 +92,18 @@ pub(super) fn create_read_task<
             .clone()
             .drop_guard();
 
+        pin!(read_end);
+
+        // Receive version and extensions
+        let extensions = read_end
+            .as_mut()
+            .receive_server_version(SSH2_FILEXFER_VERSION)
+            .await?;
+
+        tx.send(extensions).unwrap();
+
         loop {
-            let new_requests_submit = read_end.wait_for_new_request().await;
+            let new_requests_submit = read_end.as_mut().wait_for_new_request().await;
             if new_requests_submit == 0 {
                 // All responses is read in and there is no
                 // write_end/shared_data left.
@@ -97,8 +114,10 @@ pub(super) fn create_read_task<
             // If attempt to read in more than new_requests_submit, then
             // `read_in_one_packet` might block forever.
             for _ in 0..new_requests_submit {
-                read_end.read_in_one_packet().await?;
+                read_end.as_mut().read_in_one_packet_pinned().await?;
             }
         }
-    })
+    });
+
+    (rx, handle)
 }
