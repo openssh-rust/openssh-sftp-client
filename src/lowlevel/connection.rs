@@ -236,19 +236,52 @@ pub async fn connect_with_auxiliary<
     ),
     Error,
 > {
-    let shared_data = SharedData::new(writer, auxiliary);
-
-    // Send hello message
-    let version = SSH2_FILEXFER_VERSION;
-
-    let mut write_end = WriteEnd::new(shared_data);
-    write_end.send_hello(version).await?;
+    let (write_end, mut read_end) =
+        connect_with_auxiliary_relaxed_unpin(reader, writer, auxiliary).await?;
 
     // Receive version and extensions
-    let mut read_end = ReadEnd::new(reader, (*write_end).clone());
     let extensions = Pin::new(&mut read_end)
-        .receive_server_version(version)
+        .receive_server_version(SSH2_FILEXFER_VERSION)
         .await?;
 
     Ok((write_end, read_end, extensions))
+}
+
+/// Initialize connection to remote sftp server and
+/// negotiate the sftp version.
+///
+/// User of this function must manually call `receive_server_version`.
+///
+/// # Cancel Safety
+///
+/// This function is not cancel safe.
+///
+/// After dropping the future, the connection would be in a undefined state.
+pub(crate) async fn connect_with_auxiliary_relaxed_unpin<
+    R: AsyncRead,
+    W: AsyncWrite,
+    Buffer: ToBuffer + Send + Sync + 'static,
+    Auxiliary,
+>(
+    reader: R,
+    writer: W,
+    auxiliary: Auxiliary,
+) -> Result<
+    (
+        WriteEnd<W, Buffer, Auxiliary>,
+        ReadEnd<R, W, Buffer, Auxiliary>,
+    ),
+    Error,
+> {
+    let shared_data = SharedData::new(writer, auxiliary);
+
+    // Send hello message
+
+    let mut write_end = WriteEnd::new(shared_data);
+    write_end.send_hello(SSH2_FILEXFER_VERSION).await?;
+
+    // Receive version and extensions
+    let read_end = ReadEnd::new(reader, (*write_end).clone());
+
+    Ok((write_end, read_end))
 }
