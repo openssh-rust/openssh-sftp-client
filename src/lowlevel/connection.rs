@@ -243,7 +243,9 @@ pub async fn connect_with_auxiliary<
 
     // Receive version and extensions
     let mut read_end = ReadEnd::new(reader, (*write_end).clone());
-    let extensions = read_end.receive_server_version(version).await?;
+    let extensions = Pin::new(&mut read_end)
+        .receive_server_version(version)
+        .await?;
 
     Ok((write_end, read_end, extensions))
 }
