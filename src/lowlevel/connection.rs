@@ -63,12 +63,9 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
         //
         // And there can be only one ReadEnd for each connection.
         if self.strong_count() == 2 {
-            #[cfg(debug_assertions)]
-            {
+            if cfg!(debug_assertions) {
                 assert!(!self.0.is_conn_closed.swap(true, Ordering::Relaxed));
-            }
-            #[cfg(not(debug_assertions))]
-            {
+            } else {
                 self.0.is_conn_closed.store(true, Ordering::Relaxed);
             }
 
