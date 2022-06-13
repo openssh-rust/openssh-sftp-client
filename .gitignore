@@ -18,3 +18,5 @@ Cargo.lock
 #Cargo.lock
 
 tags
+
+.DS_Store

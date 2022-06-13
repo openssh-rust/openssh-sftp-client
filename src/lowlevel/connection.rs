@@ -1,15 +1,20 @@
 #![forbid(unsafe_code)]
 
 use super::awaitable_responses::AwaitableResponses;
+use super::pin_util::pinned_arc_strong_count;
 use super::writer_buffered::WriterBuffered;
 use super::*;
 
 use std::fmt::Debug;
 use std::io;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Arc;
+use std::pin::Pin;
+use std::sync::{
+    atomic::{AtomicBool, AtomicU32, Ordering},
+    Arc,
+};
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
+use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::Notify;
 
@@ -17,7 +22,9 @@ use tokio::sync::Notify;
 //  - Support for zero copy syscalls
 
 #[derive(Debug)]
+#[pin_project]
 struct SharedDataInner<W, Buffer, Auxiliary> {
+    #[pin]
     writer: WriterBuffered<W>,
     responses: AwaitableResponses<Buffer>,
 
@@ -35,7 +42,7 @@ struct SharedDataInner<W, Buffer, Auxiliary> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<W, Buffer, Auxiliary = ()>(Arc<SharedDataInner<W, Buffer, Auxiliary>>);
+pub struct SharedData<W, Buffer, Auxiliary = ()>(Pin<Arc<SharedDataInner<W, Buffer, Auxiliary>>>);
 
 impl<W, Buffer, Auxiliary> Clone for SharedData<W, Buffer, Auxiliary> {
     fn clone(&self) -> Self {
@@ -47,6 +54,14 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
     fn drop(&mut self) {
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
+        //
+        // # Correctness
+        //
+        // The users can never access to the underlying Arc, it can only deal with
+        // SharedData, WriteEnd and ReadEnd, and ReadEnd never cloned the
+        // SharedData/underlying Arc or using the weak pointer.
+        //
+        // And there can be only one ReadEnd for each connection.
         if self.strong_count() == 2 {
             #[cfg(debug_assertions)]
             {
@@ -63,34 +78,25 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
 }
 
 impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
-    pub(crate) fn writer(&self) -> &WriterBuffered<W> {
-        &self.0.writer
+    pub(crate) fn writer(&self) -> Pin<&WriterBuffered<W>> {
+        self.0.as_ref().project_ref().writer
     }
 
     pub(crate) fn responses(&self) -> &AwaitableResponses<Buffer> {
         &self.0.responses
     }
 
-    pub(crate) fn get_mut_writer(&mut self) -> Option<&mut WriterBuffered<W>> {
-        Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.writer)
-    }
-
     /// `SharedData` is a newtype wrapper for `Arc<SharedDataInner>`,
     /// so this function returns how many `Arc` there are that referred
     /// to the shared data.
     #[inline(always)]
-    pub fn strong_count(&self) -> usize {
-        Arc::strong_count(&self.0)
+    pub(crate) fn strong_count(&self) -> usize {
+        pinned_arc_strong_count(&self.0)
     }
 
     /// Returned the auxiliary data.
     pub fn get_auxiliary(&self) -> &Auxiliary {
         &self.0.auxiliary
-    }
-
-    /// Return the auxiliary data.
-    pub fn get_auxiliary_mut(&mut self) -> Option<&mut Auxiliary> {
-        Arc::get_mut(&mut self.0).map(|shared_data| &mut shared_data.auxiliary)
     }
 
     #[inline(always)]
@@ -146,7 +152,7 @@ impl<W, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     /// Flush the write buffer.
     ///
     /// If another thread is flushing, then `Ok(false)` will be returned.
@@ -185,7 +191,7 @@ impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect<
     R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    W: AsyncWrite,
     Buffer: ToBuffer + Send + Sync + 'static,
 >(
     reader: R,
@@ -204,7 +210,7 @@ pub async fn connect<
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect_with_auxiliary<
     R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    W: AsyncWrite,
     Buffer: ToBuffer + Send + Sync + 'static,
     Auxiliary,
 >(
@@ -219,7 +225,7 @@ pub async fn connect_with_auxiliary<
     ),
     Error,
 > {
-    let shared_data = SharedData(Arc::new(SharedDataInner {
+    let shared_data = SharedData(Arc::pin(SharedDataInner {
         writer: WriterBuffered::new(writer),
         responses: AwaitableResponses::new(),
         notify: Notify::new(),

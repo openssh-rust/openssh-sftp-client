@@ -126,7 +126,7 @@ impl<'s, W> OpenOptions<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> OpenOptions<'s, W> {
+impl<'s, W: AsyncWrite> OpenOptions<'s, W> {
     async fn open_impl(&self, path: &Path) -> Result<File<'s, W>, Error> {
         let filename = Cow::Borrowed(path);
 
@@ -177,7 +177,7 @@ impl<'s, W: AsyncWrite + Unpin> OpenOptions<'s, W> {
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
 /// [`tokio::io::AsyncWrite`], checkout [`TokioCompactFile`].
 #[derive(Debug)]
-pub struct File<'s, W: AsyncWrite + Unpin> {
+pub struct File<'s, W: AsyncWrite> {
     inner: OwnedHandle<'s, W>,
 
     is_readable: bool,
@@ -186,7 +186,7 @@ pub struct File<'s, W: AsyncWrite + Unpin> {
     offset: u64,
 }
 
-impl<'s, W: AsyncWrite + Unpin> Clone for File<'s, W> {
+impl<'s, W: AsyncWrite> Clone for File<'s, W> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -198,7 +198,7 @@ impl<'s, W: AsyncWrite + Unpin> Clone for File<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> File<'s, W> {
+impl<'s, W: AsyncWrite> File<'s, W> {
     fn get_auxiliary(&self) -> &'s Auxiliary {
         self.inner.get_auxiliary()
     }
@@ -649,7 +649,7 @@ impl<'s, W: AsyncWrite + Unpin> File<'s, W> {
     }
 }
 
-impl<W: AsyncWrite + Unpin> AsyncSeek for File<'_, W> {
+impl<W: AsyncWrite> AsyncSeek for File<'_, W> {
     /// start_seek only adjust local offset since sftp protocol
     /// does not provides a seek function.
     ///

@@ -65,11 +65,10 @@ impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
-            .get_mut_writer()
-            .unwrap()
+            .writer()
             .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
             .await?;
 
@@ -483,7 +482,7 @@ impl<W: AsyncWrite + Unpin, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, 
     }
 }
 
-impl<W: AsyncWrite + Unpin, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
+impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     WriteEnd<W, Buffer, Auxiliary>
 {
     /// Write will extend the file if writing beyond the end of the file.
@@ -678,7 +677,9 @@ impl<W: AsyncWrite + Unpin, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         .split();
 
         // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
-        let mut queue_pusher = self.shared_data.writer().get_pusher();
+        let writer = self.shared_data.writer();
+
+        let mut queue_pusher = writer.get_pusher();
         queue_pusher.push(header);
         for data in data_slice {
             queue_pusher.extend_from_exact_size_iter(data.iter().cloned());

@@ -6,11 +6,11 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
-async fn flush<W: AsyncWrite + Unpin>(shared_data: &SharedData<W>) -> Result<(), Error> {
+async fn flush<W: AsyncWrite>(shared_data: &SharedData<W>) -> Result<(), Error> {
     shared_data.flush().await.map_err(Error::from)
 }
 
-pub(super) fn create_flush_task<W: AsyncWrite + Unpin + Send + Sync + 'static>(
+pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
     shared_data: SharedData<W>,
     flush_interval: Duration,
 ) -> JoinHandle<Result<(), Error>> {
@@ -73,7 +73,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Unpin + Send + Sync + 'static>(
 
 pub(super) fn create_read_task<
     R: AsyncRead + Unpin + Send + Sync + 'static,
-    W: AsyncWrite + Unpin + Send + Sync + 'static,
+    W: AsyncWrite + Send + Sync + 'static,
 >(
     mut read_end: ReadEnd<R, W>,
 ) -> JoinHandle<Result<(), Error>> {

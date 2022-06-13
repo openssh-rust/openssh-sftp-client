@@ -71,7 +71,7 @@ impl<'s, W> Fs<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite + Unpin> Fs<'s, W> {
+impl<'s, W: AsyncWrite> Fs<'s, W> {
     async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_, W>, Error> {
         let path = self.concat_path_if_needed(path);
 
@@ -356,9 +356,9 @@ impl<'s, W: AsyncWrite + Unpin> Fs<'s, W> {
 /// Remote Directory
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Dir<'s, W: AsyncWrite + Unpin>(OwnedHandle<'s, W>);
+pub struct Dir<'s, W: AsyncWrite>(OwnedHandle<'s, W>);
 
-impl<W: AsyncWrite + Unpin> Dir<'_, W> {
+impl<W: AsyncWrite> Dir<'_, W> {
     /// Read dir.
     pub async fn read_dir(&mut self) -> Result<ReadDir, Error> {
         self.0
@@ -402,7 +402,7 @@ impl<W> DirBuilder<'_, '_, W> {
     }
 }
 
-impl<W: AsyncWrite + Unpin> DirBuilder<'_, '_, W> {
+impl<W: AsyncWrite> DirBuilder<'_, '_, W> {
     async fn create_impl(&mut self, path: &Path) -> Result<(), Error> {
         let fs = &mut self.fs;
 

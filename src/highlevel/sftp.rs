@@ -30,7 +30,7 @@ pub struct Sftp<W> {
     read_task: JoinHandle<Result<(), Error>>,
 }
 
-impl<W: AsyncWrite + Unpin + Send + Sync + 'static> Sftp<W> {
+impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
     /// Create [`Sftp`].
     pub async fn new<R: AsyncRead + Unpin + Send + Sync + 'static>(
         stdin: W,
@@ -74,7 +74,7 @@ impl<W: AsyncWrite + Unpin + Send + Sync + 'static> Sftp<W> {
     }
 }
 
-impl<W: AsyncWrite + Unpin> Sftp<W> {
+impl<W: AsyncWrite> Sftp<W> {
     async fn set_limits(
         &self,
         write_end: WriteEnd<W>,
