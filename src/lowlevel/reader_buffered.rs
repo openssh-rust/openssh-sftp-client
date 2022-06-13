@@ -47,9 +47,9 @@ impl<R: AsyncRead> ReaderBuffered<R> {
 
         if len < size {
             if size < BUFFER_LEN {
-                read_to_bytes_rng(&mut this.reader, &mut this.buffer, size..BUFFER_LEN).await?;
+                read_to_bytes_rng(&mut this.reader, this.buffer, size..BUFFER_LEN).await?;
             } else {
-                read_exact_to_bytes(&mut this.reader, &mut this.buffer, size - len).await?;
+                read_exact_to_bytes(&mut this.reader, this.buffer, size - len).await?;
             }
         }
 
