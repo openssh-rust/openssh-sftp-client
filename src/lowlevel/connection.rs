@@ -54,6 +54,14 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
     fn drop(&mut self) {
         // If this is the last reference, except for `ReadEnd`, to the SharedData,
         // then the connection is closed.
+        //
+        // # Correctness
+        //
+        // The users can never access to the underlying Arc, it can only deal with
+        // SharedData, WriteEnd and ReadEnd, and ReadEnd never cloned the
+        // SharedData/underlying Arc or using the weak pointer.
+        //
+        // And there can be only one ReadEnd for each connection.
         if self.strong_count() == 2 {
             #[cfg(debug_assertions)]
             {
