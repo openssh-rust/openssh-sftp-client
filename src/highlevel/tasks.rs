@@ -97,7 +97,7 @@ pub(super) fn create_read_task<
         // Receive version and extensions
         let extensions = read_end
             .as_mut()
-            .receive_server_version(SSH2_FILEXFER_VERSION)
+            .receive_server_hello(SSH2_FILEXFER_VERSION)
             .await?;
 
         tx.send(extensions).unwrap();

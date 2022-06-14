@@ -241,7 +241,7 @@ pub async fn connect_with_auxiliary<
 
     // Receive version and extensions
     let extensions = Pin::new(&mut read_end)
-        .receive_server_version(SSH2_FILEXFER_VERSION)
+        .receive_server_hello(SSH2_FILEXFER_VERSION)
         .await?;
 
     Ok((write_end, read_end, extensions))

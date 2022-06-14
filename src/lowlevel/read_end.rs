@@ -39,7 +39,7 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
         }
     }
 
-    pub(crate) async fn receive_server_version(
+    pub(crate) async fn receive_server_hello(
         mut self: Pin<&mut Self>,
         version: u32,
     ) -> Result<Extensions, Error> {
