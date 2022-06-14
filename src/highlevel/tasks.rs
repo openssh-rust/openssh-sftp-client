@@ -4,7 +4,6 @@ use crate::lowlevel::Extensions;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::pin;
 use tokio::sync::oneshot;
@@ -95,10 +94,7 @@ pub(super) fn create_read_task<
         pin!(read_end);
 
         // Receive version and extensions
-        let extensions = read_end
-            .as_mut()
-            .receive_server_hello(SSH2_FILEXFER_VERSION)
-            .await?;
+        let extensions = read_end.as_mut().receive_server_hello().await?;
 
         tx.send(extensions).unwrap();
 

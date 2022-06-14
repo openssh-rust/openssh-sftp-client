@@ -12,6 +12,7 @@ use std::fmt::Debug;
 use std::io;
 use std::pin::Pin;
 
+use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use openssh_sftp_protocol::response::{self, ServerVersion};
 use openssh_sftp_protocol::serde::de::DeserializeOwned;
 use openssh_sftp_protocol::ssh_format::from_bytes;
@@ -41,7 +42,6 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
 
     pub(crate) async fn receive_server_hello(
         mut self: Pin<&mut Self>,
-        version: u32,
     ) -> Result<Extensions, Error> {
         // Receive server version
         let len: u32 = self.as_mut().read_and_deserialize(4).await?;
@@ -56,7 +56,7 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
             .await?;
         let server_version = ServerVersion::deserialize(&*drain)?;
 
-        if server_version.version != version {
+        if server_version.version != SSH2_FILEXFER_VERSION {
             Err(Error::UnsupportedSftpProtocol {
                 version: server_version.version,
             })
