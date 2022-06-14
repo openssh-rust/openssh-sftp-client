@@ -40,7 +40,10 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
         }
     }
 
-    pub(crate) async fn receive_server_hello_pinned(
+    /// Must be called and only called once right after
+    /// [`super::connect_with_auxiliary_relaxed_unpin`]
+    /// to receive the hello message from the server.
+    pub async fn receive_server_hello_pinned(
         mut self: Pin<&mut Self>,
     ) -> Result<Extensions, Error> {
         // Receive server version
@@ -279,7 +282,10 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
 impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     ReadEnd<R, W, Buffer, Auxiliary>
 {
-    pub(crate) async fn receive_server_hello(&mut self) -> Result<Extensions, Error> {
+    /// Must be called and only called once right after
+    /// [`super::connect_with_auxiliary_relaxed_unpin`]
+    /// to receive the hello message from the server.
+    pub async fn receive_server_hello(&mut self) -> Result<Extensions, Error> {
         Pin::new(self).receive_server_hello_pinned().await
     }
 

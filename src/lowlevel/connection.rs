@@ -255,7 +255,7 @@ pub async fn connect_with_auxiliary<
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub(crate) async fn connect_with_auxiliary_relaxed_unpin<
+pub async fn connect_with_auxiliary_relaxed_unpin<
     R: AsyncRead,
     W: AsyncWrite,
     Buffer: ToBuffer + Send + Sync + 'static,
