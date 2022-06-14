@@ -248,7 +248,7 @@ pub async fn connect_with_auxiliary<
 /// Initialize connection to remote sftp server and
 /// negotiate the sftp version.
 ///
-/// User of this function must manually call `receive_server_version`.
+/// User of this function must manually call [`ReadEnd::receive_server_hello`].
 ///
 /// # Cancel Safety
 ///
