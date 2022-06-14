@@ -240,7 +240,7 @@ pub async fn connect_with_auxiliary<
         connect_with_auxiliary_relaxed_unpin(reader, writer, auxiliary).await?;
 
     // Receive version and extensions
-    let extensions = Pin::new(&mut read_end).receive_server_hello().await?;
+    let extensions = read_end.receive_server_hello().await?;
 
     Ok((write_end, read_end, extensions))
 }

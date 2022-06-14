@@ -40,7 +40,7 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
         }
     }
 
-    pub(crate) async fn receive_server_hello(
+    pub(crate) async fn receive_server_hello_pinned(
         mut self: Pin<&mut Self>,
     ) -> Result<Extensions, Error> {
         // Receive server version
@@ -279,6 +279,10 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
 impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     ReadEnd<R, W, Buffer, Auxiliary>
 {
+    pub(crate) async fn receive_server_hello(&mut self) -> Result<Extensions, Error> {
+        Pin::new(self).receive_server_hello_pinned().await
+    }
+
     /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
     ///
     /// # Restart on Error

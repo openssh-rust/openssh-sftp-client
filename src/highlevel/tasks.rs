@@ -94,7 +94,7 @@ pub(super) fn create_read_task<
         pin!(read_end);
 
         // Receive version and extensions
-        let extensions = read_end.as_mut().receive_server_hello().await?;
+        let extensions = read_end.as_mut().receive_server_hello_pinned().await?;
 
         tx.send(extensions).unwrap();
 
