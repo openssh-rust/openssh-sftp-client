@@ -63,17 +63,28 @@ impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
         //
         // And there can be only one ReadEnd for each connection.
         if self.strong_count() == 2 {
-            #[cfg(debug_assertions)]
-            {
+            if cfg!(debug_assertions) {
                 assert!(!self.0.is_conn_closed.swap(true, Ordering::Relaxed));
-            }
-            #[cfg(not(debug_assertions))]
-            {
+            } else {
                 self.0.is_conn_closed.store(true, Ordering::Relaxed);
             }
 
             self.notify_read_end();
         }
+    }
+}
+
+impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+    fn new(writer: W, auxiliary: Auxiliary) -> Self {
+        SharedData(Arc::pin(SharedDataInner {
+            writer: WriterBuffered::new(writer),
+            responses: AwaitableResponses::new(),
+            notify: Notify::new(),
+            requests_sent: AtomicU32::new(0),
+            is_conn_closed: AtomicBool::new(false),
+
+            auxiliary,
+        }))
     }
 }
 
@@ -225,25 +236,50 @@ pub async fn connect_with_auxiliary<
     ),
     Error,
 > {
-    let shared_data = SharedData(Arc::pin(SharedDataInner {
-        writer: WriterBuffered::new(writer),
-        responses: AwaitableResponses::new(),
-        notify: Notify::new(),
-        requests_sent: AtomicU32::new(0),
-        is_conn_closed: AtomicBool::new(false),
-
-        auxiliary,
-    }));
-
-    // Send hello message
-    let version = SSH2_FILEXFER_VERSION;
-
-    let mut write_end = WriteEnd::new(shared_data);
-    write_end.send_hello(version).await?;
+    let (write_end, mut read_end) =
+        connect_with_auxiliary_relaxed_unpin(reader, writer, auxiliary).await?;
 
     // Receive version and extensions
-    let mut read_end = ReadEnd::new(reader, (*write_end).clone());
-    let extensions = read_end.receive_server_version(version).await?;
+    let extensions = read_end.receive_server_hello().await?;
 
     Ok((write_end, read_end, extensions))
+}
+
+/// Initialize connection to remote sftp server and
+/// negotiate the sftp version.
+///
+/// User of this function must manually call [`ReadEnd::receive_server_hello`].
+///
+/// # Cancel Safety
+///
+/// This function is not cancel safe.
+///
+/// After dropping the future, the connection would be in a undefined state.
+pub async fn connect_with_auxiliary_relaxed_unpin<
+    R: AsyncRead,
+    W: AsyncWrite,
+    Buffer: ToBuffer + Send + Sync + 'static,
+    Auxiliary,
+>(
+    reader: R,
+    writer: W,
+    auxiliary: Auxiliary,
+) -> Result<
+    (
+        WriteEnd<W, Buffer, Auxiliary>,
+        ReadEnd<R, W, Buffer, Auxiliary>,
+    ),
+    Error,
+> {
+    let shared_data = SharedData::new(writer, auxiliary);
+
+    // Send hello message
+
+    let mut write_end = WriteEnd::new(shared_data);
+    write_end.send_hello(SSH2_FILEXFER_VERSION).await?;
+
+    // Receive version and extensions
+    let read_end = ReadEnd::new(reader, (*write_end).clone());
+
+    Ok((write_end, read_end))
 }

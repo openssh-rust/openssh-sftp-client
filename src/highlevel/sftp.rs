@@ -6,7 +6,7 @@ use super::{
 };
 
 use auxiliary::Auxiliary;
-use lowlevel::{connect_with_auxiliary, Extensions};
+use lowlevel::{connect_with_auxiliary_relaxed_unpin, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
 use std::cmp::min;
@@ -32,12 +32,12 @@ pub struct Sftp<W> {
 
 impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
     /// Create [`Sftp`].
-    pub async fn new<R: AsyncRead + Unpin + Send + Sync + 'static>(
+    pub async fn new<R: AsyncRead + Send + Sync + 'static>(
         stdin: W,
         stdout: R,
         options: SftpOptions,
     ) -> Result<Self, Error> {
-        let (write_end, read_end, extensions) = connect_with_auxiliary(
+        let (write_end, read_end) = connect_with_auxiliary_relaxed_unpin(
             stdout,
             stdin,
             Auxiliary::new(
@@ -46,6 +46,8 @@ impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
             ),
         )
         .await?;
+
+        let (rx, read_task) = create_read_task(read_end);
 
         // Create sftp here.
         //
@@ -58,7 +60,15 @@ impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
                 SharedData::clone(&write_end),
                 options.get_flush_interval(),
             ),
-            read_task: create_read_task(read_end),
+            read_task,
+        };
+
+        let extensions = if let Ok(extensions) = rx.await {
+            extensions
+        } else {
+            // Wait on flush_task and read_task to get a more detailed error message.
+            sftp.close().await?;
+            std::unreachable!("Error must have occurred in either read_task or flush_task")
         };
 
         match sftp.set_limits(write_end, options, extensions).await {

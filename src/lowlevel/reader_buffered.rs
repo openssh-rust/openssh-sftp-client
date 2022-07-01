@@ -7,13 +7,16 @@ use std::task::{Context, Poll};
 
 use bytes::{Buf, BytesMut};
 
+use pin_project::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
 use tokio_io_utility::{read_exact_to_bytes, read_to_bytes_rng, ready};
 
 const BUFFER_LEN: usize = 4096;
 
 #[derive(Debug)]
+#[pin_project]
 pub(super) struct ReaderBuffered<R> {
+    #[pin]
     reader: R,
 
     /// Use `BytesMut` here to avoid frequent copy when consuming.
@@ -26,7 +29,7 @@ pub(super) struct ReaderBuffered<R> {
     buffer: BytesMut,
 }
 
-impl<R: AsyncRead + Unpin> ReaderBuffered<R> {
+impl<R: AsyncRead> ReaderBuffered<R> {
     pub(super) fn new(reader: R) -> Self {
         Self {
             reader,
@@ -34,27 +37,32 @@ impl<R: AsyncRead + Unpin> ReaderBuffered<R> {
         }
     }
 
-    pub(super) async fn read_exact_into_buffer(&mut self, size: usize) -> io::Result<Drain<'_>> {
-        let len = self.buffer.len();
+    pub(super) async fn read_exact_into_buffer(
+        self: Pin<&mut Self>,
+        size: usize,
+    ) -> io::Result<Drain<'_>> {
+        let mut this = self.project();
+
+        let len = this.buffer.len();
 
         if len < size {
             if size < BUFFER_LEN {
-                read_to_bytes_rng(&mut self.reader, &mut self.buffer, size..BUFFER_LEN).await?;
+                read_to_bytes_rng(&mut this.reader, this.buffer, size..BUFFER_LEN).await?;
             } else {
-                read_exact_to_bytes(&mut self.reader, &mut self.buffer, size - len).await?;
+                read_exact_to_bytes(&mut this.reader, this.buffer, size - len).await?;
             }
         }
 
         Ok(Drain {
-            buffer: &mut self.buffer,
+            buffer: this.buffer,
             n: size,
         })
     }
 }
 
-impl<R: AsyncRead + Unpin> AsyncBufRead for ReaderBuffered<R> {
-    fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        let this = &mut *self;
+impl<R: AsyncRead> AsyncBufRead for ReaderBuffered<R> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let mut this = self.project();
 
         let buffer = &mut this.buffer;
         let reader = &mut this.reader;
@@ -75,11 +83,11 @@ impl<R: AsyncRead + Unpin> AsyncBufRead for ReaderBuffered<R> {
             }
         }
 
-        Poll::Ready(Ok(&Pin::into_inner(self).buffer))
+        Poll::Ready(Ok(this.buffer))
     }
 
-    fn consume(mut self: Pin<&mut Self>, amt: usize) {
-        let buffer = &mut self.buffer;
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        let buffer = &mut self.project().buffer;
 
         let len = buffer.len();
         let amt = min(len, amt);
@@ -88,22 +96,22 @@ impl<R: AsyncRead + Unpin> AsyncBufRead for ReaderBuffered<R> {
     }
 }
 
-impl<R: AsyncRead + Unpin> AsyncRead for ReaderBuffered<R> {
+impl<R: AsyncRead> AsyncRead for ReaderBuffered<R> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        let this = &mut *self;
+        let this = self.as_mut().project();
 
-        let buffer = &mut this.buffer;
-        let reader = &mut this.reader;
+        let buffer = this.buffer;
+        let reader = this.reader;
 
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
         if buffer.is_empty() && buf.remaining() >= BUFFER_LEN {
-            let res = ready!(Pin::new(reader).poll_read(cx, buf));
+            let res = ready!(reader.poll_read(cx, buf));
             return Poll::Ready(res);
         }
 
