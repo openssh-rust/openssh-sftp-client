@@ -12,7 +12,9 @@ pub use openssh_sftp_protocol;
 pub use openssh_sftp_protocol::response::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
 use openssh_sftp_protocol::ssh_format;
 
-/// Error returned by [`crate::lowlevel`] and [`crate::highlevel`].
+/// Error returned by
+/// [`openssh-sftp-client-lowlevel`](https://docs.rs/openssh-sftp-client-lowlevel)
+/// and [`openssh-sftp-client`](https://docs.rs/openssh-sftp-client)
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
