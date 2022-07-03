@@ -6,8 +6,11 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use once_cell::sync::OnceCell;
-use tokio::process::{self, ChildStdin, ChildStdout};
-use tokio_pipe::{PipeRead, PipeWrite};
+
+pub use tokio::process;
+use tokio::process::{ChildStdin, ChildStdout};
+
+pub use tokio_pipe::{PipeRead, PipeWrite};
 
 unsafe fn dup(raw_fd: RawFd) -> Result<RawFd, Error> {
     let res = libc::dup(raw_fd);
@@ -40,7 +43,7 @@ pub fn get_sftp_path() -> &'static Path {
     static SFTP_PATH: OnceCell<PathBuf> = OnceCell::new();
 
     SFTP_PATH.get_or_init(|| {
-        let mut sftp_path: PathBuf = env::var("OUT_DIR").unwrap().into();
+        let mut sftp_path: PathBuf = env!("OUT_DIR").into();
         sftp_path.push("openssh-portable");
         sftp_path.push("sftp-server");
 
@@ -66,14 +69,14 @@ pub async fn launch_sftp() -> (process::Child, PipeWrite, PipeRead) {
     (child, stdin, stdout)
 }
 
-#[cfg(target_os = "linux")]
 fn get_tmp_path() -> &'static Path {
-    Path::new("/tmp")
-}
-
-#[cfg(target_os = "macos")]
-fn get_tmp_path() -> &'static Path {
-    Path::new("/private/tmp")
+    Path::new(if cfg!(target_os = "linux") {
+        "/tmp"
+    } else if cfg!(target_os = "macos") {
+        "/private/tmp"
+    } else {
+        panic!("Unsupported target")
+    })
 }
 
 pub fn get_path_for_tmp_files() -> PathBuf {

@@ -1,6 +1,3 @@
-mod common;
-use common::*;
-
 use openssh_sftp_client::highlevel::*;
 
 use std::cmp::{max, min};
@@ -11,11 +8,11 @@ use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::stringify;
 
+use sftp_test_common::*;
+
 use bytes::BytesMut;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio::process;
 use tokio_io_utility::write_vectored_all;
-use tokio_pipe::PipeWrite;
 
 use pretty_assertions::assert_eq;
 
