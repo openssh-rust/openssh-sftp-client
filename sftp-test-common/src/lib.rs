@@ -69,14 +69,14 @@ pub async fn launch_sftp() -> (process::Child, PipeWrite, PipeRead) {
     (child, stdin, stdout)
 }
 
-#[cfg(target_os = "linux")]
 fn get_tmp_path() -> &'static Path {
-    Path::new("/tmp")
-}
-
-#[cfg(target_os = "macos")]
-fn get_tmp_path() -> &'static Path {
-    Path::new("/private/tmp")
+    Path::new(if cfg!(target_os = "linux") {
+        "/tmp"
+    } else if cfg!(target_os = "macos") {
+        "/private/tmp"
+    } else {
+        panic!("Unsupported target")
+    })
 }
 
 pub fn get_path_for_tmp_files() -> PathBuf {
