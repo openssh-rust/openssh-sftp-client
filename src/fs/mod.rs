@@ -288,7 +288,7 @@ impl<'s, W: AsyncWrite> Fs<'s, W> {
         let path = self.concat_path_if_needed(path);
 
         let mut file = self.write_end.sftp().open(path).await?;
-        let max_read_len = file.max_read_len();
+        let max_read_len = file.max_read_len_impl();
 
         let cap_to_reserve: usize = if let Some(len) = file.metadata().await?.len() {
             // To detect EOF, we need to a little bit more then the length

@@ -20,10 +20,6 @@ use tokio_io_utility::IoSliceExt;
 mod tokio_compat_file;
 pub use tokio_compat_file::{TokioCompatFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN};
 
-/// This type is renamed to [`TokioCompatFile`].
-#[deprecated(note = "This type is renamed to `TokioCompatFile`.")]
-pub type TokioCompactFile<'s, W> = TokioCompatFile<'s, W>;
-
 mod utility;
 use utility::{take_bytes, take_io_slices};
 
@@ -175,7 +171,7 @@ impl<'s, W: AsyncWrite> OpenOptions<'s, W> {
 /// and seeks can be performed independently.
 ///
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
-/// [`tokio::io::AsyncWrite`], checkout [`TokioCompactFile`].
+/// [`tokio::io::AsyncWrite`], checkout [`TokioCompatFile`].
 #[derive(Debug)]
 pub struct File<'s, W: AsyncWrite> {
     inner: OwnedHandle<'s, W>,
@@ -199,31 +195,39 @@ impl<'s, W: AsyncWrite> Clone for File<'s, W> {
 }
 
 impl<'s, W: AsyncWrite> File<'s, W> {
+    fn max_write_len_impl(&self) -> u32 {
+        self.get_auxiliary().limits().write_len
+    }
+
+    /// The maximum amount of bytes that can be read in one request.
+    /// Reading more than that, then your read will be split into multiple requests
+    pub(super) fn max_read_len_impl(&self) -> u32 {
+        self.get_auxiliary().limits().read_len
+    }
+}
+
+#[cfg(feature = "ci-tests")]
+impl<'s, W: AsyncWrite> File<'s, W> {
+    /// The maximum amount of bytes that can be written in one request.
+    /// Writing more than that, then your write will be split into multiple requests
+    pub fn max_write_len(&self) -> u32 {
+        self.max_write_len_impl()
+    }
+
+    /// The maximum amount of bytes that can be read in one request.
+    /// Reading more than that, then your read will be split into multiple requests
+    pub fn max_read_len(&self) -> u32 {
+        self.max_read_len_impl()
+    }
+}
+
+impl<'s, W: AsyncWrite> File<'s, W> {
     fn get_auxiliary(&self) -> &'s Auxiliary {
         self.inner.get_auxiliary()
     }
 
     fn get_inner(&mut self) -> (&mut WriteEnd<W>, Cow<'_, Handle>) {
         (&mut self.inner.write_end, Cow::Borrowed(&self.inner.handle))
-    }
-
-    /// The maximum amount of bytes that can be written in one request.
-    /// Writing more than that, then your write will be split into multiple requests
-    pub fn max_write_len(&self) -> u32 {
-        self.get_auxiliary().limits().write_len
-    }
-
-    /// The maximum amount of bytes that can be read in one request.
-    /// Reading more than that, then your read will be split into multiple requests
-    pub fn max_read_len(&self) -> u32 {
-        self.get_auxiliary().limits().read_len
-    }
-
-    /// Get maximum amount of bytes that [`File`] and [`TokioCompactFile`]
-    /// can write in one request.
-    /// Writing more than that, then your write will be split into multiple requests
-    pub fn max_buffered_write(&self) -> u32 {
-        self.get_auxiliary().max_buffered_write
     }
 
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
@@ -340,9 +344,6 @@ impl<'s, W: AsyncWrite> File<'s, W> {
 
     /// * `n` - number of bytes to read in
     ///
-    /// This function can read in at most [`File::max_read_len`] bytes
-    /// at a time.
-    ///
     /// If the [`File`] has reached EOF or `n == 0`, then `None` is returned.
     pub async fn read(&mut self, n: u32, buffer: BytesMut) -> Result<Option<BytesMut>, Error> {
         if n == 0 {
@@ -350,7 +351,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
         }
 
         let offset = self.offset;
-        let n: u32 = min(n, self.max_read_len());
+        let n: u32 = min(n, self.max_read_len_impl());
 
         let data = self
             .send_readable_request(|write_end, handle, id| {
@@ -372,8 +373,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
         Ok(Some(buffer))
     }
 
-    /// This function can write at most [`File::max_write_len`] bytes in one
-    /// function call, anything longer than that will be truncated.
+    /// Write data into the file.
     pub async fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
@@ -382,7 +382,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
         let offset = self.offset;
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
-        let max_write_len = self.max_write_len();
+        let max_write_len = self.max_write_len_impl();
 
         let n: u32 = buf
             .len()
@@ -406,15 +406,14 @@ impl<'s, W: AsyncWrite> File<'s, W> {
         Ok(n as usize)
     }
 
-    /// This function can write at most [`File::max_write_len`] bytes in one
-    /// function call, anything longer than that will be truncated.
+    /// Write from multiple buffer at once.
     pub async fn write_vectorized(&mut self, bufs: &[IoSlice<'_>]) -> Result<usize, Error> {
         if bufs.is_empty() {
             return Ok(0);
         }
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
-        let max_write_len = self.max_write_len();
+        let max_write_len = self.max_write_len_impl();
 
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
@@ -441,15 +440,14 @@ impl<'s, W: AsyncWrite> File<'s, W> {
         Ok(n as usize)
     }
 
-    /// This function can write at most [`File::max_write_len`] bytes in one
-    /// function call, anything longer than that will be truncated.
+    /// Zero copy write.
     pub async fn write_zero_copy(&mut self, bytes_slice: &[Bytes]) -> Result<usize, Error> {
         if bytes_slice.is_empty() {
             return Ok(0);
         }
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
-        let max_write_len = self.max_write_len();
+        let max_write_len = self.max_write_len_impl();
 
         let (n, bufs, buf) = if let Some(res) = take_bytes(bytes_slice, max_write_len as usize) {
             res

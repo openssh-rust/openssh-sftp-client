@@ -19,9 +19,6 @@ use derive_destructure2::destructure;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::JoinHandle;
 
-/// CancellationToken
-pub use tokio_util::sync::CancellationToken;
-
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]
 pub struct Sftp<W> {
@@ -40,10 +37,7 @@ impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
         let (write_end, read_end) = connect_with_auxiliary_relaxed_unpin(
             stdout,
             stdin,
-            Auxiliary::new(
-                options.get_max_pending_requests(),
-                options.get_max_buffered_write(),
-            ),
+            Auxiliary::new(options.get_max_pending_requests()),
         )
         .await?;
 
@@ -284,12 +278,6 @@ impl<W> Sftp<W> {
     /// Reading more than that, then your read will be split into multiple requests
     pub fn max_read_len(&self) -> u32 {
         self.shared_data.get_auxiliary().limits().read_len
-    }
-
-    /// Get maximum amount of bytes that [`crate::highlevel::File`] and
-    /// [`crate::highlevel::TokioCompactFile`] would write in a buffered manner.
-    pub fn max_buffered_write(&self) -> u32 {
-        self.shared_data.get_auxiliary().max_buffered_write
     }
 }
 

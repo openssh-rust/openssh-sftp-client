@@ -9,6 +9,10 @@ use crate::*;
 ///     - `fs::DirEntry`
 ///     - `fs::ReadDir`
 ///
+/// ## Removed
+///  - Unused re-export `CancellationToken`.
+///  - Backward compatibility alias `file::TokioCompactFile`.
+///
 /// ## Moved
 ///  - `lowlevel` is now moved to be another crate [openssh-sftp-client-lowlevel].
 ///  - All items in `highlevel` is now moeved into root.
