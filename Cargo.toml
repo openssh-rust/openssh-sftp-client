@@ -6,7 +6,7 @@ edition = "2018"
 authors = ["Jiahao XU <Jiahao_XU@outlook.com>"]
 
 license = "MIT"
-description = "Data format used to communicate with openssh mux server."
+description = "Highlevel API used to communicate with openssh sftp server."
 repository = "https://github.com/openssh-rust/openssh-sftp-client"
 
 keywords = ["ssh", "multiplex", "async", "network", "sftp"]
