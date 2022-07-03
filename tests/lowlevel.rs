@@ -1,6 +1,3 @@
-mod common;
-use common::*;
-
 use lowlevel::*;
 use openssh_sftp_client::lowlevel;
 
@@ -11,6 +8,8 @@ use std::io;
 use std::io::IoSlice;
 use std::os::unix::fs::symlink;
 use std::path;
+
+use sftp_test_common::*;
 
 use tokio::process;
 use tokio_pipe::{PipeRead, PipeWrite};

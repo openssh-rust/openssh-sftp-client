@@ -40,7 +40,7 @@ pub fn get_sftp_path() -> &'static Path {
     static SFTP_PATH: OnceCell<PathBuf> = OnceCell::new();
 
     SFTP_PATH.get_or_init(|| {
-        let mut sftp_path: PathBuf = env::var("OUT_DIR").unwrap().into();
+        let mut sftp_path: PathBuf = env!("OUT_DIR").into();
         sftp_path.push("openssh-portable");
         sftp_path.push("sftp-server");
 
