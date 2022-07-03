@@ -12,9 +12,7 @@ use sftp_test_common::*;
 
 use bytes::BytesMut;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio::process;
 use tokio_io_utility::write_vectored_all;
-use tokio_pipe::PipeWrite;
 
 use pretty_assertions::assert_eq;
 

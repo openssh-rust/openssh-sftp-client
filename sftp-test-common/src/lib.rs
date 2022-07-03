@@ -6,8 +6,11 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use once_cell::sync::OnceCell;
-use tokio::process::{self, ChildStdin, ChildStdout};
-use tokio_pipe::{PipeRead, PipeWrite};
+
+pub use tokio::process;
+use tokio::process::{ChildStdin, ChildStdout};
+
+pub use tokio_pipe::{PipeRead, PipeWrite};
 
 unsafe fn dup(raw_fd: RawFd) -> Result<RawFd, Error> {
     let res = libc::dup(raw_fd);

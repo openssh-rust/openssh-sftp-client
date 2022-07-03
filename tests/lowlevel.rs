@@ -11,9 +11,6 @@ use std::path;
 
 use sftp_test_common::*;
 
-use tokio::process;
-use tokio_pipe::{PipeRead, PipeWrite};
-
 use bytes::Bytes;
 use tempfile::{Builder, TempDir};
 
