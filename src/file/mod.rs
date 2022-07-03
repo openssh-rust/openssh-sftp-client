@@ -20,10 +20,6 @@ use tokio_io_utility::IoSliceExt;
 mod tokio_compat_file;
 pub use tokio_compat_file::{TokioCompatFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN};
 
-/// This type is renamed to [`TokioCompatFile`].
-#[deprecated(note = "This type is renamed to `TokioCompatFile`.")]
-pub type TokioCompactFile<'s, W> = TokioCompatFile<'s, W>;
-
 mod utility;
 use utility::{take_bytes, take_io_slices};
 

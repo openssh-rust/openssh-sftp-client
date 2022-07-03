@@ -11,6 +11,7 @@ use crate::*;
 ///
 /// ## Removed
 ///  - Unused re-export `CancellationToken`.
+///  - Backward compatibility alias `file::TokioCompactFile`.
 ///
 /// ## Moved
 ///  - `lowlevel` is now moved to be another crate [openssh-sftp-client-lowlevel].
