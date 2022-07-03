@@ -213,7 +213,7 @@ impl<'s, W: AsyncWrite> TokioCompatFile<'s, W> {
             .into()));
         }
 
-        let max_read_len = this.max_read_len();
+        let max_read_len = this.max_read_len_impl();
         let amt = min(amt.get(), max_read_len);
 
         let future = if let Some(future) = &mut this.read_future {
@@ -387,8 +387,6 @@ impl<W: AsyncWrite> AsyncBufRead for TokioCompatFile<'_, W> {
     }
 }
 
-/// [`TokioCompatFile`] can read in at most [`File::max_read_len`] bytes
-/// at a time.
 impl<W: AsyncWrite> AsyncRead for TokioCompatFile<'_, W> {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -448,9 +446,6 @@ impl<W: AsyncWrite> AsyncRead for TokioCompatFile<'_, W> {
 ///
 /// Calling [`AsyncWrite::poll_flush`] on [`TokioCompatFile`] would wait on
 /// writes in the order they are sent.
-///
-/// [`TokioCompatFile`] can write at most [`File::max_write_len`] bytes
-/// at a time.
 impl<W: AsyncWrite> AsyncWrite for TokioCompatFile<'_, W> {
     fn poll_write(
         mut self: Pin<&mut Self>,
@@ -469,7 +464,7 @@ impl<W: AsyncWrite> AsyncWrite for TokioCompatFile<'_, W> {
         }
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
-        let max_write_len = self.max_write_len();
+        let max_write_len = self.max_write_len_impl();
 
         let n: u32 = buf
             .len()
@@ -570,7 +565,7 @@ impl<W: AsyncWrite> AsyncWrite for TokioCompatFile<'_, W> {
             return Poll::Ready(Ok(0));
         }
 
-        let max_write_len = self.max_write_len();
+        let max_write_len = self.max_write_len_impl();
 
         let (n, bufs, buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
             res
