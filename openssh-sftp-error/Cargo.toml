@@ -1,0 +1,20 @@
+[package]
+name = "openssh-sftp-error"
+version = "0.1.0"
+edition = "2018"
+
+authors = ["Jiahao XU <Jiahao_XU@outlook.com>"]
+
+license = "MIT"
+description = "Error type used when communicating with openssh sftp server."
+repository = "https://github.com/openssh-rust/openssh-sftp-client"
+
+keywords = ["ssh", "multiplex", "async", "network", "sftp"]
+categories = ["asynchronous", "network-programming", "api-bindings"]
+
+[dependencies]
+thiserror = "1.0.29"
+awaitable = "0.3.3"
+openssh-sftp-protocol = "0.21.5"
+
+tokio = { version = "1.11.0", features = ["rt"] }

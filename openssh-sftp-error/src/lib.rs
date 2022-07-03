@@ -1,13 +1,15 @@
 #![forbid(unsafe_code)]
 
-use super::lowlevel::{SftpErrMsg, SftpErrorKind};
-
 use std::io;
 use std::num::TryFromIntError;
 use std::process::ExitStatus;
 
 use thiserror::Error;
 
+pub use awaitable;
+
+pub use openssh_sftp_protocol;
+pub use openssh_sftp_protocol::response::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
 use openssh_sftp_protocol::ssh_format;
 
 /// Error returned by [`crate::lowlevel`] and [`crate::highlevel`].

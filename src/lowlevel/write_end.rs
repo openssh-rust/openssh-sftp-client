@@ -13,12 +13,12 @@ use std::io::IoSlice;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
+use crate::openssh_sftp_protocol::file_attrs::FileAttrs;
+use crate::openssh_sftp_protocol::request::*;
+use crate::openssh_sftp_protocol::serde::Serialize;
+use crate::openssh_sftp_protocol::ssh_format::Serializer;
+use crate::openssh_sftp_protocol::Handle;
 use bytes::Bytes;
-use openssh_sftp_protocol::file_attrs::FileAttrs;
-use openssh_sftp_protocol::request::*;
-use openssh_sftp_protocol::serde::Serialize;
-use openssh_sftp_protocol::ssh_format::Serializer;
-use openssh_sftp_protocol::Handle;
 
 use tokio::io::AsyncWrite;
 
