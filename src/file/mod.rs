@@ -171,7 +171,7 @@ impl<'s, W: AsyncWrite> OpenOptions<'s, W> {
 /// and seeks can be performed independently.
 ///
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
-/// [`tokio::io::AsyncWrite`], checkout [`TokioCompactFile`].
+/// [`tokio::io::AsyncWrite`], checkout [`TokioCompatFile`].
 #[derive(Debug)]
 pub struct File<'s, W: AsyncWrite> {
     inner: OwnedHandle<'s, W>,
@@ -215,7 +215,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
         self.get_auxiliary().limits().read_len
     }
 
-    /// Get maximum amount of bytes that [`File`] and [`TokioCompactFile`]
+    /// Get maximum amount of bytes that [`File`] and [`TokioCompatFile`]
     /// can write in one request.
     /// Writing more than that, then your write will be split into multiple requests
     pub fn max_buffered_write(&self) -> u32 {
