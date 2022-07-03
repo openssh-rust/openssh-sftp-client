@@ -20,7 +20,7 @@
 //!
 //! You can also use this crate directly by using whatever ssh library
 //! to launch the `sftp` subsystem, then pass the stdin/stdout to
-//! [`highlevel::Sftp::new`].
+//! [`Sftp::new`].
 //!
 //! ## Extensions
 //!

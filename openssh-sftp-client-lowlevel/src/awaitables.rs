@@ -23,7 +23,7 @@ pub enum Data<Buffer> {
     /// The buffer that stores the response of Read.
     ///
     /// It will be returned if you provided a buffer to
-    /// [`crate::lowlevel::WriteEnd::send_read_request`].
+    /// [`crate::WriteEnd::send_read_request`].
     Buffer(Buffer),
 
     /// This is a fallback that is returned
