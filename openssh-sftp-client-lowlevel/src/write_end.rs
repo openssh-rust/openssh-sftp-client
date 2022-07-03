@@ -133,11 +133,11 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 
     /// - `buffer` - If set to `None` or the buffer is not long enough,
-    ///   then [`crate::lowlevel::Data::AllocatedBox`] will be returned.
+    ///   then [`crate::Data::AllocatedBox`] will be returned.
     ///
-    /// Return [`crate::lowlevel::Data::Buffer`] or
-    /// [`crate::lowlevel::Data::AllocatedBox`] if not EOF, otherwise returns
-    /// [`crate::lowlevel::Data::Eof`].
+    /// Return [`crate::Data::Buffer`] or
+    /// [`crate::Data::AllocatedBox`] if not EOF, otherwise returns
+    /// [`crate::Data::Eof`].
     ///
     /// NOTE that this merely add the request to the buffer, you need to call
     /// [`SharedData::flush`] to actually send the requests.

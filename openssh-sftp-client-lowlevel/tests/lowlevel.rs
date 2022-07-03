@@ -1,5 +1,5 @@
 use lowlevel::*;
-use openssh_sftp_client::lowlevel;
+use openssh_sftp_client_lowlevel as lowlevel;
 
 use std::borrow::Cow;
 use std::env;

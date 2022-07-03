@@ -169,7 +169,6 @@ impl<W: AsyncWrite> Sftp<W> {
         flush_task.await??;
 
         // Drop the shared_data, otherwise read_task would not return.
-        debug_assert_eq!(shared_data.strong_count(), 2);
         drop(shared_data);
 
         // Wait for responses for all requests buffered and sent.

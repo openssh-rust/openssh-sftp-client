@@ -1,4 +1,4 @@
-use openssh_sftp_client::highlevel::*;
+use openssh_sftp_client::*;
 
 use std::cmp::{max, min};
 use std::convert::identity;
