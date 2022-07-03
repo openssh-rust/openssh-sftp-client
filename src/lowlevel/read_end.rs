@@ -12,10 +12,10 @@ use std::fmt::Debug;
 use std::io;
 use std::pin::Pin;
 
-use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-use openssh_sftp_protocol::response::{self, ServerVersion};
-use openssh_sftp_protocol::serde::de::DeserializeOwned;
-use openssh_sftp_protocol::ssh_format::from_bytes;
+use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
+use crate::openssh_sftp_protocol::response::{self, ServerVersion};
+use crate::openssh_sftp_protocol::serde::de::DeserializeOwned;
+use crate::openssh_sftp_protocol::ssh_format::from_bytes;
 
 use pin_project::pin_project;
 use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite};

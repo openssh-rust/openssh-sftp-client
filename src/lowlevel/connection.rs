@@ -13,7 +13,7 @@ use std::sync::{
     Arc,
 };
 
-use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
+use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::Notify;

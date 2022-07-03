@@ -34,8 +34,8 @@
 /// Changelog for this crate.
 pub mod changelog;
 
-mod error;
-pub use error::Error;
+pub use openssh_sftp_error::Error;
+use openssh_sftp_error::{awaitable, openssh_sftp_protocol};
 
 pub mod highlevel;
 pub mod lowlevel;

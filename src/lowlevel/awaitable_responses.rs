@@ -2,9 +2,9 @@
 
 use super::Error;
 
+use crate::openssh_sftp_protocol::response::ResponseInner;
 use concurrent_arena::Arena;
 use derive_destructure2::destructure;
-use openssh_sftp_protocol::response::ResponseInner;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ pub(crate) enum Response<Buffer> {
     ExtendedReply(Box<[u8]>),
 }
 
-pub(crate) type Awaitable<Buffer> = awaitable::Awaitable<Buffer, Response<Buffer>>;
+pub(crate) type Awaitable<Buffer> = crate::awaitable::Awaitable<Buffer, Response<Buffer>>;
 
 /// BITARRAY_LEN must be LEN / usize::BITS and LEN must be divisble by usize::BITS.
 const BITARRAY_LEN: usize = 2;
