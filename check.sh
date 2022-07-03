@@ -2,9 +2,7 @@
 
 run_check() {
     cargo fmt --all -- --check
-    cargo +nightly fmt --all -- --check
     cargo clippy --all --no-deps
-    cargo +nightly clippy --all --no-deps
     cargo doc --no-deps
 }
 
