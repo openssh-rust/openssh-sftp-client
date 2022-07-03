@@ -104,17 +104,9 @@ macro_rules! def_write_all_test {
         async fn $fname() {
             let path = gen_path(stringify!($fname));
 
-            for (msg, (mut child, sftp)) in vec![
-                (
-                    "Test direct write",
-                    connect($sftp_options.max_buffered_write(NonZeroU32::new(1).unwrap())).await,
-                ),
-                (
-                    "Test buffered write",
-                    connect($sftp_options.max_buffered_write(NonZeroU32::new(u32::MAX).unwrap()))
-                        .await,
-                ),
-            ] {
+            for (msg, (mut child, sftp)) in
+                vec![("Test direct write", connect($sftp_options).await)]
+            {
                 let max_len = max(sftp.max_write_len(), sftp.max_read_len()) as usize;
                 let content = b"HELLO, WORLD!\n".repeat(max_len / 8);
 

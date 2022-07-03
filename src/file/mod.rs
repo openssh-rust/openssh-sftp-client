@@ -204,13 +204,6 @@ impl<'s, W: AsyncWrite> File<'s, W> {
     pub(super) fn max_read_len_impl(&self) -> u32 {
         self.get_auxiliary().limits().read_len
     }
-
-    /// Get maximum amount of bytes that [`File`] and [`TokioCompatFile`]
-    /// can write in one request.
-    /// Writing more than that, then your write will be split into multiple requests
-    fn max_buffered_write_impl(&self) -> u32 {
-        self.get_auxiliary().max_buffered_write
-    }
 }
 
 #[cfg(feature = "ci-tests")]
@@ -225,13 +218,6 @@ impl<'s, W: AsyncWrite> File<'s, W> {
     /// Reading more than that, then your read will be split into multiple requests
     pub fn max_read_len(&self) -> u32 {
         self.max_read_len_impl()
-    }
-
-    /// Get maximum amount of bytes that [`File`] and [`TokioCompatFile`]
-    /// can write in one request.
-    /// Writing more than that, then your write will be split into multiple requests
-    pub fn max_buffered_write(&self) -> u32 {
-        self.max_buffered_write_impl()
     }
 }
 
