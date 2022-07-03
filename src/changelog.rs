@@ -2,21 +2,16 @@
 use crate::*;
 
 /// ## Changed
-///  - [`lowlevel::WriteEnd`] now does not require `W: Unpin`
-///  - [`lowlevel::ReadEnd`] now does not require `W: Unpin`
-///  - [`lowlevel::SharedData`] now does not require `W: Unpin`
-///  - [`lowlevel::connect`] now does not require `W: Unpin`
-///  - [`lowlevel::connect_with_auxiliary`] now does not require `W: Unpin`
-///  - All types in [`highlevel`] now does not require `W: Unpin`
+///  - All types in `highlevel` now does not require `W: Unpin`
 ///    except for
-///     - the re-exported type [`highlevel::CancellationToken`]
-///     - [`highlevel::SftpOptions`]
-///     - [`highlevel::fs::DirEntry`]
-///     - [`highlevel::fs::ReadDir`]
+///     - the re-exported type `CancellationToken`
+///     - `SftpOptions`
+///     - `fs::DirEntry`
+///     - `fs::ReadDir`
 ///
-/// ## Removed
-///  - `SharedData::get_auxiliary_mut`
-///  - `SharedData::strong_count`
+/// ## Moved
+///  - `lowlevel` is now moved to be another crate [openssh-sftp-client-lowlevel].
+///  - All items in `highlevel` is now moeved into root.
 #[doc(hidden)]
 pub mod unreleased {}
 
@@ -25,8 +20,8 @@ pub mod unreleased {}
 pub mod v_0_10_3 {}
 
 /// ## Added
-///  - Async fn [`lowlevel::WriteEnd::send_copy_data_request`]
-///  - Async fn [`highlevel::file::File::copy_to`]
+///  - Async fn `lowlevel::WriteEnd::send_copy_data_request`
+///  - Async fn `highlevel::file::File::copy_to`
 pub mod v_0_10_2 {}
 
 /// ## Fixed
@@ -35,22 +30,22 @@ pub mod v_0_10_2 {}
 pub mod v0_10_1 {}
 
 /// ## Added
-///  - Export mod [`highlevel::file`]
-///  - Export mod [`highlevel::fs`]
-///  - Export mod [`highlevel::metadata`]
+///  - Export mod `highlevel::file`
+///  - Export mod `highlevel::fs`
+///  - Export mod `highlevel::metadata`
 ///
 /// ## Changed
-///  - [`lowlevel::WriteEnd`] now requires `W: AsyncWrite + Unpin`
-///  - [`lowlevel::SharedData`] now requires `W: AsyncWrite + Unpin`
-///  - [`lowlevel::ReadEnd`] now requires `W: AsyncWrite + Unpin`
-///  - [`lowlevel::connect`] now requires `W: AsyncWrite + Unpin`
-///  - [`lowlevel::connect_with_auxiliary`] now requires `W: AsyncWrite + Unpin`
-///  - All types in [`highlevel`] now requires `W: AsyncWrite + Unpin`
+///  - `lowlevel::WriteEnd` now requires `W: AsyncWrite + Unpin`
+///  - `lowlevel::SharedData` now requires `W: AsyncWrite + Unpin`
+///  - `lowlevel::ReadEnd` now requires `W: AsyncWrite + Unpin`
+///  - `lowlevel::connect` now requires `W: AsyncWrite + Unpin`
+///  - `lowlevel::connect_with_auxiliary` now requires `W: AsyncWrite + Unpin`
+///  - All types in `highlevel` now requires `W: AsyncWrite + Unpin`
 ///    except for
-///     - the re-exported type [`highlevel::CancellationToken`]
-///     - [`highlevel::SftpOptions`]
-///     - [`highlevel::fs::DirEntry`]
-///     - [`highlevel::fs::ReadDir`]
+///     - the re-exported type `highlevel::CancellationToken`
+///     - `highlevel::SftpOptions`
+///     - `highlevel::fs::DirEntry`
+///     - `highlevel::fs::ReadDir`
 ///
 /// ## Removed
 ///  - Trait `Writer`.

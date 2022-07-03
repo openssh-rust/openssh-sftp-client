@@ -16,6 +16,10 @@
 //!  - [`WriteEnd::send_hardlink_request`]
 //!  - [`WriteEnd::send_posix_rename_request`]
 
+#[cfg(doc)]
+/// Changelog for this crate.
+pub mod changelog;
+
 mod awaitable_responses;
 mod awaitables;
 mod buffer;
@@ -25,6 +29,9 @@ mod read_end;
 mod reader_buffered;
 mod write_end;
 mod writer_buffered;
+
+pub use openssh_sftp_error::Error;
+use openssh_sftp_error::{awaitable, openssh_sftp_protocol};
 
 /// Default size of buffer for up/download in openssh-portable
 pub const OPENSSH_PORTABLE_DEFAULT_COPY_BUFLEN: usize = 32768;
@@ -48,17 +55,15 @@ pub use awaitable_responses::Id;
 
 pub use buffer::{Buffer, ToBuffer};
 
-pub use super::openssh_sftp_protocol::file_attrs::{
+pub use openssh_sftp_protocol::file_attrs::{
     FileAttrs, FileType, Permissions, UnixTimeStamp, UnixTimeStampError,
 };
-pub use super::openssh_sftp_protocol::open_options::{CreateFlags, OpenOptions};
-pub use super::openssh_sftp_protocol::request::OpenFileRequest;
-pub use super::openssh_sftp_protocol::response::{
+pub use openssh_sftp_protocol::open_options::{CreateFlags, OpenOptions};
+pub use openssh_sftp_protocol::request::OpenFileRequest;
+pub use openssh_sftp_protocol::response::{
     ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, Extensions, Limits, NameEntry,
 };
-pub use super::openssh_sftp_protocol::{Handle, HandleOwned};
-
-pub use super::Error;
+pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
 pub use connection::{
     connect, connect_with_auxiliary, connect_with_auxiliary_relaxed_unpin, SharedData,

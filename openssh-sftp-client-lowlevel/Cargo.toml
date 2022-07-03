@@ -1,0 +1,32 @@
+[package]
+name = "openssh-sftp-client-lowlevel"
+version = "0.1.0"
+edition = "2018"
+
+authors = ["Jiahao XU <Jiahao_XU@outlook.com>"]
+
+license = "MIT"
+description = "Lowlevel utilities to communicate with openssh sftp server."
+repository = "https://github.com/openssh-rust/openssh-sftp-client"
+
+keywords = ["ssh", "multiplex", "async", "network", "sftp"]
+categories = ["asynchronous", "network-programming", "api-bindings"]
+
+[dependencies]
+openssh-sftp-error = { version = "0.1.0", path = "../openssh-sftp-error" }
+concurrent_arena = "0.1.6"
+derive_destructure2 = "0.1.0"
+
+tokio = { version = "1.11.0", features = ["io-util", "sync"] }
+
+bytes = "1"
+tokio-io-utility = { version = "0.6.6", features = ["mpsc", "read-exact-to-bytes"] }
+pin-project = { version = "1.0.10" }
+
+[target.'cfg(unix)'.dependencies]
+tokio-pipe = "0.2.10"
+
+[dev-dependencies]
+tokio = { version = "1.11.0", features = ["rt", "macros"] }
+tempfile = "3.1.0"
+sftp-test-common = { path = "../sftp-test-common" }

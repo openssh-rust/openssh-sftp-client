@@ -18,6 +18,7 @@ exclude = ["openssh-portable"]
 members = [
     "sftp-test-common",
     "openssh-sftp-error",
+    "openssh-sftp-client-lowlevel",
 ]
 
 [features]
@@ -26,20 +27,19 @@ ci-tests = []
 
 [dependencies]
 openssh-sftp-error = { version = "0.1.0", path = "openssh-sftp-error" }
+openssh-sftp-client-lowlevel = { version = "0.1.0", path = "openssh-sftp-client-lowlevel" }
 
-concurrent_arena = "0.1.6"
-derive_destructure2 = "0.1.0"
 once_cell = { version = "1.9.0", features = ["parking_lot"] }
 
 # Since concurrent_arena, awaitable and tokio-io-utility uses
 # dependency parking_lot anyway, enabling feature parking_lot
 # on tokio does not pull in any new dependency.
-tokio = { version = "1.11.0", features = ["io-util", "parking_lot", "sync", "time", "rt"] }
+tokio = { version = "1.11.0", features = ["parking_lot", "sync", "time", "rt"] }
 
+derive_destructure2 = "0.1.0"
 bytes = "1"
 tokio-io-utility = { version = "0.6.6", features = ["mpsc", "read-exact-to-bytes"] }
 tokio-util = { version = "0.7.0" }
-pin-project = { version = "1.0.10" }
 
 [target.'cfg(unix)'.dependencies]
 tokio-pipe = "0.2.10"
