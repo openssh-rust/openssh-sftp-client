@@ -12,8 +12,6 @@ repository = "https://github.com/openssh-rust/openssh-sftp-client"
 keywords = ["ssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
-exclude = ["openssh-portable"]
-
 [workspace]
 members = [
     "sftp-test-common",
