@@ -19,9 +19,6 @@ use derive_destructure2::destructure;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::JoinHandle;
 
-/// CancellationToken
-pub use tokio_util::sync::CancellationToken;
-
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]
 pub struct Sftp<W> {
