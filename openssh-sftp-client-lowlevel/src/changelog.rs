@@ -19,4 +19,5 @@ use crate::*;
 /// ## Removed
 ///  - `SharedData::get_auxiliary_mut`
 ///  - `SharedData::strong_count`
+///  - `ReadEnd::wait_for_new_request`
 pub mod v0_1_0 {}

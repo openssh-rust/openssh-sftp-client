@@ -1,22 +1,17 @@
 #![forbid(unsafe_code)]
 
 use super::awaitable_responses::AwaitableResponses;
-use super::pin_util::pinned_arc_strong_count;
 use super::writer_buffered::WriterBuffered;
 use super::*;
 
 use std::fmt::Debug;
 use std::io;
 use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicBool, AtomicU32, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::Notify;
 
 // TODO:
 //  - Support for zero copy syscalls
@@ -27,11 +22,6 @@ struct SharedDataInner<W, Buffer, Auxiliary> {
     #[pin]
     writer: WriterBuffered<W>,
     responses: AwaitableResponses<Buffer>,
-
-    notify: Notify,
-    requests_sent: AtomicU32,
-
-    is_conn_closed: AtomicBool,
 
     auxiliary: Auxiliary,
 }
@@ -50,38 +40,11 @@ impl<W, Buffer, Auxiliary> Clone for SharedData<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W, Buffer, Auxiliary> Drop for SharedData<W, Buffer, Auxiliary> {
-    fn drop(&mut self) {
-        // If this is the last reference, except for `ReadEnd`, to the SharedData,
-        // then the connection is closed.
-        //
-        // # Correctness
-        //
-        // The users can never access to the underlying Arc, it can only deal with
-        // SharedData, WriteEnd and ReadEnd, and ReadEnd never cloned the
-        // SharedData/underlying Arc or using the weak pointer.
-        //
-        // And there can be only one ReadEnd for each connection.
-        if self.strong_count() == 2 {
-            if cfg!(debug_assertions) {
-                assert!(!self.0.is_conn_closed.swap(true, Ordering::Relaxed));
-            } else {
-                self.0.is_conn_closed.store(true, Ordering::Relaxed);
-            }
-
-            self.notify_read_end();
-        }
-    }
-}
-
 impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     fn new(writer: W, auxiliary: Auxiliary) -> Self {
         SharedData(Arc::pin(SharedDataInner {
             writer: WriterBuffered::new(writer),
             responses: AwaitableResponses::new(),
-            notify: Notify::new(),
-            requests_sent: AtomicU32::new(0),
-            is_conn_closed: AtomicBool::new(false),
 
             auxiliary,
         }))
@@ -97,49 +60,9 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
         &self.0.responses
     }
 
-    /// `SharedData` is a newtype wrapper for `Arc<SharedDataInner>`,
-    /// so this function returns how many `Arc` there are that referred
-    /// to the shared data.
-    #[inline(always)]
-    pub(crate) fn strong_count(&self) -> usize {
-        pinned_arc_strong_count(&self.0)
-    }
-
     /// Returned the auxiliary data.
     pub fn get_auxiliary(&self) -> &Auxiliary {
         &self.0.auxiliary
-    }
-
-    #[inline(always)]
-    fn notify_read_end(&self) {
-        // We only have one waiting task, that is `ReadEnd`.
-        self.0.notify.notify_one();
-    }
-
-    pub(crate) fn notify_new_packet_event(&self) {
-        let prev_requests_sent = self.0.requests_sent.fetch_add(1, Ordering::Relaxed);
-
-        debug_assert_ne!(prev_requests_sent, u32::MAX);
-
-        // Notify the `ReadEnd` after the requests_sent is incremented.
-        self.notify_read_end();
-    }
-
-    /// Return number of requests and clear requests_sent.
-    /// **Return 0 if the connection is closed.**
-    pub(crate) async fn wait_for_new_request(&self) -> u32 {
-        loop {
-            let cnt = self.0.requests_sent.swap(0, Ordering::Relaxed);
-            if cnt > 0 {
-                break cnt;
-            }
-
-            if self.0.is_conn_closed.load(Ordering::Relaxed) {
-                break 0;
-            }
-
-            self.0.notify.notified().await;
-        }
     }
 }
 

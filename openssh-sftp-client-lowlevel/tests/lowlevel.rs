@@ -51,7 +51,6 @@ async fn read_one_packet(read_end: &mut ReadEnd) {
     read_end.get_shared_data().flush().await.unwrap();
 
     eprintln!("Wait for new request");
-    assert_eq!(read_end.wait_for_new_request().await, 1);
 
     eprintln!("Read in one packet");
     read_end.read_in_one_packet().await.unwrap();
@@ -134,9 +133,6 @@ async fn test_file_desc() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -199,9 +195,6 @@ async fn test_write_impl(
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -311,9 +304,6 @@ async fn test_file_remove() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -347,9 +337,6 @@ async fn test_file_rename() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -377,9 +364,6 @@ async fn test_mkdir() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -410,9 +394,6 @@ async fn test_rmdir() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -472,9 +453,6 @@ async fn test_dir_desc() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -507,9 +485,6 @@ async fn test_stat() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -541,9 +516,6 @@ async fn test_lstat() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -581,9 +553,6 @@ async fn test_fstat() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -625,9 +594,6 @@ async fn test_setstat() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -682,9 +648,6 @@ async fn test_fsetstat() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -716,9 +679,6 @@ async fn test_readlink() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -750,9 +710,6 @@ async fn test_readpath() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -786,9 +743,6 @@ async fn test_symlink() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -810,9 +764,6 @@ async fn test_limits() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -840,9 +791,6 @@ async fn test_expand_path() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -884,9 +832,6 @@ async fn test_fsync() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -923,9 +868,6 @@ async fn test_hardlink() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -960,9 +902,6 @@ async fn test_posix_rename() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
@@ -1027,9 +966,6 @@ async fn test_ext_copy_data() {
 
     drop(id);
     drop(write_end);
-
-    assert_eq!(read_end.wait_for_new_request().await, 0);
-
     drop(read_end);
 
     assert!(child.wait().await.unwrap().success());
