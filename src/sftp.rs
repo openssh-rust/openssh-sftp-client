@@ -11,7 +11,6 @@ use tasks::{create_flush_task, create_read_task};
 
 use std::cmp::min;
 use std::convert::TryInto;
-use std::io;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 
@@ -167,42 +166,6 @@ impl<W: AsyncWrite> Sftp<W> {
 
         // Wait for responses for all requests buffered and sent.
         read_task.await??;
-
-        Ok(())
-    }
-
-    /// without doing anything and return `false`.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn try_flush(&self) -> Result<bool, io::Error> {
-        let auxiliary = self.auxiliary();
-
-        let prev_pending_requests = auxiliary.pending_requests.load(Ordering::Relaxed);
-
-        if self.shared_data.try_flush().await? {
-            auxiliary.consume_pending_requests(prev_pending_requests);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    /// Forcibly flush the write buffer.
-    ///
-    /// If another thread is doing flushing, then this function would
-    /// wait until it completes or cancelled the future.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn flush(&self) -> Result<(), io::Error> {
-        let auxiliary = self.auxiliary();
-
-        let prev_pending_requests = auxiliary.pending_requests.load(Ordering::Relaxed);
-        self.shared_data.flush().await?;
-        auxiliary.consume_pending_requests(prev_pending_requests);
 
         Ok(())
     }
