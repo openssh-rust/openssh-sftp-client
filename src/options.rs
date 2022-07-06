@@ -1,9 +1,10 @@
-use std::num::{NonZeroU16, NonZeroU32};
+use std::num::{NonZeroU16, NonZeroU32, NonZeroUsize};
 use std::time::Duration;
 
 /// Options when creating [`super::Sftp`].
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SftpOptions {
+    buffer_size: Option<NonZeroUsize>,
     flush_interval: Option<Duration>,
     max_read_len: Option<NonZeroU32>,
     max_write_len: Option<NonZeroU32>,
@@ -14,6 +15,7 @@ impl SftpOptions {
     /// Create a new [`SftpOptions`].
     pub const fn new() -> Self {
         Self {
+            buffer_size: None,
             flush_interval: None,
             max_read_len: None,
             max_write_len: None,
@@ -95,5 +97,19 @@ impl SftpOptions {
         self.max_pending_requests
             .map(NonZeroU16::get)
             .unwrap_or(100)
+    }
+
+    /// Set the buffer size.
+    ///
+    /// It is set to 100 by default.
+    #[must_use]
+    pub fn buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
+        self.buffer_size = Some(buffer_size);
+        self
+    }
+
+    pub(super) fn get_buffer_size(&self) -> NonZeroUsize {
+        self.buffer_size
+            .unwrap_or_else(|| NonZeroUsize::new(100).unwrap())
     }
 }
