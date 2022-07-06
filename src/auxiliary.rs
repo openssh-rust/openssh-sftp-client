@@ -1,7 +1,7 @@
 use super::lowlevel::Extensions;
 
 use once_cell::sync::OnceCell;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
@@ -34,11 +34,11 @@ pub(super) struct Auxiliary {
 
     /// There can be at most `u32::MAX` pending requests, since each request
     /// requires a request id that is 32 bits.
-    pub(super) pending_requests: AtomicU32,
+    pub(super) pending_requests: AtomicUsize,
     pub(super) max_pending_requests: u16,
 
     pub(super) read_end_notify: Notify,
-    pub(super) requests_to_read: AtomicU32,
+    pub(super) requests_to_read: AtomicUsize,
 
     pub(super) shutdown_requested: AtomicBool,
 }
@@ -53,11 +53,11 @@ impl Auxiliary {
             flush_end_notify: Notify::new(),
             flush_immediately: Notify::new(),
 
-            pending_requests: AtomicU32::new(0),
+            pending_requests: AtomicUsize::new(0),
             max_pending_requests,
 
             read_end_notify: Notify::new(),
-            requests_to_read: AtomicU32::new(0),
+            requests_to_read: AtomicUsize::new(0),
 
             shutdown_requested: AtomicBool::new(false),
         }
@@ -76,7 +76,7 @@ impl Auxiliary {
         }
     }
 
-    pub(super) fn consume_pending_requests(&self, requests_consumed: u32) {
+    pub(super) fn consume_pending_requests(&self, requests_consumed: usize) {
         self.pending_requests
             .fetch_sub(requests_consumed, Ordering::Relaxed);
     }
@@ -99,8 +99,8 @@ impl Auxiliary {
         self.conn_info().limits
     }
 
-    pub(super) fn max_pending_requests(&self) -> u32 {
-        self.max_pending_requests as u32
+    pub(super) fn max_pending_requests(&self) -> usize {
+        self.max_pending_requests as usize
     }
 
     pub(super) fn requests_shutdown(&self) {

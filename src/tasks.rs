@@ -1,7 +1,7 @@
 use super::{Error, ReadEnd, SharedData};
 use crate::lowlevel::Extensions;
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -19,7 +19,7 @@ async fn flush<W: AsyncWrite>(shared_data: &SharedData<W>) -> Result<(), Error> 
 /// # Panic
 ///
 /// If it underflows, thenit will panic.
-fn atomic_sub_assign(atomic: &AtomicU32, val: u32) -> u32 {
+fn atomic_sub_assign(atomic: &AtomicUsize, val: usize) -> usize {
     atomic.fetch_sub(val, Ordering::Relaxed) - val
 }
 
