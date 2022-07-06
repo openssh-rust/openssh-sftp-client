@@ -64,7 +64,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
                 // and try flush it again just in case the flushing is cancelled
                 flush(&shared_data).await?;
 
-                cnt = pending_requests.fetch_sub(cnt, Ordering::Relaxed);
+                cnt = atomic_sub_assign(pending_requests, cnt);
 
                 if cnt < max_pending_requests {
                     break;
