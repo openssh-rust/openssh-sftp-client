@@ -158,8 +158,6 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
             .map(Response::ExtendedReply)
     }
 
-    /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
-    ///
     /// # Restart on Error
     ///
     /// Only when the returned error is [`Error::InvalidResponseId`] or
@@ -289,8 +287,6 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
         Pin::new(self).receive_server_hello_pinned().await
     }
 
-    /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
-    ///
     /// # Restart on Error
     ///
     /// Only when the returned error is [`Error::InvalidResponseId`] or
