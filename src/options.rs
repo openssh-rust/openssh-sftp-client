@@ -103,7 +103,7 @@ impl SftpOptions {
     ///
     /// It is set to 100 by default.
     #[must_use]
-    pub fn buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
+    pub const fn buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
         self.buffer_size = Some(buffer_size);
         self
     }
