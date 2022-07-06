@@ -55,7 +55,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
                 _ = auxiliary.flush_immediately.notified() => (),
             };
 
-            let mut prev_pending_requests = pending_requests.load(Ordering::Relaxed);
+            let mut cnt = pending_requests.load(Ordering::Relaxed);
 
             loop {
                 read_end_notify.notify_one();
@@ -64,10 +64,9 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
                 // and try flush it again just in case the flushing is cancelled
                 flush(&shared_data).await?;
 
-                prev_pending_requests =
-                    pending_requests.fetch_sub(prev_pending_requests, Ordering::Relaxed);
+                cnt = pending_requests.fetch_sub(cnt, Ordering::Relaxed);
 
-                if prev_pending_requests < max_pending_requests {
+                if cnt < max_pending_requests {
                     break;
                 }
             }
