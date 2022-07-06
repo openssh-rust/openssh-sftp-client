@@ -28,18 +28,19 @@ pub(super) struct Auxiliary {
     /// flush_end_notify is used to avoid unnecessary wakeup
     /// in flush_task.
     pub(super) flush_end_notify: Notify,
+    /// `Notify::notify_one` is called if
+    /// pending_requests == max_pending_requests.
+    pub(super) flush_immediately: Notify,
 
     /// There can be at most `u32::MAX` pending requests, since each request
     /// requires a request id that is 32 bits.
     pub(super) pending_requests: AtomicU32,
-
     pub(super) max_pending_requests: u16,
 
-    pub(super) shutdown_requested: AtomicBool,
+    pub(super) read_end_notify: Notify,
+    pub(super) requests_to_read: AtomicU32,
 
-    /// `Notify::notify_one` is called if
-    /// pending_requests == max_pending_requests.
-    pub(super) flush_immediately: Notify,
+    pub(super) shutdown_requested: AtomicBool,
 }
 
 impl Auxiliary {
@@ -48,18 +49,26 @@ impl Auxiliary {
             conn_info: OnceCell::new(),
 
             cancel_token: CancellationToken::new(),
+
             flush_end_notify: Notify::new(),
+            flush_immediately: Notify::new(),
 
             pending_requests: AtomicU32::new(0),
             max_pending_requests,
 
+            read_end_notify: Notify::new(),
+            requests_to_read: AtomicU32::new(0),
+
             shutdown_requested: AtomicBool::new(false),
-            flush_immediately: Notify::new(),
         }
     }
 
     pub(super) fn wakeup_flush_task(&self) {
         self.flush_end_notify.notify_one();
+
+        // Must increment requests_to_read first, since
+        // flush_task might wakeup read_end once it done flushing.
+        self.requests_to_read.fetch_add(1, Ordering::Relaxed);
 
         // Use `==` here to avoid unnecessary wakeup of flush_task.
         if self.pending_requests.fetch_add(1, Ordering::Relaxed) == self.max_pending_requests() {

@@ -34,6 +34,10 @@ impl<W: AsyncWrite> Drop for OwnedHandle<'_, W> {
             // This is the last reference to the arc
             let id = write_end.get_id_mut();
             let _ = write_end.send_close_request(id, Cow::Borrowed(handle));
+
+            // Requests is already added to write buffer, so wakeup
+            // the `flush_task`.
+            self.get_auxiliary().wakeup_flush_task();
         }
     }
 }
