@@ -2,12 +2,8 @@
 use crate::*;
 
 /// ## Changed
-///  - All types in `highlevel` now does not require `W: Unpin`
-///    except for
-///     - the re-exported type `CancellationToken`
-///     - `SftpOptions`
-///     - `fs::DirEntry`
-///     - `fs::ReadDir`
+///  - All types in `highlevel` now does not have generic parameter `W`
+///    except for `Sftp::new`
 ///
 /// ## Removed
 ///  - Unused re-export `CancellationToken`.

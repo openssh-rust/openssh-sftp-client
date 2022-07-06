@@ -1,7 +1,7 @@
 use super::lowlevel::Extensions;
 
 use once_cell::sync::OnceCell;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
@@ -40,7 +40,10 @@ pub(super) struct Auxiliary {
     pub(super) read_end_notify: Notify,
     pub(super) requests_to_read: AtomicUsize,
 
-    pub(super) shutdown_requested: AtomicBool,
+    /// 0 means no shutdown is requested
+    /// 1 means the read task should shutdown
+    /// 2 means the flush task should shutdown
+    pub(super) shutdown_stage: AtomicU8,
 }
 
 impl Auxiliary {
@@ -59,7 +62,7 @@ impl Auxiliary {
             read_end_notify: Notify::new(),
             requests_to_read: AtomicUsize::new(0),
 
-            shutdown_requested: AtomicBool::new(false),
+            shutdown_stage: AtomicU8::new(0),
         }
     }
 
@@ -98,8 +101,12 @@ impl Auxiliary {
         self.max_pending_requests as usize
     }
 
-    pub(super) fn requests_shutdown(&self) {
-        self.shutdown_requested.store(true, Ordering::Relaxed);
+    pub(super) fn order_shutdown(&self) {
+        // Order the shutdown of read_task.
+        //
+        // Once it shutdowns, it will automatically order
+        // shutdown of flush_task.
+        self.shutdown_stage.store(1, Ordering::Relaxed);
 
         self.flush_immediately.notify_one();
         self.flush_end_notify.notify_one();

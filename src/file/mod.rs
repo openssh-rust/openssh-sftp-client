@@ -14,7 +14,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::{Buf, Bytes, BytesMut};
-use tokio::io::{AsyncSeek, AsyncWrite};
+use tokio::io::AsyncSeek;
 use tokio_io_utility::IoSliceExt;
 
 mod tokio_compat_file;
@@ -25,16 +25,16 @@ use utility::{take_bytes, take_io_slices};
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Debug, Copy, Clone)]
-pub struct OpenOptions<'s, W> {
-    sftp: &'s Sftp<W>,
+pub struct OpenOptions<'s> {
+    sftp: &'s Sftp,
     options: lowlevel::OpenOptions,
     truncate: bool,
     create: bool,
     create_new: bool,
 }
 
-impl<'s, W> OpenOptions<'s, W> {
-    pub(super) fn new(sftp: &'s Sftp<W>) -> Self {
+impl<'s> OpenOptions<'s> {
+    pub(super) fn new(sftp: &'s Sftp) -> Self {
         Self {
             sftp,
             options: lowlevel::OpenOptions::new(),
@@ -122,8 +122,8 @@ impl<'s, W> OpenOptions<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite> OpenOptions<'s, W> {
-    async fn open_impl(&self, path: &Path) -> Result<File<'s, W>, Error> {
+impl<'s> OpenOptions<'s> {
+    async fn open_impl(&self, path: &Path) -> Result<File<'s>, Error> {
         let filename = Cow::Borrowed(path);
 
         let params = if self.create || self.create_new {
@@ -159,7 +159,7 @@ impl<'s, W: AsyncWrite> OpenOptions<'s, W> {
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
-    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'s, W>, Error> {
+    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'s>, Error> {
         self.open_impl(path.as_ref()).await
     }
 }
@@ -173,8 +173,8 @@ impl<'s, W: AsyncWrite> OpenOptions<'s, W> {
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
 /// [`tokio::io::AsyncWrite`], checkout [`TokioCompatFile`].
 #[derive(Debug)]
-pub struct File<'s, W: AsyncWrite> {
-    inner: OwnedHandle<'s, W>,
+pub struct File<'s> {
+    inner: OwnedHandle<'s>,
 
     is_readable: bool,
     is_writable: bool,
@@ -182,7 +182,7 @@ pub struct File<'s, W: AsyncWrite> {
     offset: u64,
 }
 
-impl<'s, W: AsyncWrite> Clone for File<'s, W> {
+impl<'s> Clone for File<'s> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -194,7 +194,7 @@ impl<'s, W: AsyncWrite> Clone for File<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite> File<'s, W> {
+impl<'s> File<'s> {
     fn max_write_len_impl(&self) -> u32 {
         self.get_auxiliary().limits().write_len
     }
@@ -207,7 +207,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
 }
 
 #[cfg(feature = "ci-tests")]
-impl<'s, W: AsyncWrite> File<'s, W> {
+impl<'s> File<'s> {
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests
     pub fn max_write_len(&self) -> u32 {
@@ -221,18 +221,18 @@ impl<'s, W: AsyncWrite> File<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite> File<'s, W> {
+impl<'s> File<'s> {
     fn get_auxiliary(&self) -> &'s Auxiliary {
         self.inner.get_auxiliary()
     }
 
-    fn get_inner(&mut self) -> (&mut WriteEnd<W>, Cow<'_, Handle>) {
+    fn get_inner(&mut self) -> (&mut WriteEnd, Cow<'_, Handle>) {
         (&mut self.inner.write_end, Cow::Borrowed(&self.inner.handle))
     }
 
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd<W>, Cow<'_, Handle>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         if !self.is_writable {
@@ -244,7 +244,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
 
     async fn send_readable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd<W>, Cow<'_, Handle>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         if !self.is_readable {
@@ -265,7 +265,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
     }
 
     /// Return the underlying sftp.
-    pub fn sftp(&self) -> &'s Sftp<W> {
+    pub fn sftp(&self) -> &'s Sftp {
         self.inner.write_end.sftp()
     }
 
@@ -647,7 +647,7 @@ impl<'s, W: AsyncWrite> File<'s, W> {
     }
 }
 
-impl<W: AsyncWrite> AsyncSeek for File<'_, W> {
+impl AsyncSeek for File<'_> {
     /// start_seek only adjust local offset since sftp protocol
     /// does not provides a seek function.
     ///

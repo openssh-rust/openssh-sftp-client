@@ -10,29 +10,27 @@ use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
-use tokio::io::AsyncWrite;
 
 mod dir;
 pub use dir::{DirEntry, ReadDir};
 
 type AwaitableStatus = lowlevel::AwaitableStatus<Buffer>;
 type AwaitableAttrs = lowlevel::AwaitableAttrs<Buffer>;
-type SendLinkingRequest<W> =
-    fn(&mut WriteEnd<W>, Id, Cow<'_, Path>, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
+type SendLinkingRequest =
+    fn(&mut WriteEnd, Id, Cow<'_, Path>, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
 
-type SendRmRequest<W> = fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
-type SendMetadataRequest<W> =
-    fn(&mut WriteEnd<W>, Id, Cow<'_, Path>) -> Result<AwaitableAttrs, Error>;
+type SendRmRequest = fn(&mut WriteEnd, Id, Cow<'_, Path>) -> Result<AwaitableStatus, Error>;
+type SendMetadataRequest = fn(&mut WriteEnd, Id, Cow<'_, Path>) -> Result<AwaitableAttrs, Error>;
 
 /// A struct used to perform operations on remote filesystem.
 #[derive(Debug, Clone)]
-pub struct Fs<'s, W> {
-    write_end: WriteEndWithCachedId<'s, W>,
+pub struct Fs<'s> {
+    write_end: WriteEndWithCachedId<'s>,
     cwd: Box<Path>,
 }
 
-impl<'s, W> Fs<'s, W> {
-    pub(super) fn new(write_end: WriteEndWithCachedId<'s, W>, cwd: PathBuf) -> Self {
+impl<'s> Fs<'s> {
+    pub(super) fn new(write_end: WriteEndWithCachedId<'s>, cwd: PathBuf) -> Self {
         Self {
             write_end,
             cwd: cwd.into_boxed_path(),
@@ -44,7 +42,7 @@ impl<'s, W> Fs<'s, W> {
     }
 
     /// Return the underlying sftp.
-    pub fn sftp(&self) -> &'s Sftp<W> {
+    pub fn sftp(&self) -> &'s Sftp {
         self.write_end.sftp()
     }
 
@@ -71,8 +69,8 @@ impl<'s, W> Fs<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite> Fs<'s, W> {
-    async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_, W>, Error> {
+impl<'s> Fs<'s> {
+    async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_>, Error> {
         let path = self.concat_path_if_needed(path);
 
         self.write_end
@@ -82,12 +80,12 @@ impl<'s, W: AsyncWrite> Fs<'s, W> {
     }
 
     /// Open a remote dir
-    pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir<'_, W>, Error> {
+    pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir<'_>, Error> {
         self.open_dir_impl(path.as_ref()).await
     }
 
     /// Create a directory builder.
-    pub fn dir_builder(&mut self) -> DirBuilder<'_, 's, W> {
+    pub fn dir_builder(&mut self) -> DirBuilder<'_, 's> {
         DirBuilder {
             fs: self,
             metadata_builder: MetaDataBuilder::new(),
@@ -99,7 +97,7 @@ impl<'s, W: AsyncWrite> Fs<'s, W> {
         self.dir_builder().create(path).await
     }
 
-    async fn remove_impl(&mut self, path: &Path, f: SendRmRequest<W>) -> Result<(), Error> {
+    async fn remove_impl(&mut self, path: &Path, f: SendRmRequest) -> Result<(), Error> {
         let path = self.concat_path_if_needed(path);
 
         self.write_end
@@ -149,7 +147,7 @@ impl<'s, W: AsyncWrite> Fs<'s, W> {
         &mut self,
         src: &Path,
         dst: &Path,
-        f: SendLinkingRequest<W>,
+        f: SendLinkingRequest,
     ) -> Result<(), Error> {
         let src = self.concat_path_if_needed(src);
         let dst = self.concat_path_if_needed(dst);
@@ -261,7 +259,7 @@ impl<'s, W: AsyncWrite> Fs<'s, W> {
     async fn metadata_impl(
         &mut self,
         path: &Path,
-        f: SendMetadataRequest<W>,
+        f: SendMetadataRequest,
     ) -> Result<MetaData, Error> {
         let path = self.concat_path_if_needed(path);
 
@@ -356,9 +354,9 @@ impl<'s, W: AsyncWrite> Fs<'s, W> {
 /// Remote Directory
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Dir<'s, W: AsyncWrite>(OwnedHandle<'s, W>);
+pub struct Dir<'s>(OwnedHandle<'s>);
 
-impl<W: AsyncWrite> Dir<'_, W> {
+impl Dir<'_> {
     /// Read dir.
     pub async fn read_dir(&mut self) -> Result<ReadDir, Error> {
         self.0
@@ -377,12 +375,12 @@ impl<W: AsyncWrite> Dir<'_, W> {
 
 /// Builder for new directory to create.
 #[derive(Debug)]
-pub struct DirBuilder<'a, 's, W> {
-    fs: &'a mut Fs<'s, W>,
+pub struct DirBuilder<'a, 's> {
+    fs: &'a mut Fs<'s>,
     metadata_builder: MetaDataBuilder,
 }
 
-impl<W> DirBuilder<'_, '_, W> {
+impl DirBuilder<'_, '_> {
     /// Reset builder back to default.
     pub fn reset(&mut self) -> &mut Self {
         self.metadata_builder = MetaDataBuilder::new();
@@ -402,7 +400,7 @@ impl<W> DirBuilder<'_, '_, W> {
     }
 }
 
-impl<W: AsyncWrite> DirBuilder<'_, '_, W> {
+impl DirBuilder<'_, '_> {
     async fn create_impl(&mut self, path: &Path) -> Result<(), Error> {
         let fs = &mut self.fs;
 

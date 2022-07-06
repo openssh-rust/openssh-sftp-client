@@ -6,7 +6,7 @@ use super::{
 };
 
 use auxiliary::Auxiliary;
-use lowlevel::{connect_with_auxiliary_relaxed_unpin, Extensions};
+use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
 use std::cmp::min;
@@ -20,25 +20,24 @@ use tokio::task::JoinHandle;
 
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]
-pub struct Sftp<W> {
-    shared_data: SharedData<W>,
+pub struct Sftp {
+    shared_data: SharedData,
     flush_task: JoinHandle<Result<(), Error>>,
     read_task: JoinHandle<Result<(), Error>>,
 }
 
-impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
+impl Sftp {
     /// Create [`Sftp`].
-    pub async fn new<R: AsyncRead + Send + Sync + 'static>(
+    pub async fn new<
+        W: AsyncWrite + Send + Sync + 'static,
+        R: AsyncRead + Send + Sync + 'static,
+    >(
         stdin: W,
         stdout: R,
         options: SftpOptions,
     ) -> Result<Self, Error> {
-        let (write_end, read_end) = connect_with_auxiliary_relaxed_unpin(
-            stdout,
-            stdin,
-            Auxiliary::new(options.get_max_pending_requests()),
-        )
-        .await?;
+        let (write_end, read_end) =
+            connect(stdout, Auxiliary::new(options.get_max_pending_requests())).await?;
 
         let (rx, read_task) = create_read_task(read_end);
 
@@ -50,11 +49,23 @@ impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
             shared_data: SharedData::clone(&write_end),
 
             flush_task: create_flush_task(
+                stdin,
                 SharedData::clone(&write_end),
                 options.get_flush_interval(),
             ),
             read_task,
         };
+
+        // Flush the hello message.
+        //
+        // Cannot use wakeup_flush_task as it would increment requests_to_read
+        // by one, while the initial hello message is special and does not
+        // count as regular response.
+        let auxiliary = sftp.shared_data.get_auxiliary();
+
+        auxiliary.pending_requests.fetch_add(1, Ordering::Relaxed);
+        auxiliary.flush_end_notify.notify_one();
+        auxiliary.flush_immediately.notify_one();
 
         let extensions = if let Ok(extensions) = rx.await {
             extensions
@@ -77,10 +88,10 @@ impl<W: AsyncWrite + Send + Sync + 'static> Sftp<W> {
     }
 }
 
-impl<W: AsyncWrite> Sftp<W> {
+impl Sftp {
     async fn set_limits(
         &self,
-        write_end: WriteEnd<W>,
+        write_end: WriteEnd,
         options: SftpOptions,
         extensions: Extensions,
     ) -> Result<(), Error> {
@@ -156,22 +167,20 @@ impl<W: AsyncWrite> Sftp<W> {
     pub async fn close(self) -> Result<(), Error> {
         let (shared_data, flush_task, read_task) = self.destructure();
 
-        // This will terminate flush_task, otherwise read_task would not return.
-        shared_data.get_auxiliary().requests_shutdown();
-
-        flush_task.await??;
-
-        // Drop the shared_data, otherwise read_task would not return.
-        drop(shared_data);
+        shared_data.get_auxiliary().order_shutdown();
 
         // Wait for responses for all requests buffered and sent.
         read_task.await??;
+
+        // read_task would order the shutdown of read_task,
+        // so we just need to wait for it here.
+        flush_task.await??;
 
         Ok(())
     }
 
     /// Return a new [`OpenOptions`] object.
-    pub fn options(&self) -> OpenOptions<'_, W> {
+    pub fn options(&self) -> OpenOptions<'_> {
         OpenOptions::new(self)
     }
 
@@ -179,7 +188,7 @@ impl<W: AsyncWrite> Sftp<W> {
     ///
     /// This function will create a file if it does not exist, and will truncate
     /// it if it does.
-    pub async fn create(&self, path: impl AsRef<Path>) -> Result<File<'_, W>, Error> {
+    pub async fn create(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
         self.options()
             .write(true)
             .create(true)
@@ -189,19 +198,19 @@ impl<W: AsyncWrite> Sftp<W> {
     }
 
     /// Attempts to open a file in read-only mode.
-    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'_, W>, Error> {
+    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
         self.options().read(true).open(path).await
     }
 
     /// [`Fs`] defaults to the current working dir set by remote `sftp-server`,
     /// which usually is the home directory.
-    pub fn fs(&self) -> Fs<'_, W> {
+    pub fn fs(&self) -> Fs<'_> {
         Fs::new(self.write_end(), "".into())
     }
 }
 
-impl<W> Sftp<W> {
-    pub(super) fn write_end(&self) -> WriteEndWithCachedId<'_, W> {
+impl Sftp {
+    pub(super) fn write_end(&self) -> WriteEndWithCachedId<'_> {
         WriteEndWithCachedId::new(self, WriteEnd::new(self.shared_data.clone()))
     }
 
@@ -226,7 +235,7 @@ impl<W> Sftp<W> {
 }
 
 #[cfg(feature = "ci-tests")]
-impl<W> Sftp<W> {
+impl Sftp {
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests
     ///
@@ -244,9 +253,9 @@ impl<W> Sftp<W> {
     }
 }
 
-impl<W> Drop for Sftp<W> {
+impl Drop for Sftp {
     fn drop(&mut self) {
         // This will terminate flush_task, otherwise read_task would not return.
-        self.shared_data.get_auxiliary().requests_shutdown();
+        self.shared_data.get_auxiliary().order_shutdown();
     }
 }

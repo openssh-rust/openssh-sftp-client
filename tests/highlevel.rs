@@ -16,7 +16,7 @@ use tokio_io_utility::write_vectored_all;
 
 use pretty_assertions::assert_eq;
 
-async fn connect(options: SftpOptions) -> (process::Child, Sftp<PipeWrite>) {
+async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
     let (child, stdin, stdout) = launch_sftp().await;
 
     (child, Sftp::new(stdin, stdout, options).await.unwrap())
@@ -222,7 +222,7 @@ async fn sftp_tokio_compact_file_basics() {
     let read_entire_file = || async {
         let mut buffer = Vec::with_capacity(content.len());
 
-        let mut file: file::TokioCompatFile<PipeWrite> = sftp.open(&path).await.unwrap().into();
+        let mut file: file::TokioCompatFile = sftp.open(&path).await.unwrap().into();
         file.read_to_end(&mut buffer).await.unwrap();
         file.close().await.unwrap();
 

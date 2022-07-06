@@ -1,17 +1,43 @@
 use super::{Error, ReadEnd, SharedData};
 use crate::lowlevel::Extensions;
 
+use std::io;
+use std::num::NonZeroUsize;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::pin;
 use tokio::sync::oneshot;
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
-async fn flush<W: AsyncWrite>(shared_data: &SharedData<W>) -> Result<(), Error> {
-    shared_data.flush().await.map_err(Error::from)
+async fn flush<W: AsyncWrite>(
+    shared_data: &SharedData,
+    mut writer: Pin<&mut W>,
+) -> Result<(), Error> {
+    let mut buffers = shared_data.get_buffers().await;
+
+    if buffers.is_empty() {
+        return Ok(());
+    }
+
+    loop {
+        let n = writer
+            .as_mut()
+            .write_vectored(buffers.get_io_slices())
+            .await?;
+
+        // Since `MpScBytesQueue::get_buffers` guarantees that every `IoSlice`
+        // returned must be non-empty, having `0` bytes written is an error
+        // likely caused by the close of the read end.
+        let n = NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
+
+        if !buffers.advance(n) {
+            break Ok(());
+        }
+    }
 }
 
 /// Return the size after substraction.
@@ -24,10 +50,13 @@ fn atomic_sub_assign(atomic: &AtomicUsize, val: usize) -> usize {
 }
 
 pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
-    shared_data: SharedData<W>,
+    writer: W,
+    shared_data: SharedData,
     flush_interval: Duration,
 ) -> JoinHandle<Result<(), Error>> {
     spawn(async move {
+        tokio::pin!(writer);
+
         let mut interval = time::interval(flush_interval);
         interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
 
@@ -35,7 +64,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
         let flush_end_notify = &auxiliary.flush_end_notify;
         let read_end_notify = &auxiliary.read_end_notify;
         let pending_requests = &auxiliary.pending_requests;
-        let shutdown_requested = &auxiliary.shutdown_requested;
+        let shutdown_stage = &auxiliary.shutdown_stage;
         let max_pending_requests = auxiliary.max_pending_requests();
 
         let cancel_guard = auxiliary.cancel_token.clone().drop_guard();
@@ -62,7 +91,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
 
                 // Wait until another thread is done or cancelled flushing
                 // and try flush it again just in case the flushing is cancelled
-                flush(&shared_data).await?;
+                flush(&shared_data, writer.as_mut()).await?;
 
                 cnt = atomic_sub_assign(pending_requests, cnt);
 
@@ -71,14 +100,14 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
                 }
             }
 
-            if shutdown_requested.load(Ordering::Relaxed) {
+            if shutdown_stage.load(Ordering::Relaxed) == 2 {
                 read_end_notify.notify_one();
 
                 // Once shutdown_requested is sent, there will be no
                 // new requests.
                 //
                 // Flushing here will ensure all pending requests is sent.
-                flush(&shared_data).await?;
+                flush(&shared_data, writer.as_mut()).await?;
 
                 cancel_guard.disarm();
 
@@ -88,11 +117,8 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
     })
 }
 
-pub(super) fn create_read_task<
-    R: AsyncRead + Send + Sync + 'static,
-    W: AsyncWrite + Send + Sync + 'static,
->(
-    read_end: ReadEnd<R, W>,
+pub(super) fn create_read_task<R: AsyncRead + Send + Sync + 'static>(
+    read_end: ReadEnd<R>,
 ) -> (oneshot::Receiver<Extensions>, JoinHandle<Result<(), Error>>) {
     let (tx, rx) = oneshot::channel();
 
@@ -101,7 +127,7 @@ pub(super) fn create_read_task<
         let auxiliary = shared_data.get_auxiliary();
         let read_end_notify = &auxiliary.read_end_notify;
         let requests_to_read = &auxiliary.requests_to_read;
-        let shutdown_requested = &auxiliary.shutdown_requested;
+        let shutdown_stage = &auxiliary.shutdown_stage;
         let cancel_guard = auxiliary.cancel_token.clone().drop_guard();
 
         pin!(read_end);
@@ -126,10 +152,17 @@ pub(super) fn create_read_task<
                 cnt = atomic_sub_assign(requests_to_read, cnt);
             }
 
-            if shutdown_requested.load(Ordering::Relaxed) {
+            if shutdown_stage.load(Ordering::Relaxed) == 1 {
                 // All responses is read in and there is no
                 // write_end/shared_data left.
                 cancel_guard.disarm();
+
+                // Order the shutdown of flush_task.
+                auxiliary.shutdown_stage.store(2, Ordering::Relaxed);
+
+                auxiliary.flush_immediately.notify_one();
+                auxiliary.flush_end_notify.notify_one();
+
                 break Ok(());
             }
         }

@@ -3,16 +3,14 @@ use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
 
-use tokio::io::AsyncWrite;
-
 #[derive(Debug)]
-pub(super) struct WriteEndWithCachedId<'s, W> {
-    sftp: &'s Sftp<W>,
-    inner: WriteEnd<W>,
+pub(super) struct WriteEndWithCachedId<'s> {
+    sftp: &'s Sftp,
+    inner: WriteEnd,
     id: Option<Id>,
 }
 
-impl<W> Clone for WriteEndWithCachedId<'_, W> {
+impl Clone for WriteEndWithCachedId<'_> {
     fn clone(&self) -> Self {
         Self {
             sftp: self.sftp,
@@ -22,22 +20,22 @@ impl<W> Clone for WriteEndWithCachedId<'_, W> {
     }
 }
 
-impl<W> Deref for WriteEndWithCachedId<'_, W> {
-    type Target = WriteEnd<W>;
+impl Deref for WriteEndWithCachedId<'_> {
+    type Target = WriteEnd;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<W> DerefMut for WriteEndWithCachedId<'_, W> {
+impl DerefMut for WriteEndWithCachedId<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<'s, W> WriteEndWithCachedId<'s, W> {
-    pub(super) fn new(sftp: &'s Sftp<W>, inner: WriteEnd<W>) -> Self {
+impl<'s> WriteEndWithCachedId<'s> {
+    pub(super) fn new(sftp: &'s Sftp, inner: WriteEnd) -> Self {
         Self {
             sftp,
             inner,
@@ -82,15 +80,15 @@ impl<'s, W> WriteEndWithCachedId<'s, W> {
         self.sftp.auxiliary()
     }
 
-    pub(super) fn sftp(&self) -> &'s Sftp<W> {
+    pub(super) fn sftp(&self) -> &'s Sftp {
         self.sftp
     }
 }
 
-impl<'s, W: AsyncWrite> WriteEndWithCachedId<'s, W> {
+impl<'s> WriteEndWithCachedId<'s> {
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd<W>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         let id = self.get_id_mut();
