@@ -10,6 +10,9 @@ use crate::*;
 ///  - Backward compatibility alias `file::TokioCompactFile`.
 ///  - `Sftp::try_flush`
 ///  - `Sftp::flush`
+///  - `file::File::max_write_len`
+///  - `file::File::max_read_len`
+///  - `file::File::max_buffered_write`
 ///
 /// ## Moved
 ///  - `lowlevel` is now moved to be another crate [openssh-sftp-client-lowlevel].
