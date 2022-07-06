@@ -158,8 +158,6 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
             .map(Response::ExtendedReply)
     }
 
-    /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
-    ///
     /// # Restart on Error
     ///
     /// Only when the returned error is [`Error::InvalidResponseId`] or
@@ -289,8 +287,6 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
         Pin::new(self).receive_server_hello_pinned().await
     }
 
-    /// Precondition: [`ReadEnd::wait_for_new_request`] must not be 0.
-    ///
     /// # Restart on Error
     ///
     /// Only when the returned error is [`Error::InvalidResponseId`] or
@@ -299,23 +295,6 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
     /// Upon other errors [`Error::IOError`], [`Error::FormatError`] and
     /// [`Error::RecursiveErrors`], the sftp session has to be discarded.
     ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let readend = ...;
-    /// loop {
-    ///     let new_requests_submit = readend.wait_for_new_request().await;
-    ///     if new_requests_submit == 0 {
-    ///         break;
-    ///     }
-    ///
-    ///     // If attempt to read in more than new_requests_submit, then
-    ///     // `read_in_one_packet` might block forever.
-    ///     for _ in 0..new_requests_submit {
-    ///         readend.read_in_one_packet().await.unwrap();
-    ///     }
-    /// }
-    /// ```
     /// # Cancel Safety
     ///
     /// This function is not cancel safe.
@@ -340,22 +319,6 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
 }
 
 impl<R, W, Buffer, Auxiliary> ReadEnd<R, W, Buffer, Auxiliary> {
-    /// Return number of requests sent (including requests that are still in the write
-    /// buffer and not yet flushed) and number of responses to read in.
-    /// **Read 0 if the connection is closed.**
-    ///
-    /// You must call this function in a loop, break if this function returns
-    /// 0, otherwise call [`ReadEnd::read_in_one_packet`] for `n` times where `n` in the
-    /// return value of this function, then repeat.
-    ///
-    /// # Cancel Safety
-    ///
-    /// It is perfectly safe to cancel this future.
-    #[inline(always)]
-    pub async fn wait_for_new_request(&self) -> u32 {
-        self.shared_data.wait_for_new_request().await
-    }
-
     /// Return the [`SharedData`] held by [`ReadEnd`].
     pub fn get_shared_data(&self) -> &SharedData<W, Buffer, Auxiliary> {
         &self.shared_data

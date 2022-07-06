@@ -105,7 +105,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
 
         id.0.reset(buffer);
         self.shared_data.writer().push(serialized);
-        self.shared_data.notify_new_packet_event();
 
         Ok(id.into_inner())
     }
@@ -612,7 +611,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
 
         id.0.reset(None);
         self.shared_data.writer().push(buffer.split());
-        self.shared_data.notify_new_packet_event();
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
@@ -686,7 +684,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         }
 
         id.0.reset(None);
-        self.shared_data.notify_new_packet_event();
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
