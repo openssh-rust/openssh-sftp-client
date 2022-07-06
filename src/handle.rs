@@ -7,16 +7,15 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use derive_destructure2::destructure;
-use tokio::io::AsyncWrite;
 
 /// Remote Directory
 #[derive(Debug, destructure)]
-pub(super) struct OwnedHandle<'s, W: AsyncWrite> {
-    pub(super) write_end: WriteEndWithCachedId<'s, W>,
+pub(super) struct OwnedHandle<'s> {
+    pub(super) write_end: WriteEndWithCachedId<'s>,
     pub(super) handle: Arc<HandleOwned>,
 }
 
-impl<W: AsyncWrite> Clone for OwnedHandle<'_, W> {
+impl Clone for OwnedHandle<'_> {
     fn clone(&self) -> Self {
         Self {
             write_end: self.write_end.clone(),
@@ -25,7 +24,7 @@ impl<W: AsyncWrite> Clone for OwnedHandle<'_, W> {
     }
 }
 
-impl<W: AsyncWrite> Drop for OwnedHandle<'_, W> {
+impl Drop for OwnedHandle<'_> {
     fn drop(&mut self) {
         let write_end = &mut self.write_end;
         let handle = &self.handle;
@@ -42,8 +41,8 @@ impl<W: AsyncWrite> Drop for OwnedHandle<'_, W> {
     }
 }
 
-impl<'s, W: AsyncWrite> OwnedHandle<'s, W> {
-    pub(super) fn new(write_end: WriteEndWithCachedId<'s, W>, handle: HandleOwned) -> Self {
+impl<'s> OwnedHandle<'s> {
+    pub(super) fn new(write_end: WriteEndWithCachedId<'s>, handle: HandleOwned) -> Self {
         Self {
             write_end,
             handle: Arc::new(handle),
@@ -52,7 +51,7 @@ impl<'s, W: AsyncWrite> OwnedHandle<'s, W> {
 
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd<W>, Cow<'_, Handle>, Id) -> Result<F, Error>,
+        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
         let handle = &self.handle;
@@ -88,15 +87,15 @@ impl<'s, W: AsyncWrite> OwnedHandle<'s, W> {
     }
 }
 
-impl<'s, W: AsyncWrite> Deref for OwnedHandle<'s, W> {
-    type Target = WriteEndWithCachedId<'s, W>;
+impl<'s> Deref for OwnedHandle<'s> {
+    type Target = WriteEndWithCachedId<'s>;
 
     fn deref(&self) -> &Self::Target {
         &self.write_end
     }
 }
 
-impl<W: AsyncWrite> DerefMut for OwnedHandle<'_, W> {
+impl DerefMut for OwnedHandle<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.write_end
     }

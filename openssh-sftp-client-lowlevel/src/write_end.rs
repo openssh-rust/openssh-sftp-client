@@ -20,25 +20,23 @@ use crate::openssh_sftp_protocol::ssh_format::Serializer;
 use crate::openssh_sftp_protocol::Handle;
 use bytes::Bytes;
 
-use tokio::io::AsyncWrite;
-
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
-pub struct WriteEnd<W, Buffer, Auxiliary = ()> {
+pub struct WriteEnd<Buffer, Auxiliary = ()> {
     serializer: Serializer<WriteBuffer>,
-    shared_data: SharedData<W, Buffer, Auxiliary>,
+    shared_data: SharedData<Buffer, Auxiliary>,
 }
 
-impl<W, Buffer, Auxiliary> Clone for WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> Clone for WriteEnd<Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<W, Buffer, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// Create a [`WriteEnd`] from [`SharedData`].
-    pub fn new(shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
+    pub fn new(shared_data: SharedData<Buffer, Auxiliary>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
@@ -46,31 +44,30 @@ impl<W, Buffer, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     }
 
     /// Consume the [`WriteEnd`] and return the stored [`SharedData`].
-    pub fn into_shared_data(self) -> SharedData<W, Buffer, Auxiliary> {
+    pub fn into_shared_data(self) -> SharedData<Buffer, Auxiliary> {
         self.shared_data
     }
 }
 
-impl<W, Buffer, Auxiliary> Deref for WriteEnd<W, Buffer, Auxiliary> {
-    type Target = SharedData<W, Buffer, Auxiliary>;
+impl<Buffer, Auxiliary> Deref for WriteEnd<Buffer, Auxiliary> {
+    type Target = SharedData<Buffer, Auxiliary>;
 
     fn deref(&self) -> &Self::Target {
         &self.shared_data
     }
 }
 
-impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> DerefMut for WriteEnd<Buffer, Auxiliary> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.shared_data
     }
 }
 
-impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
-            .writer()
-            .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
-            .await?;
+            .queue()
+            .push(Self::serialize(&mut self.serializer, Hello { version })?);
 
         Ok(())
     }
@@ -104,13 +101,11 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
         )?;
 
         id.0.reset(buffer);
-        self.shared_data.writer().push(serialized);
+        self.shared_data.queue().push(serialized);
 
         Ok(id.into_inner())
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_open_file_request(
         &mut self,
         id: Id<Buffer>,
@@ -120,8 +115,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableHandle::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_close_request(
         &mut self,
         id: Id<Buffer>,
@@ -137,9 +130,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     /// Return [`crate::Data::Buffer`] or
     /// [`crate::Data::AllocatedBox`] if not EOF, otherwise returns
     /// [`crate::Data::Eof`].
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_read_request(
         &mut self,
         id: Id<Buffer>,
@@ -160,8 +150,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
         .map(AwaitableData::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_remove_request(
         &mut self,
         id: Id<Buffer>,
@@ -171,8 +159,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_rename_request(
         &mut self,
         id: Id<Buffer>,
@@ -184,9 +170,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 
     /// * `attrs` - [`FileAttrs::get_size`] must be equal to `None`.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_mkdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -197,8 +180,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_rmdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -208,8 +189,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_opendir_request(
         &mut self,
         id: Id<Buffer>,
@@ -223,9 +202,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     /// `.` and `..`.
     ///
     /// The `filename` only contains the basename.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_readdir_request(
         &mut self,
         id: Id<Buffer>,
@@ -235,8 +211,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableNameEntries::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_stat_request(
         &mut self,
         id: Id<Buffer>,
@@ -247,9 +221,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 
     /// Does not follow symlink
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_lstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -260,9 +231,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 
     /// * `handle` - Must be opened with `FileMode::READ`.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_fstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -272,8 +240,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableAttrs::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_setstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -285,9 +251,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 
     /// * `handle` - Must be opened with `OpenOptions::write` set.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_fsetstat_request(
         &mut self,
         id: Id<Buffer>,
@@ -298,8 +261,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_readlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -309,8 +270,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableName::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_realpath_request(
         &mut self,
         id: Id<Buffer>,
@@ -321,9 +280,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 
     /// Create symlink
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     pub fn send_symlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -343,9 +299,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
 
     /// Return limits of the server
     ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::limits`] to be true.
@@ -363,9 +316,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     /// These paths are expanded using shell-like rules and the resultant path
     /// is canonicalised similarly to [`WriteEnd::send_realpath_request`].
     ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::expand_path`] to be true.
@@ -378,9 +328,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableName::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::fsync`] to be true.
@@ -393,9 +340,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::hardlink`] to be true.
@@ -409,9 +353,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// # Precondition
     ///
     /// Requires [`Extensions::posix_rename`] to be true.
@@ -425,9 +366,6 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
             .map(AwaitableStatus::new)
     }
 
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// The server MUST copy the data exactly as if the client had issued a
     /// series of [`RequestInner::Read`] requests on the `read_from_handle`
     /// starting at `read_from_offset` and totaling `read_data_length` bytes,
@@ -481,9 +419,7 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 }
 
-impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
-    WriteEnd<W, Buffer, Auxiliary>
-{
+impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics
@@ -492,9 +428,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// On most operating systems, such writes do not allocate disk space but
     /// instead leave "holes" in the file.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
@@ -541,9 +474,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     /// On most operating systems, such writes do not allocate disk space but
     /// instead leave "holes" in the file.
     ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
-    ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
     pub fn send_write_request_buffered_vectored(
@@ -564,9 +494,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// On most operating systems, such writes do not allocate disk space but
     /// instead leave "holes" in the file.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is only suitable for writing small data since it needs to copy the
     /// entire `data` into buffer.
@@ -610,7 +537,7 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         }
 
         id.0.reset(None);
-        self.shared_data.writer().push(buffer.split());
+        self.shared_data.queue().push(buffer.split());
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
@@ -623,9 +550,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// On most operating systems, such writes do not allocate disk space but
     /// instead leave "holes" in the file.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is zero-copy.
     pub fn send_write_request_zero_copy(
@@ -646,9 +570,6 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
     ///
     /// On most operating systems, such writes do not allocate disk space but
     /// instead leave "holes" in the file.
-    ///
-    /// NOTE that this merely add the request to the buffer, you need to call
-    /// [`SharedData::flush`] to actually send the requests.
     ///
     /// This function is zero-copy.
     pub fn send_write_request_zero_copy2(
@@ -675,9 +596,7 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         .split();
 
         // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
-        let writer = self.shared_data.writer();
-
-        let mut queue_pusher = writer.get_pusher();
+        let mut queue_pusher = self.shared_data.queue().get_pusher();
         queue_pusher.push(header);
         for data in data_slice {
             queue_pusher.extend_from_exact_size_iter(data.iter().cloned());

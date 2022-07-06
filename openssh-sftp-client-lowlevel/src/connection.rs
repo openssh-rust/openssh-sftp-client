@@ -1,26 +1,22 @@
 #![forbid(unsafe_code)]
 
 use super::awaitable_responses::AwaitableResponses;
-use super::writer_buffered::WriterBuffered;
 use super::*;
 
 use std::fmt::Debug;
-use std::io;
-use std::pin::Pin;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-use pin_project::pin_project;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::AsyncRead;
+use tokio_io_utility::queue::{Buffers, MpScBytesQueue};
 
 // TODO:
 //  - Support for zero copy syscalls
 
 #[derive(Debug)]
-#[pin_project]
-struct SharedDataInner<W, Buffer, Auxiliary> {
-    #[pin]
-    writer: WriterBuffered<W>,
+struct SharedDataInner<Buffer, Auxiliary> {
+    queue: MpScBytesQueue,
     responses: AwaitableResponses<Buffer>,
 
     auxiliary: Auxiliary,
@@ -32,28 +28,28 @@ struct SharedDataInner<W, Buffer, Auxiliary> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<W, Buffer, Auxiliary = ()>(Pin<Arc<SharedDataInner<W, Buffer, Auxiliary>>>);
+pub struct SharedData<Buffer, Auxiliary = ()>(Arc<SharedDataInner<Buffer, Auxiliary>>);
 
-impl<W, Buffer, Auxiliary> Clone for SharedData<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> Clone for SharedData<Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
-    fn new(writer: W, auxiliary: Auxiliary) -> Self {
-        SharedData(Arc::pin(SharedDataInner {
-            writer: WriterBuffered::new(writer),
+impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
+    fn new(auxiliary: Auxiliary) -> Self {
+        SharedData(Arc::new(SharedDataInner {
             responses: AwaitableResponses::new(),
+            queue: MpScBytesQueue::new(NonZeroUsize::new(4096).unwrap()),
 
             auxiliary,
         }))
     }
 }
 
-impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
-    pub(crate) fn writer(&self) -> Pin<&WriterBuffered<W>> {
-        self.0.as_ref().project_ref().writer
+impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
+    pub(crate) fn queue(&self) -> &MpScBytesQueue {
+        &self.0.queue
     }
 
     pub(crate) fn responses(&self) -> &AwaitableResponses<Buffer> {
@@ -64,9 +60,14 @@ impl<W, Buffer, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     pub fn get_auxiliary(&self) -> &Auxiliary {
         &self.0.auxiliary
     }
+
+    /// Return the buffer that need to be flushed.
+    pub async fn get_buffers(&self) -> Buffers<'_> {
+        self.0.queue.get_buffers_blocked().await
+    }
 }
 
-impl<W, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
+impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
     /// Create a useable response id.
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
@@ -86,115 +87,22 @@ impl<W, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
     }
 }
 
-impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> SharedData<W, Buffer, Auxiliary> {
-    /// Flush the write buffer.
-    ///
-    /// If another thread is flushing, then `Ok(false)` will be returned.
-    ///
-    /// # Cancel Safety
-    ///
-    /// Upon cancel, it might only partially flushed out the data, which can be
-    /// restarted by another thread.
-    #[inline(always)]
-    pub async fn try_flush(&self) -> Result<bool, io::Error> {
-        self.writer().try_flush().await
-    }
-
-    /// Flush the write buffer.
-    ///
-    /// If another thread is flushing, then this function would wait until
-    /// the other thread is done.
-    ///
-    /// # Cancel Safety
-    ///
-    /// Upon cancel, it might only partially flushed out the data, which can be
-    /// restarted by another thread.
-    #[inline(always)]
-    pub async fn flush(&self) -> Result<(), io::Error> {
-        self.writer().flush().await
-    }
-}
-
 /// Initialize connection to remote sftp server and
 /// negotiate the sftp version.
+///
+/// User of this function must manually call [`ReadEnd::receive_server_hello`]
+/// and manually flush the buffer.
 ///
 /// # Cancel Safety
 ///
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<
-    R: AsyncRead + Unpin,
-    W: AsyncWrite,
-    Buffer: ToBuffer + Send + Sync + 'static,
->(
+pub async fn connect<R: AsyncRead, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>(
     reader: R,
-    writer: W,
-) -> Result<(WriteEnd<W, Buffer>, ReadEnd<R, W, Buffer>, Extensions), Error> {
-    connect_with_auxiliary(reader, writer, ()).await
-}
-
-/// Initialize connection to remote sftp server and
-/// negotiate the sftp version.
-///
-/// # Cancel Safety
-///
-/// This function is not cancel safe.
-///
-/// After dropping the future, the connection would be in a undefined state.
-pub async fn connect_with_auxiliary<
-    R: AsyncRead + Unpin,
-    W: AsyncWrite,
-    Buffer: ToBuffer + Send + Sync + 'static,
-    Auxiliary,
->(
-    reader: R,
-    writer: W,
     auxiliary: Auxiliary,
-) -> Result<
-    (
-        WriteEnd<W, Buffer, Auxiliary>,
-        ReadEnd<R, W, Buffer, Auxiliary>,
-        Extensions,
-    ),
-    Error,
-> {
-    let (write_end, mut read_end) =
-        connect_with_auxiliary_relaxed_unpin(reader, writer, auxiliary).await?;
-
-    // Receive version and extensions
-    let extensions = read_end.receive_server_hello().await?;
-
-    Ok((write_end, read_end, extensions))
-}
-
-/// Initialize connection to remote sftp server and
-/// negotiate the sftp version.
-///
-/// User of this function must manually call [`ReadEnd::receive_server_hello`].
-///
-/// # Cancel Safety
-///
-/// This function is not cancel safe.
-///
-/// After dropping the future, the connection would be in a undefined state.
-pub async fn connect_with_auxiliary_relaxed_unpin<
-    R: AsyncRead,
-    W: AsyncWrite,
-    Buffer: ToBuffer + Send + Sync + 'static,
-    Auxiliary,
->(
-    reader: R,
-    writer: W,
-    auxiliary: Auxiliary,
-) -> Result<
-    (
-        WriteEnd<W, Buffer, Auxiliary>,
-        ReadEnd<R, W, Buffer, Auxiliary>,
-    ),
-    Error,
-> {
-    let shared_data = SharedData::new(writer, auxiliary);
+) -> Result<(WriteEnd<Buffer, Auxiliary>, ReadEnd<R, Buffer, Auxiliary>), Error> {
+    let shared_data = SharedData::new(auxiliary);
 
     // Send hello message
 

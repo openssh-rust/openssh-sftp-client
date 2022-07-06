@@ -6,6 +6,7 @@ use std::env;
 use std::fs;
 use std::io;
 use std::io::IoSlice;
+use std::num::NonZeroUsize;
 use std::os::unix::fs::symlink;
 use std::path;
 
@@ -13,19 +14,38 @@ use sftp_test_common::*;
 
 use bytes::Bytes;
 use tempfile::{Builder, TempDir};
+use tokio::sync::Mutex;
+use tokio_io_utility::write_vectored_all;
 
 type Id = lowlevel::Id<Vec<u8>>;
-type WriteEnd = lowlevel::WriteEnd<PipeWrite, Vec<u8>>;
-type ReadEnd = lowlevel::ReadEnd<PipeRead, PipeWrite, Vec<u8>>;
+type WriteEnd = lowlevel::WriteEnd<Vec<u8>, Mutex<PipeWrite>>;
+type ReadEnd = lowlevel::ReadEnd<PipeRead, Vec<u8>, Mutex<PipeWrite>>;
 
 fn assert_not_found(err: io::Error) {
     assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
 }
 
+async fn flush(read_end: &mut ReadEnd) {
+    let shared_data = read_end.get_shared_data();
+    let stdin = shared_data.get_auxiliary();
+    let mut buffers = shared_data.get_buffers().await;
+
+    let mut io_slices: Vec<IoSlice<'_>> = buffers.get_io_slices().to_vec();
+    let n: usize = io_slices.iter().map(|slice| slice.len()).sum();
+
+    write_vectored_all(&mut *stdin.lock().await, &mut io_slices)
+        .await
+        .unwrap();
+
+    assert!(!buffers.advance(NonZeroUsize::new(n).unwrap()));
+}
+
 async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extensions) {
     let (child, stdin, stdout) = launch_sftp().await;
 
-    let (write_end, read_end, extensions) = lowlevel::connect(stdout, stdin).await.unwrap();
+    let (write_end, mut read_end) = lowlevel::connect(stdout, Mutex::new(stdin)).await.unwrap();
+    flush(&mut read_end).await;
+    let extensions = read_end.receive_server_hello().await.unwrap();
     (write_end, read_end, child, extensions)
 }
 
@@ -48,7 +68,7 @@ fn create_tmpdir() -> TempDir {
 }
 
 async fn read_one_packet(read_end: &mut ReadEnd) {
-    read_end.get_shared_data().flush().await.unwrap();
+    flush(read_end).await;
 
     eprintln!("Wait for new request");
 

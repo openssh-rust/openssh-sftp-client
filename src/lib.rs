@@ -85,8 +85,8 @@ pub mod metadata;
 
 type Buffer = BytesMut;
 
-type WriteEnd<W> = lowlevel::WriteEnd<W, Buffer, Auxiliary>;
-type ReadEnd<R, W> = lowlevel::ReadEnd<R, W, Buffer, Auxiliary>;
-type SharedData<W> = lowlevel::SharedData<W, Buffer, Auxiliary>;
+type WriteEnd = lowlevel::WriteEnd<Buffer, Auxiliary>;
+type ReadEnd<R> = lowlevel::ReadEnd<R, Buffer, Auxiliary>;
+type SharedData = lowlevel::SharedData<Buffer, Auxiliary>;
 type Id = lowlevel::Id<Buffer>;
 type Data = lowlevel::Data<Buffer>;
