@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - [`SftpOptions::buffer_size`]
+///
 /// ## Changed
 ///  - All types in `highlevel` now does not have generic parameter `W`
 ///    except for `Sftp::new`

@@ -36,8 +36,12 @@ impl Sftp {
         stdout: R,
         options: SftpOptions,
     ) -> Result<Self, Error> {
-        let (write_end, read_end) =
-            connect(stdout, Auxiliary::new(options.get_max_pending_requests())).await?;
+        let (write_end, read_end) = connect(
+            stdout,
+            options.get_buffer_size(),
+            Auxiliary::new(options.get_max_pending_requests()),
+        )
+        .await?;
 
         let (rx, read_task) = create_read_task(read_end);
 
