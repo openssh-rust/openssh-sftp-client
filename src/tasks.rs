@@ -117,8 +117,6 @@ pub(super) fn create_read_task<
             let mut cnt = requests_to_read.load(Ordering::Relaxed);
 
             while cnt != 0 {
-                eprintln!("Enter while loop cnt = {cnt}");
-
                 // If attempt to read in more than new_requests_submit, then
                 // `read_in_one_packet` might block forever.
                 for _ in 0..cnt {
@@ -126,7 +124,6 @@ pub(super) fn create_read_task<
                 }
 
                 cnt = atomic_sub_assign(requests_to_read, cnt);
-                eprintln!("Updated requests_to_read: new_cnt = {cnt}");
             }
 
             if shutdown_requested.load(Ordering::Relaxed) {
