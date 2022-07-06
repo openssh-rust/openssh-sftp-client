@@ -10,11 +10,13 @@ use crate::*;
 ///
 /// ## Changed
 ///
-///  - `lowlevel::WriteEnd` now does not require `W: Unpin`
-///  - `lowlevel::ReadEnd` now does not require `W: Unpin`
-///  - `lowlevel::SharedData` now does not require `W: Unpin`
-///  - `lowlevel::connect` now does not require `W: Unpin`
-///  - `lowlevel::connect_with_auxiliary` now does not require `W: Unpin`
+///  - `lowlevel::WriteEnd` now does not require `W`
+///  - `lowlevel::ReadEnd` now does not require `W`
+///  - `lowlevel::SharedData` now does not require `W`
+///  - `lowlevel::connect` now does not require `W` and does not return
+///    the extension.
+///  - `lowlevel::connect_with_auxiliary` now does not require `W` and
+///    does not return the extension.
 ///
 /// ## Removed
 ///  - `SharedData::get_auxiliary_mut`

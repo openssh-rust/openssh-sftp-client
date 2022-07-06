@@ -20,25 +20,23 @@ use crate::openssh_sftp_protocol::ssh_format::Serializer;
 use crate::openssh_sftp_protocol::Handle;
 use bytes::Bytes;
 
-use tokio::io::AsyncWrite;
-
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
-pub struct WriteEnd<W, Buffer, Auxiliary = ()> {
+pub struct WriteEnd<Buffer, Auxiliary = ()> {
     serializer: Serializer<WriteBuffer>,
-    shared_data: SharedData<W, Buffer, Auxiliary>,
+    shared_data: SharedData<Buffer, Auxiliary>,
 }
 
-impl<W, Buffer, Auxiliary> Clone for WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> Clone for WriteEnd<Buffer, Auxiliary> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<W, Buffer, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// Create a [`WriteEnd`] from [`SharedData`].
-    pub fn new(shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
+    pub fn new(shared_data: SharedData<Buffer, Auxiliary>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
@@ -46,31 +44,30 @@ impl<W, Buffer, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
     }
 
     /// Consume the [`WriteEnd`] and return the stored [`SharedData`].
-    pub fn into_shared_data(self) -> SharedData<W, Buffer, Auxiliary> {
+    pub fn into_shared_data(self) -> SharedData<Buffer, Auxiliary> {
         self.shared_data
     }
 }
 
-impl<W, Buffer, Auxiliary> Deref for WriteEnd<W, Buffer, Auxiliary> {
-    type Target = SharedData<W, Buffer, Auxiliary>;
+impl<Buffer, Auxiliary> Deref for WriteEnd<Buffer, Auxiliary> {
+    type Target = SharedData<Buffer, Auxiliary>;
 
     fn deref(&self) -> &Self::Target {
         &self.shared_data
     }
 }
 
-impl<W, Buffer, Auxiliary> DerefMut for WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer, Auxiliary> DerefMut for WriteEnd<Buffer, Auxiliary> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.shared_data
     }
 }
 
-impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliary> {
+impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
-            .writer()
-            .write_all(&*Self::serialize(&mut self.serializer, Hello { version })?)
-            .await?;
+            .queue()
+            .push(Self::serialize(&mut self.serializer, Hello { version })?);
 
         Ok(())
     }
@@ -104,7 +101,7 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
         )?;
 
         id.0.reset(buffer);
-        self.shared_data.writer().push(serialized);
+        self.shared_data.queue().push(serialized);
 
         Ok(id.into_inner())
     }
@@ -481,9 +478,7 @@ impl<W: AsyncWrite, Buffer: Send + Sync, Auxiliary> WriteEnd<W, Buffer, Auxiliar
     }
 }
 
-impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
-    WriteEnd<W, Buffer, Auxiliary>
-{
+impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics
@@ -610,7 +605,7 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         }
 
         id.0.reset(None);
-        self.shared_data.writer().push(buffer.split());
+        self.shared_data.queue().push(buffer.split());
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
@@ -675,9 +670,7 @@ impl<W: AsyncWrite, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>
         .split();
 
         // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
-        let writer = self.shared_data.writer();
-
-        let mut queue_pusher = writer.get_pusher();
+        let mut queue_pusher = self.shared_data.queue().get_pusher();
         queue_pusher.push(header);
         for data in data_slice {
             queue_pusher.extend_from_exact_size_iter(data.iter().cloned());

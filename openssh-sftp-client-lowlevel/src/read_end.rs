@@ -18,22 +18,22 @@ use crate::openssh_sftp_protocol::serde::de::DeserializeOwned;
 use crate::openssh_sftp_protocol::ssh_format::from_bytes;
 
 use pin_project::pin_project;
-use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 
 /// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
 #[pin_project]
-pub struct ReadEnd<R, W, Buffer, Auxiliary = ()> {
+pub struct ReadEnd<R, Buffer, Auxiliary = ()> {
     #[pin]
     reader: ReaderBuffered<R>,
-    shared_data: SharedData<W, Buffer, Auxiliary>,
+    shared_data: SharedData<Buffer, Auxiliary>,
 }
 
-impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
-    ReadEnd<R, W, Buffer, Auxiliary>
+impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+    ReadEnd<R, Buffer, Auxiliary>
 {
-    pub(crate) fn new(reader: R, shared_data: SharedData<W, Buffer, Auxiliary>) -> Self {
+    pub(crate) fn new(reader: R, shared_data: SharedData<Buffer, Auxiliary>) -> Self {
         Self {
             reader: ReaderBuffered::new(reader),
             shared_data,
@@ -277,8 +277,8 @@ impl<R: AsyncRead, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxi
     }
 }
 
-impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
-    ReadEnd<R, W, Buffer, Auxiliary>
+impl<R: AsyncRead + Unpin, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+    ReadEnd<R, Buffer, Auxiliary>
 {
     /// Must be called and only called once right after
     /// [`super::connect_with_auxiliary_relaxed_unpin`]
@@ -318,9 +318,9 @@ impl<R: AsyncRead + Unpin, W: AsyncWrite, Buffer: ToBuffer + 'static + Send + Sy
     }
 }
 
-impl<R, W, Buffer, Auxiliary> ReadEnd<R, W, Buffer, Auxiliary> {
+impl<R, Buffer, Auxiliary> ReadEnd<R, Buffer, Auxiliary> {
     /// Return the [`SharedData`] held by [`ReadEnd`].
-    pub fn get_shared_data(&self) -> &SharedData<W, Buffer, Auxiliary> {
+    pub fn get_shared_data(&self) -> &SharedData<Buffer, Auxiliary> {
         &self.shared_data
     }
 }
