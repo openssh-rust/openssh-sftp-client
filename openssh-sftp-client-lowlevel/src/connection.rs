@@ -37,10 +37,10 @@ impl<Buffer, Auxiliary> Clone for SharedData<Buffer, Auxiliary> {
 }
 
 impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
-    fn new(auxiliary: Auxiliary) -> Self {
+    fn new(buffer_size: NonZeroUsize, auxiliary: Auxiliary) -> Self {
         SharedData(Arc::new(SharedDataInner {
             responses: AwaitableResponses::new(),
-            queue: MpScBytesQueue::new(NonZeroUsize::new(4096).unwrap()),
+            queue: MpScBytesQueue::new(buffer_size),
 
             auxiliary,
         }))
@@ -61,7 +61,7 @@ impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
         &self.0.auxiliary
     }
 
-    /// Return the buffer that need to be flushed.
+    /// Return the buffers that need to be flushed.
     pub async fn get_buffers(&self) -> Buffers<'_> {
         self.0.queue.get_buffers_blocked().await
     }
@@ -100,9 +100,10 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect<R: AsyncRead, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>(
     reader: R,
+    buffer_size: NonZeroUsize,
     auxiliary: Auxiliary,
 ) -> Result<(WriteEnd<Buffer, Auxiliary>, ReadEnd<R, Buffer, Auxiliary>), Error> {
-    let shared_data = SharedData::new(auxiliary);
+    let shared_data = SharedData::new(buffer_size, auxiliary);
 
     // Send hello message
 

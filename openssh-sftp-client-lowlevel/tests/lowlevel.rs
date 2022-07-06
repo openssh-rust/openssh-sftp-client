@@ -43,7 +43,10 @@ async fn flush(read_end: &mut ReadEnd) {
 async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extensions) {
     let (child, stdin, stdout) = launch_sftp().await;
 
-    let (write_end, mut read_end) = lowlevel::connect(stdout, Mutex::new(stdin)).await.unwrap();
+    let (write_end, mut read_end) =
+        lowlevel::connect(stdout, NonZeroUsize::new(1000).unwrap(), Mutex::new(stdin))
+            .await
+            .unwrap();
     flush(&mut read_end).await;
     let extensions = read_end.receive_server_hello().await.unwrap();
     (write_end, read_end, child, extensions)
