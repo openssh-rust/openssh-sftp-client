@@ -16,6 +16,7 @@ use std::sync::atomic::Ordering;
 
 use derive_destructure2::destructure;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::oneshot::Receiver;
 use tokio::task::JoinHandle;
 
 /// A file-oriented channel to a remote host.
@@ -42,18 +43,29 @@ impl Sftp {
 
         let (rx, read_task) = create_read_task(read_end);
 
+        let flush_task = create_flush_task(
+            stdin,
+            SharedData::clone(&write_end),
+            options.get_flush_interval(),
+        );
+
+        Self::init(flush_task, read_task, write_end, rx, options).await
+    }
+
+    async fn init(
+        flush_task: JoinHandle<Result<(), Error>>,
+        read_task: JoinHandle<Result<(), Error>>,
+        write_end: WriteEnd,
+        rx: Receiver<Extensions>,
+        options: SftpOptions,
+    ) -> Result<Self, Error> {
         // Create sftp here.
         //
         // It would also gracefully shutdown `flush_task` and `read_task` if
         // the future is cancelled or error is encounted.
         let sftp = Self {
             shared_data: SharedData::clone(&write_end),
-
-            flush_task: create_flush_task(
-                stdin,
-                SharedData::clone(&write_end),
-                options.get_flush_interval(),
-            ),
+            flush_task,
             read_task,
         };
 
@@ -87,9 +99,7 @@ impl Sftp {
 
         Ok(sftp)
     }
-}
 
-impl Sftp {
     async fn set_limits(
         &self,
         write_end: WriteEnd,
