@@ -169,7 +169,7 @@ impl Sftp {
             .get_auxiliary()
             .conn_info
             .set(auxiliary::ConnInfo { limits, extensions })
-            .expect("auxiliary.conn_info shall be empty");
+            .expect("auxiliary.conn_info shall be uninitialized");
 
         Ok(())
     }
