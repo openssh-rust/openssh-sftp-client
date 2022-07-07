@@ -106,11 +106,9 @@ pub async fn connect<R: AsyncRead, Buffer: ToBuffer + Send + Sync + 'static, Aux
     let shared_data = SharedData::new(buffer_size, auxiliary);
 
     // Send hello message
-
     let mut write_end = WriteEnd::new(shared_data);
     write_end.send_hello(SSH2_FILEXFER_VERSION).await?;
 
-    // Receive version and extensions
     let read_end = ReadEnd::new(reader, (*write_end).clone());
 
     Ok((write_end, read_end))
