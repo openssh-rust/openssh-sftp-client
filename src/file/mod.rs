@@ -120,47 +120,47 @@ impl<'s> OpenOptions<'s> {
         self.create_new = create_new;
         self
     }
-}
-
-impl<'s> OpenOptions<'s> {
-    async fn open_impl(&self, path: &Path) -> Result<File<'s>, Error> {
-        let filename = Cow::Borrowed(path);
-
-        let params = if self.create || self.create_new {
-            let flags = if self.create_new {
-                CreateFlags::Excl
-            } else if self.truncate {
-                CreateFlags::Trunc
-            } else {
-                CreateFlags::None
-            };
-
-            self.options.create(filename, flags, FileAttrs::new())
-        } else {
-            self.options.open(filename)
-        };
-
-        let mut write_end = self.sftp.write_end();
-
-        let handle = write_end
-            .send_request(|write_end, id| Ok(write_end.send_open_file_request(id, params)?.wait()))
-            .await?;
-
-        Ok(File {
-            inner: OwnedHandle::new(write_end, handle),
-
-            is_readable: self.options.get_read(),
-            is_writable: self.options.get_write(),
-            need_flush: false,
-            offset: 0,
-        })
-    }
 
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
     pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'s>, Error> {
-        self.open_impl(path.as_ref()).await
+        async fn inner<'s>(this: &OpenOptions<'s>, path: &Path) -> Result<File<'s>, Error> {
+            let filename = Cow::Borrowed(path);
+
+            let params = if this.create || this.create_new {
+                let flags = if this.create_new {
+                    CreateFlags::Excl
+                } else if this.truncate {
+                    CreateFlags::Trunc
+                } else {
+                    CreateFlags::None
+                };
+
+                this.options.create(filename, flags, FileAttrs::new())
+            } else {
+                this.options.open(filename)
+            };
+
+            let mut write_end = this.sftp.write_end();
+
+            let handle = write_end
+                .send_request(|write_end, id| {
+                    Ok(write_end.send_open_file_request(id, params)?.wait())
+                })
+                .await?;
+
+            Ok(File {
+                inner: OwnedHandle::new(write_end, handle),
+
+                is_readable: this.options.get_read(),
+                is_writable: this.options.get_write(),
+                need_flush: false,
+                offset: 0,
+            })
+        }
+
+        inner(self, path.as_ref()).await
     }
 }
 
