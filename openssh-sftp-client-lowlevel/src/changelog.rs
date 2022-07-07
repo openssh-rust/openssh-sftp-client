@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// This is the first release!
 ///
 /// This crate has been extracted out from
