@@ -401,19 +401,21 @@ impl DirBuilder<'_, '_> {
 }
 
 impl DirBuilder<'_, '_> {
-    async fn create_impl(&mut self, path: &Path) -> Result<(), Error> {
-        let fs = &mut self.fs;
-
-        let path = fs.concat_path_if_needed(path);
-        let attrs = self.metadata_builder.create().into_inner();
-
-        fs.write_end
-            .send_request(|write_end, id| Ok(write_end.send_mkdir_request(id, path, attrs)?.wait()))
-            .await
-    }
-
     /// Creates the specified directory with the configured options.
     pub async fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-        self.create_impl(path.as_ref()).await
+        async fn inner(this: &mut DirBuilder<'_, '_>, path: &Path) -> Result<(), Error> {
+            let fs = &mut this.fs;
+
+            let path = fs.concat_path_if_needed(path);
+            let attrs = this.metadata_builder.create().into_inner();
+
+            fs.write_end
+                .send_request(|write_end, id| {
+                    Ok(write_end.send_mkdir_request(id, path, attrs)?.wait())
+                })
+                .await
+        }
+
+        inner(self, path.as_ref()).await
     }
 }
