@@ -83,6 +83,8 @@ impl Sftp {
         let extensions = if let Ok(extensions) = rx.await {
             extensions
         } else {
+            drop(write_end);
+
             // Wait on flush_task and read_task to get a more detailed error message.
             sftp.close().await?;
             std::unreachable!("Error must have occurred in either read_task or flush_task")
