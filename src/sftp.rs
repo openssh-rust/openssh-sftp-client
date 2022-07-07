@@ -36,6 +36,7 @@ impl Sftp {
     ) -> Result<Self, Error> {
         let (write_end, read_end) = connect(
             stdout,
+            options.get_read_end_buffer_size(),
             options.get_write_end_buffer_size(),
             Auxiliary::new(options.get_max_pending_requests()),
         )
