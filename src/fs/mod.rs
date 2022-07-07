@@ -94,7 +94,11 @@ impl<'s> Fs<'s> {
 
     /// Creates a new, empty directory at the provided path.
     pub async fn create_dir(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-        self.dir_builder().create(path).await
+        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<(), Error> {
+            this.dir_builder().create(path).await
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     async fn remove_impl(&mut self, path: &Path, f: SendRmRequest) -> Result<(), Error> {
