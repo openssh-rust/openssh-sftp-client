@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::future::Future;
 use std::io;
+use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -10,8 +11,6 @@ use bytes::{Buf, BytesMut};
 use pin_project::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
 use tokio_io_utility::{read_exact_to_bytes, read_to_bytes_rng, ready};
-
-const BUFFER_LEN: usize = 4096;
 
 #[derive(Debug)]
 #[pin_project]
@@ -30,10 +29,10 @@ pub(super) struct ReaderBuffered<R> {
 }
 
 impl<R: AsyncRead> ReaderBuffered<R> {
-    pub(super) fn new(reader: R) -> Self {
+    pub(super) fn new(reader: R, reader_buffer_len: NonZeroUsize) -> Self {
         Self {
             reader,
-            buffer: BytesMut::with_capacity(BUFFER_LEN),
+            buffer: BytesMut::with_capacity(reader_buffer_len.get()),
         }
     }
 
@@ -43,13 +42,15 @@ impl<R: AsyncRead> ReaderBuffered<R> {
     ) -> io::Result<Drain<'_>> {
         let mut this = self.project();
 
-        let len = this.buffer.len();
+        let n = this.buffer.len();
 
-        if len < size {
-            if size < BUFFER_LEN {
-                read_to_bytes_rng(&mut this.reader, this.buffer, size..BUFFER_LEN).await?;
+        if n < size {
+            // buffer does not contain enough data, read more
+            let cap = this.buffer.capacity();
+            if size < cap {
+                read_to_bytes_rng(&mut this.reader, this.buffer, (size - n)..(cap - n)).await?;
             } else {
-                read_exact_to_bytes(&mut this.reader, this.buffer, size - len).await?;
+                read_exact_to_bytes(&mut this.reader, this.buffer, size - n).await?;
             }
         }
 
@@ -72,7 +73,9 @@ impl<R: AsyncRead> AsyncBufRead for ReaderBuffered<R> {
         // Branch using `>=` instead of the more correct `==`
         // to tell the compiler that the pos..cap slice is always valid.
         if buffer.is_empty() {
-            let mut future = read_to_bytes_rng(reader, buffer, ..BUFFER_LEN);
+            let cap = buffer.capacity();
+
+            let mut future = read_to_bytes_rng(reader, buffer, ..cap);
             let future = Pin::new(&mut future);
             match ready!(future.poll(cx)) {
                 Ok(()) => (),
@@ -110,7 +113,9 @@ impl<R: AsyncRead> AsyncRead for ReaderBuffered<R> {
         // If we don't have any buffered data and we're doing a massive read
         // (larger than our internal buffer), bypass our internal buffer
         // entirely.
-        if buffer.is_empty() && buf.remaining() >= BUFFER_LEN {
+        let cap = buffer.capacity();
+
+        if buffer.is_empty() && buf.remaining() >= cap {
             let res = ready!(reader.poll_read(cx, buf));
             return Poll::Ready(res);
         }

@@ -4,6 +4,7 @@ use std::time::Duration;
 /// Options when creating [`super::Sftp`].
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SftpOptions {
+    read_end_buffer_size: Option<NonZeroUsize>,
     write_end_buffer_size: Option<NonZeroUsize>,
     flush_interval: Option<Duration>,
     max_read_len: Option<NonZeroU32>,
@@ -15,6 +16,7 @@ impl SftpOptions {
     /// Create a new [`SftpOptions`].
     pub const fn new() -> Self {
         Self {
+            read_end_buffer_size: None,
             write_end_buffer_size: None,
             flush_interval: None,
             max_read_len: None,
@@ -99,7 +101,8 @@ impl SftpOptions {
             .unwrap_or(100)
     }
 
-    /// Set the buffer size.
+    /// Set the buffer size for write_end.
+    /// It is used to store [`bytes::Bytes`].
     ///
     /// It is set to 100 by default.
     #[must_use]
@@ -111,5 +114,21 @@ impl SftpOptions {
     pub(super) fn get_write_end_buffer_size(&self) -> NonZeroUsize {
         self.write_end_buffer_size
             .unwrap_or_else(|| NonZeroUsize::new(100).unwrap())
+    }
+
+    /// Set the init buffer size for read_end.
+    /// If the header of the response is larger than the buffer, then the buffer
+    /// will be resized to fit the size of the header.
+    ///
+    /// It is set to 1024 by default.
+    #[must_use]
+    pub const fn read_end_buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
+        self.read_end_buffer_size = Some(buffer_size);
+        self
+    }
+
+    pub(super) fn get_read_end_buffer_size(&self) -> NonZeroUsize {
+        self.read_end_buffer_size
+            .unwrap_or_else(|| NonZeroUsize::new(1024).unwrap())
     }
 }

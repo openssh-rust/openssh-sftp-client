@@ -10,6 +10,7 @@ use super::ToBuffer;
 
 use std::fmt::Debug;
 use std::io;
+use std::num::NonZeroUsize;
 use std::pin::Pin;
 
 use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
@@ -33,9 +34,13 @@ pub struct ReadEnd<R, Buffer, Auxiliary = ()> {
 impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     ReadEnd<R, Buffer, Auxiliary>
 {
-    pub(crate) fn new(reader: R, shared_data: SharedData<Buffer, Auxiliary>) -> Self {
+    pub(crate) fn new(
+        reader: R,
+        reader_buffer_len: NonZeroUsize,
+        shared_data: SharedData<Buffer, Auxiliary>,
+    ) -> Self {
         Self {
-            reader: ReaderBuffered::new(reader),
+            reader: ReaderBuffered::new(reader, reader_buffer_len),
             shared_data,
         }
     }

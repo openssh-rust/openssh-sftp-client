@@ -100,6 +100,7 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
 /// After dropping the future, the connection would be in a undefined state.
 pub async fn connect<R: AsyncRead, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>(
     reader: R,
+    reader_buffer_len: NonZeroUsize,
     write_end_buffer_size: NonZeroUsize,
     auxiliary: Auxiliary,
 ) -> Result<(WriteEnd<Buffer, Auxiliary>, ReadEnd<R, Buffer, Auxiliary>), Error> {
@@ -109,7 +110,7 @@ pub async fn connect<R: AsyncRead, Buffer: ToBuffer + Send + Sync + 'static, Aux
     let mut write_end = WriteEnd::new(shared_data);
     write_end.send_hello(SSH2_FILEXFER_VERSION).await?;
 
-    let read_end = ReadEnd::new(reader, (*write_end).clone());
+    let read_end = ReadEnd::new(reader, reader_buffer_len, (*write_end).clone());
 
     Ok((write_end, read_end))
 }
