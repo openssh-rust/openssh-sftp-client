@@ -276,8 +276,10 @@ impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     }
 }
 
-impl<R: AsyncRead + Unpin, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
+impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     ReadEnd<R, Buffer, Auxiliary>
+where
+    Self: Unpin,
 {
     /// Must be called once right after [`super::connect`]
     /// to receive the hello message from the server.
