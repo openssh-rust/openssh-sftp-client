@@ -42,16 +42,15 @@ impl<R: AsyncRead> ReaderBuffered<R> {
     ) -> io::Result<Drain<'_>> {
         let mut this = self.project();
 
-        let len = this.buffer.len();
+        let n = this.buffer.len();
 
-        if len < size {
+        if n < size {
             // buffer does not contain enough data, read more
-
             let cap = this.buffer.capacity();
             if size < cap {
-                read_to_bytes_rng(&mut this.reader, this.buffer, size..cap).await?;
+                read_to_bytes_rng(&mut this.reader, this.buffer, (size - n)..(cap - n)).await?;
             } else {
-                read_exact_to_bytes(&mut this.reader, this.buffer, size - len).await?;
+                read_exact_to_bytes(&mut this.reader, this.buffer, size - n).await?;
             }
         }
 
