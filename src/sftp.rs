@@ -202,12 +202,16 @@ impl Sftp {
     /// This function will create a file if it does not exist, and will truncate
     /// it if it does.
     pub async fn create(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
-        self.options()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .await
+        async fn inner<'s>(this: &'s Sftp, path: &Path) -> Result<File<'s>, Error> {
+            this.options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .await
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// Attempts to open a file in read-only mode.
