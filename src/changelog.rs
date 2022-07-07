@@ -2,7 +2,7 @@
 use crate::*;
 
 /// ## Added
-///  - [`SftpOptions::buffer_size`]
+///  - [`SftpOptions::write_end_buffer_size`]
 ///
 /// ## Changed
 ///  - All types in `highlevel` now does not have generic parameter `W`

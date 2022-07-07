@@ -4,7 +4,7 @@ use std::time::Duration;
 /// Options when creating [`super::Sftp`].
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SftpOptions {
-    buffer_size: Option<NonZeroUsize>,
+    write_end_buffer_size: Option<NonZeroUsize>,
     flush_interval: Option<Duration>,
     max_read_len: Option<NonZeroU32>,
     max_write_len: Option<NonZeroU32>,
@@ -15,7 +15,7 @@ impl SftpOptions {
     /// Create a new [`SftpOptions`].
     pub const fn new() -> Self {
         Self {
-            buffer_size: None,
+            write_end_buffer_size: None,
             flush_interval: None,
             max_read_len: None,
             max_write_len: None,
@@ -103,13 +103,13 @@ impl SftpOptions {
     ///
     /// It is set to 100 by default.
     #[must_use]
-    pub const fn buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
-        self.buffer_size = Some(buffer_size);
+    pub const fn write_end_buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
+        self.write_end_buffer_size = Some(buffer_size);
         self
     }
 
-    pub(super) fn get_buffer_size(&self) -> NonZeroUsize {
-        self.buffer_size
+    pub(super) fn get_write_end_buffer_size(&self) -> NonZeroUsize {
+        self.write_end_buffer_size
             .unwrap_or_else(|| NonZeroUsize::new(100).unwrap())
     }
 }
