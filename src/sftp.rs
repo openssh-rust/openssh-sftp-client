@@ -216,7 +216,11 @@ impl Sftp {
 
     /// Attempts to open a file in read-only mode.
     pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
-        self.options().read(true).open(path).await
+        async fn inner<'s>(this: &'s Sftp, path: &Path) -> Result<File<'s>, Error> {
+            this.options().read(true).open(path).await
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// [`Fs`] defaults to the current working dir set by remote `sftp-server`,
