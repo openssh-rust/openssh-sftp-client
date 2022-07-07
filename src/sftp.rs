@@ -49,7 +49,7 @@ impl Sftp {
             options.get_flush_interval(),
         );
 
-        Self::init(flush_task, read_task, write_end, rx, options).await
+        Self::init(flush_task, read_task, write_end, rx, &options).await
     }
 
     async fn init(
@@ -57,7 +57,7 @@ impl Sftp {
         read_task: JoinHandle<Result<(), Error>>,
         write_end: WriteEnd,
         rx: Receiver<Extensions>,
-        options: SftpOptions,
+        options: &SftpOptions,
     ) -> Result<Self, Error> {
         // Create sftp here.
         //
@@ -103,7 +103,7 @@ impl Sftp {
     async fn set_limits(
         &self,
         write_end: WriteEnd,
-        options: SftpOptions,
+        options: &SftpOptions,
         extensions: Extensions,
     ) -> Result<(), Error> {
         let mut write_end = WriteEndWithCachedId::new(self, write_end);
