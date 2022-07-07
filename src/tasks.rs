@@ -49,7 +49,7 @@ fn atomic_sub_assign(atomic: &AtomicUsize, val: usize) -> usize {
     atomic.fetch_sub(val, Ordering::Relaxed) - val
 }
 
-pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
+pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
     writer: W,
     shared_data: SharedData,
     flush_interval: Duration,
@@ -117,7 +117,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + Sync + 'static>(
     })
 }
 
-pub(super) fn create_read_task<R: AsyncRead + Send + Sync + 'static>(
+pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
     read_end: ReadEnd<R>,
 ) -> (oneshot::Receiver<Extensions>, JoinHandle<Result<(), Error>>) {
     let (tx, rx) = oneshot::channel();

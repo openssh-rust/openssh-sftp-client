@@ -28,10 +28,7 @@ pub struct Sftp {
 
 impl Sftp {
     /// Create [`Sftp`].
-    pub async fn new<
-        W: AsyncWrite + Send + Sync + 'static,
-        R: AsyncRead + Send + Sync + 'static,
-    >(
+    pub async fn new<W: AsyncWrite + Send + 'static, R: AsyncRead + Send + 'static>(
         stdin: W,
         stdout: R,
         options: SftpOptions,
