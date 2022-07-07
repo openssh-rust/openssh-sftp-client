@@ -67,14 +67,15 @@ impl Auxiliary {
     }
 
     pub(super) fn wakeup_flush_task(&self) {
-        self.flush_end_notify.notify_one();
-
         // Must increment requests_to_read first, since
         // flush_task might wakeup read_end once it done flushing.
         self.requests_to_read.fetch_add(1, Ordering::Relaxed);
 
+        let pending_requests = self.pending_requests.fetch_add(1, Ordering::Relaxed);
+
+        self.flush_end_notify.notify_one();
         // Use `==` here to avoid unnecessary wakeup of flush_task.
-        if self.pending_requests.fetch_add(1, Ordering::Relaxed) == self.max_pending_requests() {
+        if pending_requests == self.max_pending_requests() {
             self.flush_immediately.notify_one();
         }
     }

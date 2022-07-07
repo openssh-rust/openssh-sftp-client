@@ -9,19 +9,10 @@ use std::sync::Arc;
 use derive_destructure2::destructure;
 
 /// Remote Directory
-#[derive(Debug, destructure)]
+#[derive(Debug, Clone, destructure)]
 pub(super) struct OwnedHandle<'s> {
     pub(super) write_end: WriteEndWithCachedId<'s>,
     pub(super) handle: Arc<HandleOwned>,
-}
-
-impl Clone for OwnedHandle<'_> {
-    fn clone(&self) -> Self {
-        Self {
-            write_end: self.write_end.clone(),
-            handle: self.handle.clone(),
-        }
-    }
 }
 
 impl Drop for OwnedHandle<'_> {

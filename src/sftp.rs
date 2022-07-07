@@ -16,6 +16,7 @@ use std::sync::atomic::Ordering;
 
 use derive_destructure2::destructure;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::oneshot::Receiver;
 use tokio::task::JoinHandle;
 
 /// A file-oriented channel to a remote host.
@@ -35,25 +36,36 @@ impl Sftp {
     ) -> Result<Self, Error> {
         let (write_end, read_end) = connect(
             stdout,
-            options.get_buffer_size(),
+            options.get_write_end_buffer_size(),
             Auxiliary::new(options.get_max_pending_requests()),
         )
         .await?;
 
         let (rx, read_task) = create_read_task(read_end);
 
+        let flush_task = create_flush_task(
+            stdin,
+            SharedData::clone(&write_end),
+            options.get_flush_interval(),
+        );
+
+        Self::init(flush_task, read_task, write_end, rx, &options).await
+    }
+
+    async fn init(
+        flush_task: JoinHandle<Result<(), Error>>,
+        read_task: JoinHandle<Result<(), Error>>,
+        write_end: WriteEnd,
+        rx: Receiver<Extensions>,
+        options: &SftpOptions,
+    ) -> Result<Self, Error> {
         // Create sftp here.
         //
         // It would also gracefully shutdown `flush_task` and `read_task` if
         // the future is cancelled or error is encounted.
         let sftp = Self {
             shared_data: SharedData::clone(&write_end),
-
-            flush_task: create_flush_task(
-                stdin,
-                SharedData::clone(&write_end),
-                options.get_flush_interval(),
-            ),
+            flush_task,
             read_task,
         };
 
@@ -71,6 +83,8 @@ impl Sftp {
         let extensions = if let Ok(extensions) = rx.await {
             extensions
         } else {
+            drop(write_end);
+
             // Wait on flush_task and read_task to get a more detailed error message.
             sftp.close().await?;
             std::unreachable!("Error must have occurred in either read_task or flush_task")
@@ -87,13 +101,11 @@ impl Sftp {
 
         Ok(sftp)
     }
-}
 
-impl Sftp {
     async fn set_limits(
         &self,
         write_end: WriteEnd,
-        options: SftpOptions,
+        options: &SftpOptions,
         extensions: Extensions,
     ) -> Result<(), Error> {
         let mut write_end = WriteEndWithCachedId::new(self, write_end);
@@ -159,7 +171,7 @@ impl Sftp {
             .get_auxiliary()
             .conn_info
             .set(auxiliary::ConnInfo { limits, extensions })
-            .expect("auxiliary.conn_info shall be empty");
+            .expect("auxiliary.conn_info shall be uninitialized");
 
         Ok(())
     }
@@ -190,17 +202,25 @@ impl Sftp {
     /// This function will create a file if it does not exist, and will truncate
     /// it if it does.
     pub async fn create(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
-        self.options()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .await
+        async fn inner<'s>(this: &'s Sftp, path: &Path) -> Result<File<'s>, Error> {
+            this.options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .await
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// Attempts to open a file in read-only mode.
     pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'_>, Error> {
-        self.options().read(true).open(path).await
+        async fn inner<'s>(this: &'s Sftp, path: &Path) -> Result<File<'s>, Error> {
+            this.options().read(true).open(path).await
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// [`Fs`] defaults to the current working dir set by remote `sftp-server`,
