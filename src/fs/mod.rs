@@ -70,18 +70,18 @@ impl<'s> Fs<'s> {
 }
 
 impl<'s> Fs<'s> {
-    async fn open_dir_impl(&mut self, path: &Path) -> Result<Dir<'_>, Error> {
-        let path = self.concat_path_if_needed(path);
-
-        self.write_end
-            .send_request(|write_end, id| Ok(write_end.send_opendir_request(id, path)?.wait()))
-            .await
-            .map(|handle| Dir(OwnedHandle::new(self.write_end.clone(), handle)))
-    }
-
     /// Open a remote dir
     pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir<'_>, Error> {
-        self.open_dir_impl(path.as_ref()).await
+        async fn inner<'s>(this: &mut Fs<'s>, path: &Path) -> Result<Dir<'s>, Error> {
+            let path = this.concat_path_if_needed(path);
+
+            this.write_end
+                .send_request(|write_end, id| Ok(write_end.send_opendir_request(id, path)?.wait()))
+                .await
+                .map(|handle| Dir(OwnedHandle::new(this.write_end.clone(), handle)))
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// Create a directory builder.
@@ -117,30 +117,30 @@ impl<'s> Fs<'s> {
             .await
     }
 
-    async fn canonicalize_impl(&mut self, path: &Path) -> Result<PathBuf, Error> {
-        let path = self.concat_path_if_needed(path);
-
-        let f = if self.get_auxiliary().extensions().expand_path {
-            // This supports canonicalisation of relative paths and those that
-            // need tilde-expansion, i.e. “~”, “~/…” and “~user/…”.
-            //
-            // These paths are expanded using shell-like rules and the resultant
-            // path is canonicalised similarly to WriteEnd::send_realpath_request.
-            WriteEnd::send_expand_path_request
-        } else {
-            WriteEnd::send_realpath_request
-        };
-
-        self.write_end
-            .send_request(|write_end, id| Ok(f(write_end, id, path)?.wait()))
-            .await
-            .map(Into::into)
-    }
-
     /// Returns the canonical, absolute form of a path with all intermediate
     /// components normalized and symbolic links resolved.
     pub async fn canonicalize(&mut self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {
-        self.canonicalize_impl(path.as_ref()).await
+        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<PathBuf, Error> {
+            let path = this.concat_path_if_needed(path);
+
+            let f = if this.get_auxiliary().extensions().expand_path {
+                // This supports canonicalisation of relative paths and those that
+                // need tilde-expansion, i.e. “~”, “~/…” and “~user/…”.
+                //
+                // These paths are expanded using shell-like rules and the resultant
+                // path is canonicalised similarly to WriteEnd::send_realpath_request.
+                WriteEnd::send_expand_path_request
+            } else {
+                WriteEnd::send_realpath_request
+            };
+
+            this.write_end
+                .send_request(|write_end, id| Ok(f(write_end, id, path)?.wait()))
+                .await
+                .map(Into::into)
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     async fn linking_impl(
@@ -157,22 +157,22 @@ impl<'s> Fs<'s> {
             .await
     }
 
-    async fn hard_link_impl(&mut self, src: &Path, dst: &Path) -> Result<(), Error> {
-        if !self.get_auxiliary().extensions().hardlink {
-            return Err(Error::UnsupportedExtension(&"hardlink"));
-        }
-
-        self.linking_impl(src, dst, WriteEnd::send_hardlink_request)
-            .await
-    }
-
     /// Creates a new hard link on the remote filesystem.
     pub async fn hard_link(
         &mut self,
         src: impl AsRef<Path>,
         dst: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        self.hard_link_impl(src.as_ref(), dst.as_ref()).await
+        async fn inner(this: &mut Fs<'_>, src: &Path, dst: &Path) -> Result<(), Error> {
+            if !this.get_auxiliary().extensions().hardlink {
+                return Err(Error::UnsupportedExtension(&"hardlink"));
+            }
+
+            this.linking_impl(src, dst, WriteEnd::send_hardlink_request)
+                .await
+        }
+
+        inner(self, src.as_ref(), dst.as_ref()).await
     }
 
     /// Creates a new symlink on the remote filesystem.
@@ -185,17 +185,6 @@ impl<'s> Fs<'s> {
             .await
     }
 
-    async fn rename_impl(&mut self, from: &Path, to: &Path) -> Result<(), Error> {
-        let f = if self.get_auxiliary().extensions().posix_rename {
-            // posix rename is guaranteed to be atomic
-            WriteEnd::send_posix_rename_request
-        } else {
-            WriteEnd::send_rename_request
-        };
-
-        self.linking_impl(from, to, f).await
-    }
-
     /// Renames a file or directory to a new name, replacing the original file if to already exists.
     ///
     /// This will not work if the new name is on a different mount point.
@@ -204,21 +193,32 @@ impl<'s> Fs<'s> {
         from: impl AsRef<Path>,
         to: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        self.rename_impl(from.as_ref(), to.as_ref()).await
-    }
+        async fn inner(this: &mut Fs<'_>, from: &Path, to: &Path) -> Result<(), Error> {
+            let f = if this.get_auxiliary().extensions().posix_rename {
+                // posix rename is guaranteed to be atomic
+                WriteEnd::send_posix_rename_request
+            } else {
+                WriteEnd::send_rename_request
+            };
 
-    async fn read_link_impl(&mut self, path: &Path) -> Result<PathBuf, Error> {
-        let path = self.concat_path_if_needed(path);
+            this.linking_impl(from, to, f).await
+        }
 
-        self.write_end
-            .send_request(|write_end, id| Ok(write_end.send_readlink_request(id, path)?.wait()))
-            .await
-            .map(Into::into)
+        inner(self, from.as_ref(), to.as_ref()).await
     }
 
     /// Reads a symbolic link, returning the file that the link points to.
     pub async fn read_link(&mut self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {
-        self.read_link_impl(path.as_ref()).await
+        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<PathBuf, Error> {
+            let path = this.concat_path_if_needed(path);
+
+            this.write_end
+                .send_request(|write_end, id| Ok(write_end.send_readlink_request(id, path)?.wait()))
+                .await
+                .map(Into::into)
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     async fn set_metadata_impl(&mut self, path: &Path, metadata: MetaData) -> Result<(), Error> {
@@ -242,18 +242,18 @@ impl<'s> Fs<'s> {
         self.set_metadata_impl(path.as_ref(), metadata).await
     }
 
-    async fn set_permissions_impl(&mut self, path: &Path, perm: Permissions) -> Result<(), Error> {
-        self.set_metadata_impl(path, MetaDataBuilder::new().permissions(perm).create())
-            .await
-    }
-
     /// Changes the permissions found on a file or a directory.
     pub async fn set_permissions(
         &mut self,
         path: impl AsRef<Path>,
         perm: Permissions,
     ) -> Result<(), Error> {
-        self.set_permissions_impl(path.as_ref(), perm).await
+        async fn inner(this: &mut Fs<'_>, path: &Path, perm: Permissions) -> Result<(), Error> {
+            this.set_metadata_impl(path, MetaDataBuilder::new().permissions(perm).create())
+                .await
+        }
+
+        inner(self, path.as_ref(), perm).await
     }
 
     async fn metadata_impl(
@@ -282,63 +282,52 @@ impl<'s> Fs<'s> {
             .await
     }
 
-    async fn read_impl(&mut self, path: &Path) -> Result<BytesMut, Error> {
-        let path = self.concat_path_if_needed(path);
-
-        let mut file = self.write_end.sftp().open(path).await?;
-        let max_read_len = file.max_read_len_impl();
-
-        let cap_to_reserve: usize = if let Some(len) = file.metadata().await?.len() {
-            // To detect EOF, we need to a little bit more then the length
-            // of the file.
-            len.saturating_add(300)
-                .try_into()
-                .unwrap_or(max_read_len as usize)
-        } else {
-            max_read_len as usize
-        };
-
-        let mut buffer = BytesMut::with_capacity(cap_to_reserve);
-
-        loop {
-            let cnt = buffer.len();
-
-            let n: u32 = if cnt <= cap_to_reserve {
-                // To detect EOF, we need to a little bit more then the
-                // length of the file.
-                (cap_to_reserve - cnt)
-                    .saturating_add(300)
-                    .try_into()
-                    .map(|n| min(n, max_read_len))
-                    .unwrap_or(max_read_len)
-            } else {
-                max_read_len
-            };
-            buffer.reserve(n.try_into().unwrap_or(usize::MAX));
-
-            if let Some(bytes) = file.read(n, buffer.split_off(cnt)).await? {
-                buffer.unsplit(bytes);
-            } else {
-                // Eof
-                break Ok(buffer);
-            }
-        }
-    }
-
     /// Reads the entire contents of a file into a bytes.
     pub async fn read(&mut self, path: impl AsRef<Path>) -> Result<BytesMut, Error> {
-        self.read_impl(path.as_ref()).await
-    }
+        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<BytesMut, Error> {
+            let path = this.concat_path_if_needed(path);
 
-    async fn write_impl(&mut self, path: &Path, content: &[u8]) -> Result<(), Error> {
-        let path = self.concat_path_if_needed(path);
+            let mut file = this.write_end.sftp().open(path).await?;
+            let max_read_len = file.max_read_len_impl();
 
-        self.write_end
-            .sftp()
-            .create(path)
-            .await?
-            .write_all(content)
-            .await
+            let cap_to_reserve: usize = if let Some(len) = file.metadata().await?.len() {
+                // To detect EOF, we need to a little bit more then the length
+                // of the file.
+                len.saturating_add(300)
+                    .try_into()
+                    .unwrap_or(max_read_len as usize)
+            } else {
+                max_read_len as usize
+            };
+
+            let mut buffer = BytesMut::with_capacity(cap_to_reserve);
+
+            loop {
+                let cnt = buffer.len();
+
+                let n: u32 = if cnt <= cap_to_reserve {
+                    // To detect EOF, we need to a little bit more then the
+                    // length of the file.
+                    (cap_to_reserve - cnt)
+                        .saturating_add(300)
+                        .try_into()
+                        .map(|n| min(n, max_read_len))
+                        .unwrap_or(max_read_len)
+                } else {
+                    max_read_len
+                };
+                buffer.reserve(n.try_into().unwrap_or(usize::MAX));
+
+                if let Some(bytes) = file.read(n, buffer.split_off(cnt)).await? {
+                    buffer.unsplit(bytes);
+                } else {
+                    // Eof
+                    break Ok(buffer);
+                }
+            }
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// Open/Create a file for writing and write the entire `contents` into it.
@@ -347,7 +336,18 @@ impl<'s> Fs<'s> {
         path: impl AsRef<Path>,
         content: impl AsRef<[u8]>,
     ) -> Result<(), Error> {
-        self.write_impl(path.as_ref(), content.as_ref()).await
+        async fn inner(this: &mut Fs<'_>, path: &Path, content: &[u8]) -> Result<(), Error> {
+            let path = this.concat_path_if_needed(path);
+
+            this.write_end
+                .sftp()
+                .create(path)
+                .await?
+                .write_all(content)
+                .await
+        }
+
+        inner(self, path.as_ref(), content.as_ref()).await
     }
 }
 
