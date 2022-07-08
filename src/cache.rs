@@ -2,6 +2,7 @@ use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd
 
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 
 #[derive(Debug)]
 pub(super) struct WriteEndWithCachedId<'s> {
@@ -105,15 +106,23 @@ impl<'s> WriteEndWithCachedId<'s> {
         let write_end = &mut self.inner;
 
         let future = f(write_end, id)?;
+        tokio::pin!(future);
 
-        // Requests is already added to write buffer, so wakeup
-        // the `flush_task`.
-        self.get_auxiliary().wakeup_flush_task();
+        async fn inner<R>(
+            this: &mut WriteEndWithCachedId<'_>,
+            future: Pin<&mut (dyn Future<Output = Result<(Id, R), Error>>)>,
+        ) -> Result<R, Error> {
+            // Requests is already added to write buffer, so wakeup
+            // the `flush_task`.
+            this.get_auxiliary().wakeup_flush_task();
 
-        let (id, ret) = self.cancel_if_task_failed(future).await?;
+            let (id, ret) = this.cancel_if_task_failed(future).await?;
 
-        self.cache_id_mut(id);
+            this.cache_id_mut(id);
 
-        Ok(ret)
+            Ok(ret)
+        }
+
+        inner(self, future).await
     }
 }
