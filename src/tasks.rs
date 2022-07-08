@@ -103,13 +103,15 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
             }
 
             if shutdown_stage.load(Ordering::Relaxed) == 2 {
-                read_end_notify.notify_one();
-
-                // Once shutdown_requested is sent, there will be no
-                // new requests.
+                // Read tasks have read in all responses, thus
+                // write task can exit now.
                 //
-                // Flushing here will ensure all pending requests is sent.
-                flush(&shared_data, writer.as_mut()).await?;
+                // Since sftp-server implementation from openssh-portable
+                // will quit once its cannot read anything, we have to keep
+                // the write task alive until all requests have been processed
+                // by sftp-server and each response is handled by the read task.
+
+                debug_assert_eq!(cnt, 0);
 
                 cancel_guard.disarm();
 
