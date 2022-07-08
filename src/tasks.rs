@@ -34,6 +34,8 @@ async fn flush<W: AsyncWrite>(
         // likely caused by the close of the read end.
         let n = NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
 
+        // buffers.advance returns false when there is nothing
+        // left to flush.
         if !buffers.advance(n) {
             break Ok(());
         }
