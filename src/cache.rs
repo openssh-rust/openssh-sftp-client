@@ -2,6 +2,7 @@ use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd
 
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 
 #[derive(Debug)]
 pub(super) struct WriteEndWithCachedId<'s> {
@@ -61,19 +62,29 @@ impl<'s> WriteEndWithCachedId<'s> {
         F: Future<Output = Result<R, E>>,
         E: Into<Error>,
     {
-        let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
-        let auxiliary = self.sftp.auxiliary();
+        async fn inner<R>(
+            this: &mut WriteEndWithCachedId<'_>,
+            future: Pin<&mut (dyn Future<Output = Result<R, Error>>)>,
+        ) -> Result<R, Error> {
+            let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
+            let auxiliary = this.sftp.auxiliary();
 
-        let cancel_token = &auxiliary.cancel_token;
+            let cancel_token = &auxiliary.cancel_token;
 
-        if cancel_token.is_cancelled() {
-            return cancel_err();
+            if cancel_token.is_cancelled() {
+                return cancel_err();
+            }
+
+            tokio::select! {
+                res = future => res,
+                _ = cancel_token.cancelled() => cancel_err(),
+            }
         }
 
-        tokio::select! {
-            res = future => res.map_err(Into::into),
-            _ = cancel_token.cancelled() => cancel_err(),
-        }
+        let future = async move { future.await.map_err(Into::into) };
+        tokio::pin!(future);
+
+        inner(self, future).await
     }
 
     pub(super) fn get_auxiliary(&self) -> &'s Auxiliary {
@@ -95,15 +106,23 @@ impl<'s> WriteEndWithCachedId<'s> {
         let write_end = &mut self.inner;
 
         let future = f(write_end, id)?;
+        tokio::pin!(future);
 
-        // Requests is already added to write buffer, so wakeup
-        // the `flush_task`.
-        self.get_auxiliary().wakeup_flush_task();
+        async fn inner<R>(
+            this: &mut WriteEndWithCachedId<'_>,
+            future: Pin<&mut (dyn Future<Output = Result<(Id, R), Error>>)>,
+        ) -> Result<R, Error> {
+            // Requests is already added to write buffer, so wakeup
+            // the `flush_task`.
+            this.get_auxiliary().wakeup_flush_task();
 
-        let (id, ret) = self.cancel_if_task_failed(future).await?;
+            let (id, ret) = this.cancel_if_task_failed(future).await?;
 
-        self.cache_id_mut(id);
+            this.cache_id_mut(id);
 
-        Ok(ret)
+            Ok(ret)
+        }
+
+        inner(self, future).await
     }
 }
