@@ -64,7 +64,7 @@ impl<'s> WriteEndWithCachedId<'s> {
     {
         async fn inner<R>(
             this: &mut WriteEndWithCachedId<'_>,
-            future: &mut (dyn Future<Output = Result<R, Error>> + Unpin),
+            future: Pin<&mut (dyn Future<Output = Result<R, Error>>)>,
         ) -> Result<R, Error> {
             let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
             let auxiliary = this.sftp.auxiliary();
@@ -84,7 +84,7 @@ impl<'s> WriteEndWithCachedId<'s> {
         let future = async move { future.await.map_err(Into::into) };
         tokio::pin!(future);
 
-        inner(self, &mut future).await
+        inner(self, future).await
     }
 
     pub(super) fn get_auxiliary(&self) -> &'s Auxiliary {
