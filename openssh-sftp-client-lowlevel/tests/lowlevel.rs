@@ -66,9 +66,13 @@ async fn test_connect() {
 }
 
 fn create_tmpdir() -> TempDir {
+    let path = get_path_for_tmp_files();
+
+    fs::create_dir_all(&path).unwrap();
+
     Builder::new()
         .prefix("lowlevel-test")
-        .tempdir_in(get_path_for_tmp_files())
+        .tempdir_in(path)
         .unwrap()
 }
 

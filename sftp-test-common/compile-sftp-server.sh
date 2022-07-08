@@ -4,6 +4,10 @@ set -euxo pipefail
 
 openssh="$(dirname "$(realpath "$0")")/openssh-portable"
 
+cd "$openssh"
+git submodule update --init --depth 1 --recursive
+cd -
+
 rsync -aHAX --inplace --sparse "$openssh/" .
 
 if [ ! -e configured ]; then

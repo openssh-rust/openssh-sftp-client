@@ -3,6 +3,7 @@ use openssh_sftp_client::*;
 use std::cmp::{max, min};
 use std::convert::identity;
 use std::convert::TryInto;
+use std::fs;
 use std::io::IoSlice;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
@@ -23,7 +24,15 @@ async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
 }
 
 fn gen_path(func: &str) -> PathBuf {
-    get_path_for_tmp_files().join(func)
+    let mut path = get_path_for_tmp_files().join("highlevel");
+    fs::create_dir_all(&path).unwrap();
+
+    path.push(func);
+
+    fs::remove_dir_all(&path).ok();
+    fs::remove_file(&path).ok();
+
+    path
 }
 
 #[tokio::test]
