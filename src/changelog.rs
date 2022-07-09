@@ -1,11 +1,14 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Added
 ///  - [`SftpOptions::write_end_buffer_size`]
 ///
 /// ## Changed
-///  - All types in `highlevel` now does not have generic parameter `W`
+///  - All types now does not have generic parameter `W`
 ///    except for `Sftp::new`
 ///
 /// ## Removed
@@ -18,10 +21,9 @@ use crate::*;
 ///  - `file::File::max_buffered_write`
 ///
 /// ## Moved
-///  - `lowlevel` is now moved to be another crate [openssh-sftp-client-lowlevel].
-///  - All items in `highlevel` is now moeved into root.
-#[doc(hidden)]
-pub mod unreleased {}
+///  - `lowlevel` is now moved to be another crate [openssh_sftp_client_lowlevel].
+///  - All items in `highlevel` is now moved into root.
+pub mod v_0_11_0_rc_1 {}
 
 /// ## Fixed
 ///  - Changelog of v0.10.2
