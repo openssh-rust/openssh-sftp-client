@@ -1,6 +1,14 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - [`file::File::copy_all_to`] to copy until EOF.
+///    This function is extracted from the old `copy_to`
+///    function.
+///
+/// ## Changed
+///  - [`file::File::copy_to`] now takes [`std::num::NonZeroU64`]
+///    instead of `u64`.
 #[doc(hidden)]
 pub mod unreleased {}
 

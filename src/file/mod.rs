@@ -9,6 +9,7 @@ use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::io::{self, IoSlice};
+use std::num::NonZeroU64;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -586,33 +587,7 @@ impl<'s> File<'s> {
         self.offset
     }
 
-    /// Copy `n` bytes of data from `self` to `dst`.
-    ///
-    /// The server MUST copy the data exactly as if the data is copied
-    /// using a series of read and write.
-    ///
-    /// If `n` is `0`, this imples data should be read until EOF is
-    /// encountered.
-    ///
-    /// There are no protocol restictions on this operation; however, the
-    /// server MUST ensure that the user does not exceed quota, etc.  The
-    /// server is, as always, free to complete this operation out of order if
-    /// it is too large to complete immediately, or to refuse a request that
-    /// is too large.
-    ///
-    /// After a successful function call, the offset of `self` and `dst`
-    /// are increased by `n`.
-    ///
-    /// # Precondition
-    ///
-    /// Requires extension copy_data.
-    /// For [openssh-portable], this is available from V_9_0_P1.
-    ///
-    /// If the extension is not supported by the server, this function
-    /// would fail with [`Error::UnsupportedExtension`].
-    ///
-    /// [openssh-portable]: https://github.com/openssh/openssh-portable
-    pub async fn copy_to(&mut self, dst: &mut Self, n: u64) -> Result<(), Error> {
+    async fn copy_to_impl(&mut self, dst: &mut Self, n: u64) -> Result<(), Error> {
         if !self.inner.get_auxiliary().extensions().copy_data {
             return Err(Error::UnsupportedExtension(&"copy_data"));
         }
@@ -644,6 +619,60 @@ impl<'s> File<'s> {
         Pin::new(dst).start_seek(io::SeekFrom::Current(n.try_into().unwrap()))?;
 
         Ok(())
+    }
+
+    /// Copy `n` bytes of data from `self` to `dst`.
+    ///
+    /// The server MUST copy the data exactly as if the data is copied
+    /// using a series of read and write.
+    ///
+    /// There are no protocol restictions on this operation; however, the
+    /// server MUST ensure that the user does not exceed quota, etc.  The
+    /// server is, as always, free to complete this operation out of order if
+    /// it is too large to complete immediately, or to refuse a request that
+    /// is too large.
+    ///
+    /// After a successful function call, the offset of `self` and `dst`
+    /// are increased by `n`.
+    ///
+    /// # Precondition
+    ///
+    /// Requires extension copy_data.
+    /// For [openssh-portable], this is available from V_9_0_P1.
+    ///
+    /// If the extension is not supported by the server, this function
+    /// would fail with [`Error::UnsupportedExtension`].
+    ///
+    /// [openssh-portable]: https://github.com/openssh/openssh-portable
+    pub async fn copy_to(&mut self, dst: &mut Self, n: NonZeroU64) -> Result<(), Error> {
+        self.copy_to_impl(dst, n.get()).await
+    }
+
+    /// Copy data from `self` to `dst` until EOF is encountered.
+    ///
+    /// The server MUST copy the data exactly as if the data is copied
+    /// using a series of read and write.
+    ///
+    /// There are no protocol restictions on this operation; however, the
+    /// server MUST ensure that the user does not exceed quota, etc.  The
+    /// server is, as always, free to complete this operation out of order if
+    /// it is too large to complete immediately, or to refuse a request that
+    /// is too large.
+    ///
+    /// After a successful function call, the offset of `self` and `dst`
+    /// are unchanged.
+    ///
+    /// # Precondition
+    ///
+    /// Requires extension copy_data.
+    /// For [openssh-portable], this is available from V_9_0_P1.
+    ///
+    /// If the extension is not supported by the server, this function
+    /// would fail with [`Error::UnsupportedExtension`].
+    ///
+    /// [openssh-portable]: https://github.com/openssh/openssh-portable
+    pub async fn copy_all_to(&mut self, dst: &mut Self) -> Result<(), Error> {
+        self.copy_to_impl(dst, 0).await
     }
 }
 
