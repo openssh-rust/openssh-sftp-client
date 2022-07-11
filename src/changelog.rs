@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Fixed
+///  - Changelog of v0.11.0-rc.1
 /// ## Added
 ///  - [`file::File::copy_all_to`] to copy until EOF.
 ///    This function is extracted from the old `copy_to`
