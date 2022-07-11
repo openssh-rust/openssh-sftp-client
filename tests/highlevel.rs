@@ -5,7 +5,7 @@ use std::convert::identity;
 use std::convert::TryInto;
 use std::fs;
 use std::io::IoSlice;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
 use std::stringify;
 
@@ -551,7 +551,10 @@ async fn sftp_file_copy_to() {
             .unwrap();
 
         file0
-            .copy_to(&mut file1, content.len().try_into().unwrap())
+            .copy_to(
+                &mut file1,
+                NonZeroU64::new(content.len().try_into().unwrap()).unwrap(),
+            )
             .await
             .unwrap();
 
