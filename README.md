@@ -8,7 +8,7 @@
 
 [![docs](https://docs.rs/openssh-sftp-client/badge.svg)](https://docs.rs/openssh-sftp-client)
 
-openssh sftp client, implements [sftp v3] accodring to
+openssh-sftp-client, implements [sftp v3] accodring to
 [`openssh-portable/sftp-client.c`] in rust using `tokio` and `serde`.
 
 It exposes highlevel `async` APIs that models closely after `std::fs` that are
