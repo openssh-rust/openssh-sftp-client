@@ -139,7 +139,7 @@ impl<'s> TokioCompatFile<'s> {
         self.into_inner().close().await
     }
 
-    /// This function is a lower-level call.
+    /// This function is a low-level call.
     ///
     /// It needs to be paired with the `consume` method or
     /// [`TokioCompatFile::consume_and_return_buffer`] to function properly.
@@ -183,7 +183,7 @@ impl<'s> TokioCompatFile<'s> {
 
     /// * `amt` - Amount of data to read into the buffer.
     ///
-    /// This function is a lower-level call.
+    /// This function is a low-level call.
     ///
     /// It needs to be paired with the `consume` method or
     /// [`TokioCompatFile::consume_and_return_buffer`] to function properly.
@@ -271,7 +271,7 @@ impl<'s> TokioCompatFile<'s> {
 
     /// * `amt` - Amount of data to read into the buffer.
     ///
-    /// This function is a lower-level call.
+    /// This function is a low-level call.
     ///
     /// It needs to be paired with the `consume` method or
     /// [`TokioCompatFile::consume_and_return_buffer`] to function properly.
