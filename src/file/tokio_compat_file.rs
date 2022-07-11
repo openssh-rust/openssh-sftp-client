@@ -73,7 +73,8 @@ pub struct TokioCompatFile<'s> {
 }
 
 impl<'s> TokioCompatFile<'s> {
-    /// Create a [`TokioCompatFile`].
+    /// Create a [`TokioCompatFile`] using [`DEFAULT_BUFLEN`] and
+    /// [`DEFAULT_MAX_BUFLEN`].
     pub fn new(inner: File<'s>) -> Self {
         Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
     }
