@@ -6,6 +6,7 @@ pub mod unreleased {}
 
 /// ## Added
 ///  - [`SftpOptions::write_end_buffer_size`]
+///  - [`SftpOptions::read_end_buffer_size`]
 ///
 /// ## Changed
 ///  - All types now does not have generic parameter `W`
