@@ -144,6 +144,16 @@ impl<'s> TokioCompatFile<'s> {
         self.buffer.capacity()
     }
 
+    /// Reserve the capacity of the internal buffer for at least `cap`
+    /// bytes.
+    pub fn reserve(&mut self, new_cap: usize) {
+        let curr_cap = self.capacity();
+
+        if curr_cap < new_cap {
+            self.buffer.reserve(new_cap - curr_cap);
+        }
+    }
+
     /// This function is a low-level call.
     ///
     /// It needs to be paired with the `consume` method or
