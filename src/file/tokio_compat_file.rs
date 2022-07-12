@@ -139,6 +139,11 @@ impl<'s> TokioCompatFile<'s> {
         self.into_inner().close().await
     }
 
+    /// Return capacity of the internal buffer
+    pub fn capacity(&self) -> usize {
+        self.buffer.capacity()
+    }
+
     /// This function is a low-level call.
     ///
     /// It needs to be paired with the `consume` method or
