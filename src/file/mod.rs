@@ -19,7 +19,7 @@ use tokio::io::AsyncSeek;
 use tokio_io_utility::IoSliceExt;
 
 mod tokio_compat_file;
-pub use tokio_compat_file::{TokioCompatFile, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN};
+pub use tokio_compat_file::{TokioCompatFile, DEFAULT_BUFLEN};
 
 mod utility;
 use utility::{take_bytes, take_io_slices};

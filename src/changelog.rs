@@ -3,14 +3,23 @@ use crate::*;
 
 /// ## Fixed
 ///  - Changelog of v0.11.0-rc.1
+///
 /// ## Added
 ///  - [`file::File::copy_all_to`] to copy until EOF.
 ///    This function is extracted from the old `copy_to`
 ///    function.
+///  - [`file::TokioCompatFile::capacity`]
+///  - [`file::TokioCompatFile::reserve`]
+///  - [`file::TokioCompatFile::shrink_to`]
 ///
 /// ## Changed
 ///  - [`file::File::copy_to`] now takes [`std::num::NonZeroU64`]
 ///    instead of `u64`.
+///  - [`file::TokioCompatFile::with_capacity`] does not take
+///    `max_buffer_len` anymore.
+///
+/// ## Removed
+///  - `file::DEFAULT_MAX_BUFLEN`
 #[doc(hidden)]
 pub mod unreleased {}
 
