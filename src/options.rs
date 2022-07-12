@@ -101,8 +101,9 @@ impl SftpOptions {
             .unwrap_or(100)
     }
 
-    /// Set the buffer size for write_end.
-    /// It is used to store [`bytes::Bytes`].
+    /// Set the init buffer size for write_end.
+    /// It is used to store [`bytes::Bytes`] and it will be resized
+    /// to fit the pending requests.
     ///
     /// It is set to 100 by default.
     #[must_use]

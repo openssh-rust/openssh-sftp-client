@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Changed
+///  - Improve documentation for [`SftpOptions::write_end_buffer_size`]
 #[doc(hidden)]
 pub mod unreleased {}
 
