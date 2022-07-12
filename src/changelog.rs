@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Fixed
 ///  - Changelog of v0.11.0-rc.1
 ///
@@ -20,8 +23,7 @@ use crate::*;
 ///
 /// ## Removed
 ///  - `file::DEFAULT_MAX_BUFLEN`
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_11_0_rc_2 {}
 
 /// ## Added
 ///  - [`SftpOptions::write_end_buffer_size`]
