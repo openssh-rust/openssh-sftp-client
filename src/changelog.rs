@@ -10,6 +10,7 @@ use crate::*;
 ///    function.
 ///  - [`file::TokioCompatFile::capacity`]
 ///  - [`file::TokioCompatFile::reserve`]
+///  - [`file::TokioCompatFile::shrink_to`]
 ///
 /// ## Changed
 ///  - [`file::File::copy_to`] now takes [`std::num::NonZeroU64`]

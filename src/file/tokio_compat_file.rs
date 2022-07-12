@@ -140,6 +140,9 @@ impl<'s> TokioCompatFile<'s> {
     }
 
     /// Return capacity of the internal buffer
+    ///
+    /// Note that if there are pending requests, then the actual
+    /// capacity might be more than the returned value.
     pub fn capacity(&self) -> usize {
         self.buffer.capacity()
     }
@@ -151,6 +154,16 @@ impl<'s> TokioCompatFile<'s> {
 
         if curr_cap < new_cap {
             self.buffer.reserve(new_cap - curr_cap);
+        }
+    }
+
+    /// Shrink the capacity of the internal buffer to at most `cap`
+    /// bytes.
+    pub fn shrink_to(&mut self, new_cap: usize) {
+        let curr_cap = self.capacity();
+
+        if curr_cap > new_cap {
+            self.buffer = BytesMut::with_capacity(new_cap);
         }
     }
 
