@@ -15,6 +15,11 @@ use crate::*;
 /// ## Changed
 ///  - [`file::File::copy_to`] now takes [`std::num::NonZeroU64`]
 ///    instead of `u64`.
+///  - [`file::TokioCompatFile::with_capacity`] does not take
+///    `max_buffer_len` anymore.
+///
+/// ## Removed
+///  - `file::DEFAULT_MAX_BUFLEN`
 #[doc(hidden)]
 pub mod unreleased {}
 

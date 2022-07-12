@@ -23,10 +23,6 @@ use derive_destructure2::destructure;
 /// The default length of the buffer used in [`TokioCompatFile`].
 pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };
 
-/// The default maximum length of the buffer that can be created in
-/// [`AsyncRead`] implementation of [`TokioCompatFile`].
-pub const DEFAULT_MAX_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096 * 10) };
-
 fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     match sftp_err {
         Error::IOError(io_error) => io_error,
@@ -62,7 +58,6 @@ pub struct TokioCompatFile<'s> {
     inner: File<'s>,
 
     buffer_len: NonZeroUsize,
-    max_buffer_len: NonZeroUsize,
     buffer: BytesMut,
 
     read_future: Option<AwaitableDataFuture<Buffer>>,
@@ -73,35 +68,21 @@ pub struct TokioCompatFile<'s> {
 }
 
 impl<'s> TokioCompatFile<'s> {
-    /// Create a [`TokioCompatFile`] using [`DEFAULT_BUFLEN`] and
-    /// [`DEFAULT_MAX_BUFLEN`].
+    /// Create a [`TokioCompatFile`] using [`DEFAULT_BUFLEN`].
     pub fn new(inner: File<'s>) -> Self {
-        Self::with_capacity(inner, DEFAULT_BUFLEN, DEFAULT_MAX_BUFLEN)
+        Self::with_capacity(inner, DEFAULT_BUFLEN)
     }
 
     /// Create a [`TokioCompatFile`].
     ///
     /// * `buffer_len` - buffer len to be used in [`AsyncBufRead`]
     ///   and the minimum length to read in [`AsyncRead`].
-    /// * `max_buffer_len` - maximum len to be used in [`AsyncRead`].
-    ///
-    /// If `max_buffer_len` is less than `buffer_len`, then it will be set to
-    /// `buffer_len`.
-    pub fn with_capacity(
-        inner: File<'s>,
-        buffer_len: NonZeroUsize,
-        mut max_buffer_len: NonZeroUsize,
-    ) -> Self {
-        if max_buffer_len < buffer_len {
-            max_buffer_len = buffer_len;
-        }
-
+    pub fn with_capacity(inner: File<'s>, buffer_len: NonZeroUsize) -> Self {
         Self {
             inner,
 
             buffer: BytesMut::new(),
             buffer_len,
-            max_buffer_len,
 
             read_future: None,
             read_cancellation_future: BoxedWaitForCancellationFuture::new(),
@@ -348,7 +329,7 @@ impl<'s> From<TokioCompatFile<'s>> for File<'s> {
 /// Reads, writes, and seeks can be performed independently.
 impl Clone for TokioCompatFile<'_> {
     fn clone(&self) -> Self {
-        Self::with_capacity(self.inner.clone(), self.buffer_len, self.max_buffer_len)
+        Self::with_capacity(self.inner.clone(), self.buffer_len)
     }
 }
 
@@ -436,7 +417,6 @@ impl AsyncRead for TokioCompatFile<'_> {
 
         if self.buffer.is_empty() {
             let n = max(remaining, DEFAULT_BUFLEN.get());
-            let n = min(n, self.max_buffer_len.get());
             let n = n.try_into().unwrap_or(u32::MAX);
             let n = NonZeroU32::new(n).unwrap();
 
