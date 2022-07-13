@@ -2,7 +2,9 @@
 use crate::*;
 
 /// ## Changed
-///  - Improve documentation for [`SftpOptions::write_end_buffer_size`]
+///  - Rename `SftpOptions::write_end_buffer_size` to
+///    [`SftpOptions::requests_buffer_size`] and improve its
+///    documentation.
 #[doc(hidden)]
 pub mod unreleased {}
 
@@ -28,7 +30,7 @@ pub mod unreleased {}
 pub mod v_0_11_0_rc_2 {}
 
 /// ## Added
-///  - [`SftpOptions::write_end_buffer_size`]
+///  - `SftpOptions::write_end_buffer_size`
 ///  - [`SftpOptions::read_end_buffer_size`]
 ///
 /// ## Changed

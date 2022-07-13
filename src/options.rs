@@ -107,7 +107,7 @@ impl SftpOptions {
     ///
     /// It is set to 100 by default.
     #[must_use]
-    pub const fn write_end_buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
+    pub const fn requests_buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {
         self.write_end_buffer_size = Some(buffer_size);
         self
     }
