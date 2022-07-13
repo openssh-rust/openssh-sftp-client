@@ -1,5 +1,8 @@
-use std::num::{NonZeroU16, NonZeroU32, NonZeroUsize};
+use std::num::{NonZeroU16, NonZeroUsize};
 use std::time::Duration;
+
+#[cfg(feature = "ci-tests")]
+use std::num::NonZeroU32;
 
 /// Options when creating [`super::Sftp`].
 #[derive(Debug, Copy, Clone, Default)]
@@ -7,9 +10,12 @@ pub struct SftpOptions {
     read_end_buffer_size: Option<NonZeroUsize>,
     write_end_buffer_size: Option<NonZeroUsize>,
     flush_interval: Option<Duration>,
-    max_read_len: Option<NonZeroU32>,
-    max_write_len: Option<NonZeroU32>,
     max_pending_requests: Option<NonZeroU16>,
+
+    #[cfg(feature = "ci-tests")]
+    max_read_len: Option<NonZeroU32>,
+    #[cfg(feature = "ci-tests")]
+    max_write_len: Option<NonZeroU32>,
 }
 
 impl SftpOptions {
@@ -19,9 +25,12 @@ impl SftpOptions {
             read_end_buffer_size: None,
             write_end_buffer_size: None,
             flush_interval: None,
-            max_read_len: None,
-            max_write_len: None,
             max_pending_requests: None,
+
+            #[cfg(feature = "ci-tests")]
+            max_read_len: None,
+            #[cfg(feature = "ci-tests")]
+            max_write_len: None,
         }
     }
 
@@ -53,34 +62,6 @@ impl SftpOptions {
     pub(super) fn get_flush_interval(&self) -> Duration {
         self.flush_interval
             .unwrap_or_else(|| Duration::from_micros(500))
-    }
-
-    /// Set `max_read_len`.
-    ///
-    /// It can be used to reduce `max_read_len`, but cannot be used
-    /// to increase `max_read_len`.
-    #[must_use]
-    pub const fn max_read_len(mut self, max_read_len: NonZeroU32) -> Self {
-        self.max_read_len = Some(max_read_len);
-        self
-    }
-
-    pub(super) fn get_max_read_len(&self) -> Option<u32> {
-        self.max_read_len.map(NonZeroU32::get)
-    }
-
-    /// Set `max_write_len`.
-    ///
-    /// It can be used to reduce `max_write_len`, but cannot be used
-    /// to increase `max_write_len`.
-    #[must_use]
-    pub const fn max_write_len(mut self, max_write_len: NonZeroU32) -> Self {
-        self.max_write_len = Some(max_write_len);
-        self
-    }
-
-    pub(super) fn get_max_write_len(&self) -> Option<u32> {
-        self.max_write_len.map(NonZeroU32::get)
     }
 
     /// Set `max_pending_requests`.
@@ -131,5 +112,47 @@ impl SftpOptions {
     pub(super) fn get_read_end_buffer_size(&self) -> NonZeroUsize {
         self.read_end_buffer_size
             .unwrap_or_else(|| NonZeroUsize::new(1024).unwrap())
+    }
+}
+
+#[cfg(feature = "ci-tests")]
+impl SftpOptions {
+    /// Set `max_read_len`.
+    ///
+    /// It can be used to reduce `max_read_len`, but cannot be used
+    /// to increase `max_read_len`.
+    #[must_use]
+    pub const fn max_read_len(mut self, max_read_len: NonZeroU32) -> Self {
+        self.max_read_len = Some(max_read_len);
+        self
+    }
+
+    pub(super) fn get_max_read_len(&self) -> Option<u32> {
+        self.max_read_len.map(NonZeroU32::get)
+    }
+
+    /// Set `max_write_len`.
+    ///
+    /// It can be used to reduce `max_write_len`, but cannot be used
+    /// to increase `max_write_len`.
+    #[must_use]
+    pub const fn max_write_len(mut self, max_write_len: NonZeroU32) -> Self {
+        self.max_write_len = Some(max_write_len);
+        self
+    }
+
+    pub(super) fn get_max_write_len(&self) -> Option<u32> {
+        self.max_write_len.map(NonZeroU32::get)
+    }
+}
+
+#[cfg(not(feature = "ci-tests"))]
+impl SftpOptions {
+    pub(super) const fn get_max_read_len(&self) -> Option<u32> {
+        None
+    }
+
+    pub(super) const fn get_max_write_len(&self) -> Option<u32> {
+        None
     }
 }

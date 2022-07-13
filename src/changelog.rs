@@ -8,6 +8,10 @@ use crate::*;
 ///  - Rename `SftpOptions::read_end_buffer_size` to
 ///    [`SftpOptions::responses_buffer_size`] and improve its
 ///    documentation.
+///
+/// ## Removed
+///  - `SftpOptions::max_read_len`
+///  - `SftpOptions::max_write_len`
 #[doc(hidden)]
 pub mod unreleased {}
 
