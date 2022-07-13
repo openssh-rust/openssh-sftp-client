@@ -4,3 +4,15 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+  - package-ecosystem: "cargo"
+    directory: "/openssh-sftp-error"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "cargo"
+    directory: "/openssh-sftp-client-lowlevel"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "cargo"
+    directory: "/sftp-test-common"
+    schedule:
+      interval: "daily"
