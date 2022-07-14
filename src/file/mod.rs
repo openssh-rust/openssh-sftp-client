@@ -231,16 +231,22 @@ impl<'s> File<'s> {
         (&mut self.inner.write_end, Cow::Borrowed(&self.inner.handle))
     }
 
+    fn check_for_writable(&self) -> Result<(), Error> {
+        if !self.is_writable {
+            Err(io::Error::new(io::ErrorKind::Other, "This file is not opened for writing").into())
+        } else {
+            Ok(())
+        }
+    }
+
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
         Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
-        if !self.is_writable {
-            Err(io::Error::new(io::ErrorKind::Other, "This file is not opened for writing").into())
-        } else {
-            self.inner.send_request(f).await
-        }
+        self.check_for_writable()?;
+
+        self.inner.send_request(f).await
     }
 
     async fn send_readable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
@@ -592,11 +598,7 @@ impl<'s> File<'s> {
             return Err(Error::UnsupportedExtension(&"copy_data"));
         }
 
-        if !dst.is_writable {
-            return Err(
-                io::Error::new(io::ErrorKind::Other, "dst is not opened for writing").into(),
-            );
-        }
+        dst.check_for_writable()?;
 
         let offset = self.offset;
 
