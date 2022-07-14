@@ -4,6 +4,9 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// Nothing has changed from [`v_0_11_0_rc_3`].
+pub mod v_0_11_0 {}
+
 /// ## Changed
 ///  - Rename `SftpOptions::write_end_buffer_size` to
 ///    [`SftpOptions::requests_buffer_size`] and improve its
