@@ -249,16 +249,22 @@ impl<'s> File<'s> {
         self.inner.send_request(f).await
     }
 
+    fn check_for_readable(&self) -> Result<(), Error> {
+        if !self.is_readable {
+            Err(io::Error::new(io::ErrorKind::Other, "This file is not opened for reading").into())
+        } else {
+            Ok(())
+        }
+    }
+
     async fn send_readable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
         Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
         F: Future<Output = Result<(Id, R), Error>> + 'static,
     {
-        if !self.is_readable {
-            Err(io::Error::new(io::ErrorKind::Other, "This file is not opened for reading").into())
-        } else {
-            self.inner.send_request(f).await
-        }
+        self.check_for_readable()?;
+
+        self.inner.send_request(f).await
     }
 
     /// Close the [`File`], send the close request
