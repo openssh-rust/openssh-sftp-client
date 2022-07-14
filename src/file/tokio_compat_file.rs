@@ -215,13 +215,7 @@ impl<'s> TokioCompatFile<'s> {
         // one mutable borrow to self.
         let this = &mut *self;
 
-        if !this.is_readable {
-            return Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "This file is not opened for reading",
-            )
-            .into()));
-        }
+        this.check_for_readable()?;
 
         let max_read_len = this.max_read_len_impl();
         let amt = min(amt.get(), max_read_len);
@@ -403,12 +397,7 @@ impl AsyncRead for TokioCompatFile<'_> {
         cx: &mut Context<'_>,
         read_buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        if !self.is_readable {
-            return Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "This file is not opened for reading",
-            )));
-        }
+        self.check_for_readable_io_err()?;
 
         let remaining = read_buf.remaining();
         if remaining == 0 {
@@ -461,12 +450,7 @@ impl AsyncWrite for TokioCompatFile<'_> {
         _cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        if !self.is_writable {
-            return Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "This file is not opened for writing",
-            )));
-        }
+        self.check_for_writable_io_err()?;
 
         if buf.is_empty() {
             return Poll::Ready(Ok(0));
@@ -509,12 +493,7 @@ impl AsyncWrite for TokioCompatFile<'_> {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if !self.is_writable {
-            return Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "This file does not support writing",
-            )));
-        }
+        self.check_for_writable_io_err()?;
 
         let this = &mut *self;
 
@@ -563,12 +542,7 @@ impl AsyncWrite for TokioCompatFile<'_> {
         _cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        if !self.is_writable {
-            return Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "This file does not support writing",
-            )));
-        }
+        self.check_for_writable_io_err()?;
 
         if bufs.is_empty() {
             return Poll::Ready(Ok(0));

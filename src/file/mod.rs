@@ -231,12 +231,20 @@ impl<'s> File<'s> {
         (&mut self.inner.write_end, Cow::Borrowed(&self.inner.handle))
     }
 
-    fn check_for_writable(&self) -> Result<(), Error> {
+    fn check_for_writable_io_err(&self) -> Result<(), io::Error> {
         if !self.is_writable {
-            Err(io::Error::new(io::ErrorKind::Other, "This file is not opened for writing").into())
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "This file is not opened for writing",
+            ))
         } else {
             Ok(())
         }
+    }
+
+    fn check_for_writable(&self) -> Result<(), Error> {
+        self.check_for_writable_io_err()?;
+        Ok(())
     }
 
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
@@ -249,12 +257,20 @@ impl<'s> File<'s> {
         self.inner.send_request(f).await
     }
 
-    fn check_for_readable(&self) -> Result<(), Error> {
+    fn check_for_readable_io_err(&self) -> Result<(), io::Error> {
         if !self.is_readable {
-            Err(io::Error::new(io::ErrorKind::Other, "This file is not opened for reading").into())
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "This file is not opened for reading",
+            ))
         } else {
             Ok(())
         }
+    }
+
+    fn check_for_readable(&self) -> Result<(), Error> {
+        self.check_for_readable_io_err()?;
+        Ok(())
     }
 
     async fn send_readable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
