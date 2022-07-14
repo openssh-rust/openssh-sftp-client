@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Changed
 ///  - Rename `SftpOptions::write_end_buffer_size` to
 ///    [`SftpOptions::requests_buffer_size`] and improve its
@@ -12,8 +15,7 @@ use crate::*;
 /// ## Removed
 ///  - `SftpOptions::max_read_len`
 ///  - `SftpOptions::max_write_len`
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_11_0_rc_3 {}
 
 /// ## Fixed
 ///  - Changelog of v0.11.0-rc.1
