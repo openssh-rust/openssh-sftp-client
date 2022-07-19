@@ -5,6 +5,12 @@ use crate::*;
 pub mod unreleased {}
 
 /// Nothing has changed from [`v_0_11_0_rc_3`].
+///
+/// ## Other changes
+///  - Dependency [`bytes`] bump to v1.2.0 for its optimizations.
+pub mod v_0_11_1 {}
+
+/// Nothing has changed from [`v_0_11_0_rc_3`].
 pub mod v_0_11_0 {}
 
 /// ## Changed
