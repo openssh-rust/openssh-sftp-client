@@ -8,7 +8,9 @@ pub trait Queue {
     fn get_pusher(&self) -> Self::Pusher;
 
     /// Push one `bytes`.
-    fn push(&self, bytes: Bytes);
+    fn push(&self, bytes: Bytes) {
+        self.get_pusher().push(bytes);
+    }
 }
 
 pub trait QueuePusher {
