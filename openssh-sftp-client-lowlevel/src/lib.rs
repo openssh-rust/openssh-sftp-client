@@ -24,6 +24,7 @@ mod awaitable_responses;
 mod awaitables;
 mod buffer;
 mod connection;
+mod queue;
 mod read_end;
 mod reader_buffered;
 mod write_end;
@@ -75,3 +76,5 @@ pub use awaitables::{
     AwaitableNameEntries, AwaitableNameEntriesFuture, AwaitableNameFuture, AwaitableStatus,
     AwaitableStatusFuture, Data,
 };
+
+pub use queue::{Queue, QueuePusher};
