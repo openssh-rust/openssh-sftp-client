@@ -2,6 +2,13 @@
 use crate::*;
 
 #[doc(hidden)]
+/// ## Added
+///  - new trait `Queue`
+///
+/// ## Changed
+///  - `connect` now takes `queue` instead of `write_end_buffer_size`
+///  - `ReadEnd`, `WriteEnd` and `SharedData` now takes an additional generic
+///    parameter `Q`.
 pub mod unreleased {}
 
 /// This is the first release!
