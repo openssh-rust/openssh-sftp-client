@@ -86,6 +86,9 @@ impl SftpOptions {
     /// It is used to store [`bytes::Bytes`] and it will be resized
     /// to fit the pending requests.
     ///
+    /// NOTE that sftp uses double buffer for efficient flushing
+    /// without blocking the writers.
+    ///
     /// It is set to 100 by default.
     #[must_use]
     pub const fn requests_buffer_size(mut self, buffer_size: NonZeroUsize) -> Self {

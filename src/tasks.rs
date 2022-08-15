@@ -7,39 +7,39 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use bytes::Bytes;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::pin;
 use tokio::sync::oneshot;
 use tokio::task::{spawn, JoinHandle};
 use tokio::time;
+use tokio_io_utility::{init_maybeuninit_io_slices_mut, write_vectored_all, ReusableIoSlices};
 
 async fn flush<W: AsyncWrite>(
     shared_data: &SharedData,
     mut writer: Pin<&mut W>,
+    buffer: &mut Vec<Bytes>,
+    reusable_io_slices: &mut ReusableIoSlices,
 ) -> Result<(), Error> {
-    let mut buffers = shared_data.get_buffers().await;
+    shared_data.queue().swap(buffer);
 
-    if buffers.is_empty() {
-        return Ok(());
+    let mut n = 0;
+
+    while n < buffer.len() {
+        let uninit_io_slices = reusable_io_slices.get_mut();
+
+        let io_slices = init_maybeuninit_io_slices_mut(
+            uninit_io_slices,
+            buffer[n..].iter().map(|bytes| io::IoSlice::new(bytes)),
+        );
+
+        write_vectored_all(&mut writer, io_slices).await?;
+        n += io_slices.len();
     }
 
-    loop {
-        let n = writer
-            .as_mut()
-            .write_vectored(buffers.get_io_slices())
-            .await?;
+    buffer.clear();
 
-        // Since `MpScBytesQueue::get_buffers` guarantees that every `IoSlice`
-        // returned must be non-empty, having `0` bytes written is an error
-        // likely caused by the close of the read end.
-        let n = NonZeroUsize::new(n).ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, ""))?;
-
-        // buffers.advance returns false when there is nothing
-        // left to flush.
-        if !buffers.advance(n) {
-            break Ok(());
-        }
-    }
+    Ok(())
 }
 
 /// Return the size after substraction.
@@ -54,6 +54,7 @@ fn atomic_sub_assign(atomic: &AtomicUsize, val: usize) -> usize {
 pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
     writer: W,
     shared_data: SharedData,
+    write_end_buffer_size: NonZeroUsize,
     flush_interval: Duration,
 ) -> JoinHandle<Result<(), Error>> {
     spawn(async move {
@@ -70,6 +71,9 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         let max_pending_requests = auxiliary.max_pending_requests();
 
         let cancel_guard = auxiliary.cancel_token.clone().drop_guard();
+
+        let mut backup_queue_buffer = Vec::with_capacity(write_end_buffer_size.get());
+        let mut reusable_io_slices = ReusableIoSlices::new(write_end_buffer_size);
 
         // The loop can only return `Err`
         loop {
@@ -93,7 +97,13 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
 
                 // Wait until another thread is done or cancelled flushing
                 // and try flush it again just in case the flushing is cancelled
-                flush(&shared_data, writer.as_mut()).await?;
+                flush(
+                    &shared_data,
+                    writer.as_mut(),
+                    &mut backup_queue_buffer,
+                    &mut reusable_io_slices,
+                )
+                .await?;
 
                 cnt = atomic_sub_assign(pending_requests, cnt);
 
