@@ -25,19 +25,21 @@ use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
 /// The ReadEnd for the lowlevel API.
 #[derive(Debug)]
 #[pin_project]
-pub struct ReadEnd<R, Buffer, Auxiliary = ()> {
+pub struct ReadEnd<R, Buffer, Q, Auxiliary = ()> {
     #[pin]
     reader: ReaderBuffered<R>,
-    shared_data: SharedData<Buffer, Auxiliary>,
+    shared_data: SharedData<Buffer, Q, Auxiliary>,
 }
 
-impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
-    ReadEnd<R, Buffer, Auxiliary>
+impl<R, Buffer, Q, Auxiliary> ReadEnd<R, Buffer, Q, Auxiliary>
+where
+    R: AsyncRead,
+    Buffer: ToBuffer + 'static + Send + Sync,
 {
     pub(crate) fn new(
         reader: R,
         reader_buffer_len: NonZeroUsize,
-        shared_data: SharedData<Buffer, Auxiliary>,
+        shared_data: SharedData<Buffer, Q, Auxiliary>,
     ) -> Self {
         Self {
             reader: ReaderBuffered::new(reader, reader_buffer_len),
@@ -281,10 +283,11 @@ impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
     }
 }
 
-impl<R: AsyncRead, Buffer: ToBuffer + 'static + Send + Sync, Auxiliary>
-    ReadEnd<R, Buffer, Auxiliary>
+impl<R, Buffer, Q, Auxiliary> ReadEnd<R, Buffer, Q, Auxiliary>
 where
     Self: Unpin,
+    R: AsyncRead,
+    Buffer: ToBuffer + 'static + Send + Sync,
 {
     /// Must be called once right after [`super::connect`]
     /// to receive the hello message from the server.
@@ -323,9 +326,9 @@ where
     }
 }
 
-impl<R, Buffer, Auxiliary> ReadEnd<R, Buffer, Auxiliary> {
+impl<R, Buffer, Q, Auxiliary> ReadEnd<R, Buffer, Q, Auxiliary> {
     /// Return the [`SharedData`] held by [`ReadEnd`].
-    pub fn get_shared_data(&self) -> &SharedData<Buffer, Auxiliary> {
+    pub fn get_shared_data(&self) -> &SharedData<Buffer, Q, Auxiliary> {
         &self.shared_data
     }
 }

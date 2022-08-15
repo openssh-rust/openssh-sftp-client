@@ -23,20 +23,20 @@ use bytes::Bytes;
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
-pub struct WriteEnd<Buffer, Auxiliary = ()> {
+pub struct WriteEnd<Buffer, Q, Auxiliary = ()> {
     serializer: Serializer<WriteBuffer>,
-    shared_data: SharedData<Buffer, Auxiliary>,
+    shared_data: SharedData<Buffer, Q, Auxiliary>,
 }
 
-impl<Buffer, Auxiliary> Clone for WriteEnd<Buffer, Auxiliary> {
+impl<Buffer, Q, Auxiliary> Clone for WriteEnd<Buffer, Q, Auxiliary> {
     fn clone(&self) -> Self {
         Self::new(self.shared_data.clone())
     }
 }
 
-impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+impl<Buffer, Q, Auxiliary> WriteEnd<Buffer, Q, Auxiliary> {
     /// Create a [`WriteEnd`] from [`SharedData`].
-    pub fn new(shared_data: SharedData<Buffer, Auxiliary>) -> Self {
+    pub fn new(shared_data: SharedData<Buffer, Q, Auxiliary>) -> Self {
         Self {
             serializer: Serializer::new(),
             shared_data,
@@ -44,26 +44,30 @@ impl<Buffer, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     }
 
     /// Consume the [`WriteEnd`] and return the stored [`SharedData`].
-    pub fn into_shared_data(self) -> SharedData<Buffer, Auxiliary> {
+    pub fn into_shared_data(self) -> SharedData<Buffer, Q, Auxiliary> {
         self.shared_data
     }
 }
 
-impl<Buffer, Auxiliary> Deref for WriteEnd<Buffer, Auxiliary> {
-    type Target = SharedData<Buffer, Auxiliary>;
+impl<Buffer, Q, Auxiliary> Deref for WriteEnd<Buffer, Q, Auxiliary> {
+    type Target = SharedData<Buffer, Q, Auxiliary>;
 
     fn deref(&self) -> &Self::Target {
         &self.shared_data
     }
 }
 
-impl<Buffer, Auxiliary> DerefMut for WriteEnd<Buffer, Auxiliary> {
+impl<Buffer, Q, Auxiliary> DerefMut for WriteEnd<Buffer, Q, Auxiliary> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.shared_data
     }
 }
 
-impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+impl<Buffer, Q, Auxiliary> WriteEnd<Buffer, Q, Auxiliary>
+where
+    Buffer: Send + Sync,
+    Q: Queue,
+{
     pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .queue()
@@ -419,7 +423,11 @@ impl<Buffer: Send + Sync, Auxiliary> WriteEnd<Buffer, Auxiliary> {
     }
 }
 
-impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxiliary> {
+impl<Buffer, Q, Auxiliary> WriteEnd<Buffer, Q, Auxiliary>
+where
+    Buffer: ToBuffer + Send + Sync + 'static,
+    Q: Queue,
+{
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics
@@ -595,14 +603,8 @@ impl<Buffer: ToBuffer + Send + Sync + 'static, Auxiliary> WriteEnd<Buffer, Auxil
         )?
         .split();
 
-        // queue_pusher holds the mutex, so the `push` and `extend` here are atomic.
-        let mut queue_pusher = self.shared_data.queue().get_pusher();
-        queue_pusher.push(header);
-        for data in data_slice {
-            queue_pusher.extend_from_exact_size_iter(data.iter().cloned());
-        }
-
         id.0.reset(None);
+        self.shared_data.queue().extend(header, data_slice);
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
