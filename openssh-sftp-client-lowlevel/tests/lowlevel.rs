@@ -14,12 +14,14 @@ use sftp_test_common::*;
 
 use bytes::Bytes;
 use tempfile::{Builder, TempDir};
-use tokio::sync::Mutex;
-use tokio_io_utility::write_vectored_all;
+use tokio::{io::AsyncWriteExt, sync::Mutex};
+
+mod queue;
+use queue::MpscQueue;
 
 type Id = lowlevel::Id<Vec<u8>>;
-type WriteEnd = lowlevel::WriteEnd<Vec<u8>, Mutex<PipeWrite>>;
-type ReadEnd = lowlevel::ReadEnd<PipeRead, Vec<u8>, Mutex<PipeWrite>>;
+type WriteEnd = lowlevel::WriteEnd<Vec<u8>, MpscQueue, Mutex<PipeWrite>>;
+type ReadEnd = lowlevel::ReadEnd<PipeRead, Vec<u8>, MpscQueue, Mutex<PipeWrite>>;
 
 fn assert_not_found(err: io::Error) {
     assert!(matches!(err.kind(), io::ErrorKind::NotFound), "{:#?}", err);
@@ -28,16 +30,13 @@ fn assert_not_found(err: io::Error) {
 async fn flush(read_end: &mut ReadEnd) {
     let shared_data = read_end.get_shared_data();
     let stdin = shared_data.get_auxiliary();
-    let mut buffers = shared_data.get_buffers().await;
+    let bytes = shared_data.queue().consume();
 
-    let mut io_slices: Vec<IoSlice<'_>> = buffers.get_io_slices().to_vec();
-    let n: usize = io_slices.iter().map(|slice| slice.len()).sum();
+    let mut stdin_locked = stdin.lock().await;
 
-    write_vectored_all(&mut *stdin.lock().await, &mut io_slices)
-        .await
-        .unwrap();
-
-    assert!(!buffers.advance(NonZeroUsize::new(n).unwrap()));
+    for byte in bytes {
+        stdin_locked.write_all(&*byte).await.unwrap();
+    }
 }
 
 async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extensions) {
@@ -46,7 +45,7 @@ async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extens
     let buffer_size = NonZeroUsize::new(1000).unwrap();
 
     let (write_end, mut read_end) =
-        lowlevel::connect(stdout, buffer_size, buffer_size, Mutex::new(stdin))
+        lowlevel::connect(stdout, buffer_size, MpscQueue::default(), Mutex::new(stdin))
             .await
             .unwrap();
     flush(&mut read_end).await;

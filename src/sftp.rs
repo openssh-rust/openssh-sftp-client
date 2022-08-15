@@ -2,7 +2,7 @@ use super::{
     auxiliary,
     file::{File, OpenOptions},
     fs::Fs,
-    lowlevel, tasks, Error, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
+    lowlevel, tasks, Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
 };
 
 use auxiliary::Auxiliary;
@@ -34,10 +34,12 @@ impl Sftp {
         stdout: R,
         options: SftpOptions,
     ) -> Result<Self, Error> {
+        let write_end_buffer_size = options.get_write_end_buffer_size();
+
         let (write_end, read_end) = connect(
             stdout,
             options.get_read_end_buffer_size(),
-            options.get_write_end_buffer_size(),
+            MpscQueue::with_capacity(write_end_buffer_size.get()),
             Auxiliary::new(options.get_max_pending_requests()),
         )
         .await?;
@@ -47,6 +49,7 @@ impl Sftp {
         let flush_task = create_flush_task(
             stdin,
             SharedData::clone(&write_end),
+            write_end_buffer_size,
             options.get_flush_interval(),
         );
 

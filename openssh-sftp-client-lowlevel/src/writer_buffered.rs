@@ -18,7 +18,7 @@ impl WriteBuffer {
 
     pub(crate) fn put_io_slices(&mut self, io_slices: &[IoSlice<'_>]) {
         for io_slice in io_slices {
-            self.0.put_slice(&*io_slice);
+            self.0.put_slice(io_slice);
         }
     }
 }

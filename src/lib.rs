@@ -63,6 +63,9 @@ use cancel_utility::BoxedWaitForCancellationFuture;
 mod options;
 pub use options::SftpOptions;
 
+mod queue;
+use queue::MpscQueue;
+
 mod tasks;
 
 mod auxiliary;
@@ -85,8 +88,8 @@ pub mod metadata;
 
 type Buffer = BytesMut;
 
-type WriteEnd = lowlevel::WriteEnd<Buffer, Auxiliary>;
-type ReadEnd<R> = lowlevel::ReadEnd<R, Buffer, Auxiliary>;
-type SharedData = lowlevel::SharedData<Buffer, Auxiliary>;
+type WriteEnd = lowlevel::WriteEnd<Buffer, MpscQueue, Auxiliary>;
+type ReadEnd<R> = lowlevel::ReadEnd<R, Buffer, MpscQueue, Auxiliary>;
+type SharedData = lowlevel::SharedData<Buffer, MpscQueue, Auxiliary>;
 type Id = lowlevel::Id<Buffer>;
 type Data = lowlevel::Data<Buffer>;

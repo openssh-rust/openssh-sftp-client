@@ -2,6 +2,10 @@
 use crate::*;
 
 #[doc(hidden)]
+///
+/// ## Other change
+///  - Bump `openssh_sftp_client_lowlevel` version and optimize
+///    write buffer implementation.
 pub mod unreleased {}
 
 /// Nothing has changed from [`v_0_11_0_rc_3`].

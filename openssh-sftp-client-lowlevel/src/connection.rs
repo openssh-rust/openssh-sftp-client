@@ -9,14 +9,13 @@ use std::sync::Arc;
 
 use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use tokio::io::AsyncRead;
-use tokio_io_utility::queue::{Buffers, MpScBytesQueue};
 
 // TODO:
 //  - Support for zero copy syscalls
 
 #[derive(Debug)]
-struct SharedDataInner<Buffer, Auxiliary> {
-    queue: MpScBytesQueue,
+struct SharedDataInner<Buffer, Q, Auxiliary> {
+    queue: Q,
     responses: AwaitableResponses<Buffer>,
 
     auxiliary: Auxiliary,
@@ -28,27 +27,27 @@ struct SharedDataInner<Buffer, Auxiliary> {
 ///    of sftp-server would close the read end right away, discarding
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
-pub struct SharedData<Buffer, Auxiliary = ()>(Arc<SharedDataInner<Buffer, Auxiliary>>);
+pub struct SharedData<Buffer, Q, Auxiliary = ()>(Arc<SharedDataInner<Buffer, Q, Auxiliary>>);
 
-impl<Buffer, Auxiliary> Clone for SharedData<Buffer, Auxiliary> {
+impl<Buffer, Q, Auxiliary> Clone for SharedData<Buffer, Q, Auxiliary> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
-    fn new(buffer_size: NonZeroUsize, auxiliary: Auxiliary) -> Self {
+impl<Buffer: Send + Sync, Q, Auxiliary> SharedData<Buffer, Q, Auxiliary> {
+    fn new(queue: Q, auxiliary: Auxiliary) -> Self {
         SharedData(Arc::new(SharedDataInner {
             responses: AwaitableResponses::new(),
-            queue: MpScBytesQueue::new(buffer_size),
+            queue,
 
             auxiliary,
         }))
     }
 }
 
-impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
-    pub(crate) fn queue(&self) -> &MpScBytesQueue {
+impl<Buffer, Q, Auxiliary> SharedData<Buffer, Q, Auxiliary> {
+    pub fn queue(&self) -> &Q {
         &self.0.queue
     }
 
@@ -60,14 +59,9 @@ impl<Buffer, Auxiliary> SharedData<Buffer, Auxiliary> {
     pub fn get_auxiliary(&self) -> &Auxiliary {
         &self.0.auxiliary
     }
-
-    /// Return the buffers that need to be flushed.
-    pub async fn get_buffers(&self) -> Buffers<'_> {
-        self.0.queue.get_buffers_blocked().await
-    }
 }
 
-impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
+impl<Buffer: Send + Sync, Q, Auxiliary> SharedData<Buffer, Q, Auxiliary> {
     /// Create a useable response id.
     #[inline(always)]
     pub fn create_response_id(&self) -> Id<Buffer> {
@@ -98,13 +92,24 @@ impl<Buffer: Send + Sync, Auxiliary> SharedData<Buffer, Auxiliary> {
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<R: AsyncRead, Buffer: ToBuffer + Send + Sync + 'static, Auxiliary>(
+pub async fn connect<R, Buffer, Q, Auxiliary>(
     reader: R,
     reader_buffer_len: NonZeroUsize,
-    write_end_buffer_size: NonZeroUsize,
+    queue: Q,
     auxiliary: Auxiliary,
-) -> Result<(WriteEnd<Buffer, Auxiliary>, ReadEnd<R, Buffer, Auxiliary>), Error> {
-    let shared_data = SharedData::new(write_end_buffer_size, auxiliary);
+) -> Result<
+    (
+        WriteEnd<Buffer, Q, Auxiliary>,
+        ReadEnd<R, Buffer, Q, Auxiliary>,
+    ),
+    Error,
+>
+where
+    R: AsyncRead,
+    Buffer: ToBuffer + Send + Sync + 'static,
+    Q: Queue,
+{
+    let shared_data = SharedData::new(queue, auxiliary);
 
     // Send hello message
     let mut write_end = WriteEnd::new(shared_data);
