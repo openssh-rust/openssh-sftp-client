@@ -77,4 +77,4 @@ pub use awaitables::{
     AwaitableStatusFuture, Data,
 };
 
-pub use queue::{Queue, QueuePusher};
+pub use queue::Queue;
