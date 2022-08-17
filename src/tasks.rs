@@ -1,43 +1,84 @@
 use super::{Error, ReadEnd, SharedData};
 use crate::lowlevel::Extensions;
 
-use std::io;
-use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
+use std::{
+    collections::VecDeque,
+    io, mem,
+    num::NonZeroUsize,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 use bytes::Bytes;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::pin;
-use tokio::sync::oneshot;
-use tokio::task::{spawn, JoinHandle};
-use tokio::time;
-use tokio_io_utility::{init_maybeuninit_io_slices_mut, write_vectored_all, ReusableIoSlices};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    pin,
+    sync::oneshot,
+    task::{spawn, JoinHandle},
+    time,
+};
+use tokio_io_utility::{init_maybeuninit_io_slices_mut, ReusableIoSlices};
 
 async fn flush<W: AsyncWrite>(
     shared_data: &SharedData,
     mut writer: Pin<&mut W>,
-    buffer: &mut Vec<Bytes>,
+    backup_buffer: &mut Vec<Bytes>,
     reusable_io_slices: &mut ReusableIoSlices,
 ) -> Result<(), Error> {
-    shared_data.queue().swap(buffer);
+    shared_data.queue().swap(backup_buffer);
 
-    let mut n = 0;
+    // Remove all empty `Bytes`s so that:
+    //  - We can check for `io::ErrorKind::WriteZero` error easily
+    //  - It won't occupy precise slot in `reusable_io_slices` so that
+    //    we can group as many non-zero IoSlice in one write.
+    //  - Avoid conserion from/to `VecDeque` unless necessary,
+    //    which might allocate.
+    //  - Simplify the loop below.
+    backup_buffer.retain(|bytes| !bytes.is_empty());
 
-    while n < buffer.len() {
-        let uninit_io_slices = reusable_io_slices.get_mut();
-
-        let io_slices = init_maybeuninit_io_slices_mut(
-            uninit_io_slices,
-            buffer[n..].iter().map(|bytes| io::IoSlice::new(bytes)),
-        );
-
-        write_vectored_all(&mut writer, io_slices).await?;
-        n += io_slices.len();
+    if backup_buffer.is_empty() {
+        return Ok(());
     }
 
-    buffer.clear();
+    // Convert to VecDeque so that we can pop_front with O(1) cost
+    let mut buffer = VecDeque::from(mem::take(backup_buffer));
+
+    // do-while style loop, because on the first iteration
+    // buffer.is_empty() must be false.
+    'outer: loop {
+        let uninit_io_slices = reusable_io_slices.get_mut();
+
+        // buffer.is_empty() == false
+        // io_slices.is_empty() == false
+        let io_slices = init_maybeuninit_io_slices_mut(
+            uninit_io_slices,
+            buffer.iter().map(|bytes| io::IoSlice::new(bytes)),
+        );
+
+        let mut n = writer.write_vectored(io_slices).await?;
+
+        if n == 0 {
+            return Err(Error::from(io::Error::from(io::ErrorKind::WriteZero)));
+        }
+
+        // On first iteration, buffer.is_empty() == false
+        while n >= buffer[0].len() {
+            n -= buffer[0].len();
+            buffer.pop_front();
+
+            if buffer.is_empty() {
+                debug_assert_eq!(n, 0);
+                break 'outer;
+            }
+        }
+
+        // buffer.is_empty() == false,
+        // n < buffer[0].len()
+        buffer[0] = buffer[0].slice(n..);
+    }
+
+    *backup_buffer = Vec::from(buffer);
 
     Ok(())
 }
