@@ -14,12 +14,12 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
 openssh-sftp-error = { version = "0.1.0", path = "../openssh-sftp-error" }
-concurrent_arena = "0.1.6"
+concurrent_arena = "0.1.7"
 derive_destructure2 = "0.1.0"
 
 tokio = { version = "1.11.0", features = ["io-util", "sync"] }
 
-bytes = "1"
+bytes = "1.2.1"
 tokio-io-utility = { version = "0.6.6", features = ["read-exact-to-bytes"] }
 pin-project = { version = "1.0.10" }
 
