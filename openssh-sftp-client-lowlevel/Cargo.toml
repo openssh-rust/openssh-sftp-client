@@ -14,7 +14,7 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
 openssh-sftp-error = { version = "0.1.0", path = "../openssh-sftp-error" }
-concurrent_arena = "0.1.6"
+concurrent_arena = "0.1.7"
 derive_destructure2 = "0.1.0"
 
 tokio = { version = "1.11.0", features = ["io-util", "sync"] }
