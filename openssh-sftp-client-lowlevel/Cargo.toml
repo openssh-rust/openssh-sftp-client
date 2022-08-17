@@ -19,7 +19,7 @@ derive_destructure2 = "0.1.0"
 
 tokio = { version = "1.11.0", features = ["io-util", "sync"] }
 
-bytes = "1"
+bytes = "1.2.1"
 tokio-io-utility = { version = "0.6.6", features = ["read-exact-to-bytes"] }
 pin-project = { version = "1.0.10" }
 
