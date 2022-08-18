@@ -174,7 +174,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
     }
 
     spawn(async move {
-        tokio::pin!(writer);
+        pin!(writer);
 
         inner(writer, shared_data, write_end_buffer_size, flush_interval).await
     })
