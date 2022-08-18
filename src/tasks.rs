@@ -64,6 +64,8 @@ async fn flush(
         // On first iteration, start < buffer.len()
         while n >= buffer[start].len() {
             n -= buffer[start].len();
+            // Release `Bytes` so that the memory they occupied
+            // can be reused in `BytesMut`.
             buffer[start] = EMPTY_BYTES.clone();
             start += 1;
 
