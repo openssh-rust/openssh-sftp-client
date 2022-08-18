@@ -41,17 +41,17 @@ impl Sftp {
         )
         .await?;
 
-        let (rx, read_task) = create_read_task(
-            stdout,
-            options.get_read_end_buffer_size(),
-            SharedData::clone(&write_end),
-        );
-
         let flush_task = create_flush_task(
             stdin,
             SharedData::clone(&write_end),
             write_end_buffer_size,
             options.get_flush_interval(),
+        );
+
+        let (rx, read_task) = create_read_task(
+            stdout,
+            options.get_read_end_buffer_size(),
+            SharedData::clone(&write_end),
         );
 
         Self::init(flush_task, read_task, write_end, rx, &options).await
