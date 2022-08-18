@@ -118,7 +118,6 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         let mut backup_queue_buffer = Vec::with_capacity(write_end_buffer_size.get());
         let mut reusable_io_slices = ReusableIoSlices::new(write_end_buffer_size);
 
-        // The loop can only return `Err`
         loop {
             flush_end_notify.notified().await;
 
