@@ -9,7 +9,7 @@ use auxiliary::Auxiliary;
 use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
-use std::{cmp::min, convert::TryInto, ops::Deref, path::Path, sync::atomic::Ordering};
+use std::{cmp::min, convert::TryInto, path::Path, sync::atomic::Ordering};
 
 use derive_destructure2::destructure;
 use tokio::{
@@ -44,7 +44,7 @@ impl Sftp {
         let (rx, read_task) = create_read_task(
             stdout,
             options.get_read_end_buffer_size(),
-            write_end.deref().clone(),
+            SharedData::clone(&write_end),
         );
 
         let flush_task = create_flush_task(
