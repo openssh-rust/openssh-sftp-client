@@ -1,14 +1,10 @@
 use lowlevel::*;
 use openssh_sftp_client_lowlevel as lowlevel;
 
-use std::borrow::Cow;
-use std::env;
-use std::fs;
-use std::io;
-use std::io::IoSlice;
-use std::num::NonZeroUsize;
-use std::os::unix::fs::symlink;
-use std::path;
+use std::{
+    borrow::Cow, env, fs, io, io::IoSlice, num::NonZeroUsize, ops::Deref, os::unix::fs::symlink,
+    path,
+};
 
 use sftp_test_common::*;
 
@@ -44,10 +40,12 @@ async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extens
 
     let buffer_size = NonZeroUsize::new(1000).unwrap();
 
-    let (write_end, mut read_end) =
-        lowlevel::connect(stdout, buffer_size, MpscQueue::default(), Mutex::new(stdin))
-            .await
-            .unwrap();
+    let write_end = lowlevel::connect(MpscQueue::default(), Mutex::new(stdin))
+        .await
+        .unwrap();
+
+    let mut read_end = ReadEnd::new(stdout, buffer_size, write_end.deref().clone());
+
     flush(&mut read_end).await;
     let extensions = read_end.receive_server_hello().await.unwrap();
     (write_end, read_end, child, extensions)

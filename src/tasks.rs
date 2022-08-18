@@ -1,5 +1,4 @@
-use super::{Error, ReadEnd, SharedData};
-use crate::lowlevel::Extensions;
+use super::{lowlevel::Extensions, Error, ReadEnd, SharedData};
 
 use std::{
     collections::VecDeque,
@@ -119,7 +118,6 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         let mut backup_queue_buffer = Vec::with_capacity(write_end_buffer_size.get());
         let mut reusable_io_slices = ReusableIoSlices::new(write_end_buffer_size);
 
-        // The loop can only return `Err`
         loop {
             flush_end_notify.notified().await;
 
@@ -175,19 +173,25 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
     }
 
     spawn(async move {
-        tokio::pin!(writer);
+        pin!(writer);
 
         inner(writer, shared_data, write_end_buffer_size, flush_interval).await
     })
 }
 
 pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
-    read_end: ReadEnd<R>,
+    stdout: R,
+    read_end_buffer_size: NonZeroUsize,
+    shared_data: SharedData,
 ) -> (oneshot::Receiver<Extensions>, JoinHandle<Result<(), Error>>) {
-    let (tx, rx) = oneshot::channel();
+    async fn inner(
+        stdout: Pin<&mut (dyn AsyncRead + Send)>,
+        read_end_buffer_size: NonZeroUsize,
+        shared_data: SharedData,
+        tx: oneshot::Sender<Extensions>,
+    ) -> Result<(), Error> {
+        let read_end = ReadEnd::new(stdout, read_end_buffer_size, shared_data.clone());
 
-    let handle = spawn(async move {
-        let shared_data = read_end.get_shared_data().clone();
         let auxiliary = shared_data.get_auxiliary();
         let read_end_notify = &auxiliary.read_end_notify;
         let requests_to_read = &auxiliary.requests_to_read;
@@ -230,6 +234,14 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
                 break Ok(());
             }
         }
+    }
+
+    let (tx, rx) = oneshot::channel();
+
+    let handle = spawn(async move {
+        pin!(stdout);
+
+        inner(stdout, read_end_buffer_size, shared_data, tx).await
     });
 
     (rx, handle)
