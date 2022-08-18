@@ -6,6 +6,7 @@ use crate::*;
 /// ## Other change
 ///  - Bump `openssh_sftp_client_lowlevel` version and optimize
 ///    write buffer implementation.
+///  - Optimize: Reduce monomorphization
 pub mod unreleased {}
 
 /// Nothing has changed from [`v_0_11_0_rc_3`].
