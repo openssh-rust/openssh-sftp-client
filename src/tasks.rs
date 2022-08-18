@@ -182,11 +182,15 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
 }
 
 pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
-    read_end: ReadEnd<R>,
+    stdout: R,
+    read_end_buffer_size: NonZeroUsize,
+    shared_data: SharedData,
 ) -> (oneshot::Receiver<Extensions>, JoinHandle<Result<(), Error>>) {
     let (tx, rx) = oneshot::channel();
 
     let handle = spawn(async move {
+        let read_end = ReadEnd::new(stdout, read_end_buffer_size, shared_data);
+
         let shared_data = read_end.get_shared_data().clone();
         let auxiliary = shared_data.get_auxiliary();
         let read_end_notify = &auxiliary.read_end_notify;

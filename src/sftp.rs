@@ -9,15 +9,14 @@ use auxiliary::Auxiliary;
 use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
-use std::cmp::min;
-use std::convert::TryInto;
-use std::path::Path;
-use std::sync::atomic::Ordering;
+use std::{cmp::min, convert::TryInto, ops::Deref, path::Path, sync::atomic::Ordering};
 
 use derive_destructure2::destructure;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::oneshot::Receiver;
-use tokio::task::JoinHandle;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::oneshot::Receiver,
+    task::JoinHandle,
+};
 
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]
@@ -36,15 +35,17 @@ impl Sftp {
     ) -> Result<Self, Error> {
         let write_end_buffer_size = options.get_write_end_buffer_size();
 
-        let (write_end, read_end) = connect(
-            stdout,
-            options.get_read_end_buffer_size(),
+        let write_end = connect(
             MpscQueue::with_capacity(write_end_buffer_size.get()),
             Auxiliary::new(options.get_max_pending_requests()),
         )
         .await?;
 
-        let (rx, read_task) = create_read_task(read_end);
+        let (rx, read_task) = create_read_task(
+            stdout,
+            options.get_read_end_buffer_size(),
+            write_end.deref().clone(),
+        );
 
         let flush_task = create_flush_task(
             stdin,
