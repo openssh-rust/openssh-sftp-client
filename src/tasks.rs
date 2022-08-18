@@ -20,7 +20,7 @@ use tokio::{
 };
 use tokio_io_utility::{init_maybeuninit_io_slices_mut, ReusableIoSlices};
 
-async fn flush<W: AsyncWrite>(
+async fn flush<W: AsyncWrite + ?Sized>(
     shared_data: &SharedData,
     mut writer: Pin<&mut W>,
     backup_buffer: &mut Vec<Bytes>,
@@ -98,9 +98,12 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
     write_end_buffer_size: NonZeroUsize,
     flush_interval: Duration,
 ) -> JoinHandle<Result<(), Error>> {
-    spawn(async move {
-        tokio::pin!(writer);
-
+    async fn inner(
+        mut writer: Pin<&mut (dyn AsyncWrite + Send)>,
+        shared_data: SharedData,
+        write_end_buffer_size: NonZeroUsize,
+        flush_interval: Duration,
+    ) -> Result<(), Error> {
         let mut interval = time::interval(flush_interval);
         interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
 
@@ -169,6 +172,12 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
                 break Ok(());
             }
         }
+    }
+
+    spawn(async move {
+        tokio::pin!(writer);
+
+        inner(writer, shared_data, write_end_buffer_size, flush_interval).await
     })
 }
 
