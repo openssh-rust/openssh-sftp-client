@@ -18,14 +18,20 @@ impl MpscQueue {
 
 impl Queue for MpscQueue {
     fn push(&self, bytes: Bytes) {
-        self.0.lock().unwrap().push(bytes);
+        if !bytes.is_empty() {
+            self.0.lock().unwrap().push(bytes);
+        }
     }
 
     fn extend(&self, header: Bytes, body: &[&[Bytes]]) {
         let mut v = self.0.lock().unwrap();
-        v.push(header);
+
+        if !header.is_empty() {
+            v.push(header);
+        }
+
         for data in body {
-            v.extend(data.iter().cloned());
+            v.extend(data.iter().filter(|bytes| !bytes.is_empty()).cloned());
         }
     }
 }

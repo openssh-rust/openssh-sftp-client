@@ -28,14 +28,14 @@ async fn flush<W: AsyncWrite>(
 ) -> Result<(), Error> {
     shared_data.queue().swap(backup_buffer);
 
-    // Remove all empty `Bytes`s so that:
+    // `Queue` implementation for `MpscQueue` already removes
+    // all empty `Bytes`s so that:
     //  - We can check for `io::ErrorKind::WriteZero` error easily
     //  - It won't occupy precise slot in `reusable_io_slices` so that
     //    we can group as many non-zero IoSlice in one write.
     //  - Avoid conserion from/to `VecDeque` unless necessary,
     //    which might allocate.
     //  - Simplify the loop below.
-    backup_buffer.retain(|bytes| !bytes.is_empty());
 
     if backup_buffer.is_empty() {
         return Ok(());
