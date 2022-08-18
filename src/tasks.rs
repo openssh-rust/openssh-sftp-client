@@ -1,8 +1,7 @@
 use super::{lowlevel::Extensions, Error, ReadEnd, SharedData};
 
 use std::{
-    collections::VecDeque,
-    io, mem,
+    io,
     num::NonZeroUsize,
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
@@ -19,13 +18,15 @@ use tokio::{
 };
 use tokio_io_utility::{init_maybeuninit_io_slices_mut, ReusableIoSlices};
 
-async fn flush<W: AsyncWrite + ?Sized>(
+async fn flush(
     shared_data: &SharedData,
-    mut writer: Pin<&mut W>,
-    backup_buffer: &mut Vec<Bytes>,
+    mut writer: Pin<&mut (dyn AsyncWrite + Send)>,
+    buffer: &mut Vec<Bytes>,
     reusable_io_slices: &mut ReusableIoSlices,
 ) -> Result<(), Error> {
-    shared_data.queue().swap(backup_buffer);
+    static EMPTY_BYTES: Bytes = Bytes::from_static(b"");
+
+    shared_data.queue().swap(buffer);
 
     // `Queue` implementation for `MpscQueue` already removes
     // all empty `Bytes`s so that:
@@ -36,23 +37,22 @@ async fn flush<W: AsyncWrite + ?Sized>(
     //    which might allocate.
     //  - Simplify the loop below.
 
-    if backup_buffer.is_empty() {
+    if buffer.is_empty() {
         return Ok(());
     }
 
-    // Convert to VecDeque so that we can pop_front with O(1) cost
-    let mut buffer = VecDeque::from(mem::take(backup_buffer));
+    let mut start = 0;
 
     // do-while style loop, because on the first iteration
-    // buffer.is_empty() must be false.
+    // start < buffer.len()
     'outer: loop {
         let uninit_io_slices = reusable_io_slices.get_mut();
 
-        // buffer.is_empty() == false
+        // start < buffer.len()
         // io_slices.is_empty() == false
         let io_slices = init_maybeuninit_io_slices_mut(
             uninit_io_slices,
-            buffer.iter().map(|bytes| io::IoSlice::new(bytes)),
+            buffer[start..].iter().map(|bytes| io::IoSlice::new(bytes)),
         );
 
         let mut n = writer.write_vectored(io_slices).await?;
@@ -61,23 +61,26 @@ async fn flush<W: AsyncWrite + ?Sized>(
             return Err(Error::from(io::Error::from(io::ErrorKind::WriteZero)));
         }
 
-        // On first iteration, buffer.is_empty() == false
-        while n >= buffer[0].len() {
-            n -= buffer[0].len();
-            buffer.pop_front();
+        // On first iteration, start < buffer.len()
+        while n >= buffer[start].len() {
+            n -= buffer[start].len();
+            // Release `Bytes` so that the memory they occupied
+            // can be reused in `BytesMut`.
+            buffer[start] = EMPTY_BYTES.clone();
+            start += 1;
 
-            if buffer.is_empty() {
+            if start == buffer.len() {
                 debug_assert_eq!(n, 0);
                 break 'outer;
             }
         }
 
-        // buffer.is_empty() == false,
-        // n < buffer[0].len()
-        buffer[0] = buffer[0].slice(n..);
+        // start < buffer.len(),
+        // n < buffer[start].len()
+        buffer[start] = buffer[start].slice(n..);
     }
 
-    *backup_buffer = Vec::from(buffer);
+    buffer.clear();
 
     Ok(())
 }
