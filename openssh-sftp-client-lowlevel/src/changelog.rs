@@ -3,11 +3,19 @@ use crate::*;
 
 #[doc(hidden)]
 /// ## Added
-///  - new trait `Queue`
+///  - new trait [`Queue`]
+///  - [`ReadEnd::new`] is now public
 ///
 /// ## Changed
-///  - `connect` now takes `queue` instead of `write_end_buffer_size`
-///  - `ReadEnd`, `WriteEnd` and `SharedData` now takes an additional generic
+///  - [`connect`] now takes `queue` instead of `write_end_buffer_size`
+///  - [`connect`] does not take `reader` and `reader_buffer_len` and it
+///    does not return [`ReadEnd`] anymore.
+///
+///    User has to manually call [`ReadEnd::new`] to create [`ReadEnd`].
+///
+///    This is done to give the user more freedom on how and when [`ReadEnd`]
+///    is created.
+///  - [`ReadEnd`], [`WriteEnd`] and [`SharedData`] now takes an additional generic
 ///    parameter `Q`.
 pub mod unreleased {}
 

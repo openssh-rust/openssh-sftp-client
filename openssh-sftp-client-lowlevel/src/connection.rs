@@ -1,14 +1,10 @@
 #![forbid(unsafe_code)]
 
-use super::awaitable_responses::AwaitableResponses;
-use super::*;
+use super::{awaitable_responses::AwaitableResponses, *};
 
-use std::fmt::Debug;
-use std::num::NonZeroUsize;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-use tokio::io::AsyncRead;
 
 // TODO:
 //  - Support for zero copy syscalls
@@ -84,7 +80,7 @@ impl<Buffer: Send + Sync, Q, Auxiliary> SharedData<Buffer, Q, Auxiliary> {
 /// Initialize connection to remote sftp server and
 /// negotiate the sftp version.
 ///
-/// User of this function must manually call [`ReadEnd::receive_server_hello`]
+/// User of this function must manually create [`ReadEnd`]
 /// and manually flush the buffer.
 ///
 /// # Cancel Safety
@@ -92,20 +88,11 @@ impl<Buffer: Send + Sync, Q, Auxiliary> SharedData<Buffer, Q, Auxiliary> {
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<R, Buffer, Q, Auxiliary>(
-    reader: R,
-    reader_buffer_len: NonZeroUsize,
+pub async fn connect<Buffer, Q, Auxiliary>(
     queue: Q,
     auxiliary: Auxiliary,
-) -> Result<
-    (
-        WriteEnd<Buffer, Q, Auxiliary>,
-        ReadEnd<R, Buffer, Q, Auxiliary>,
-    ),
-    Error,
->
+) -> Result<WriteEnd<Buffer, Q, Auxiliary>, Error>
 where
-    R: AsyncRead,
     Buffer: ToBuffer + Send + Sync + 'static,
     Q: Queue,
 {
@@ -115,7 +102,5 @@ where
     let mut write_end = WriteEnd::new(shared_data);
     write_end.send_hello(SSH2_FILEXFER_VERSION).await?;
 
-    let read_end = ReadEnd::new(reader, reader_buffer_len, (*write_end).clone());
-
-    Ok((write_end, read_end))
+    Ok(write_end)
 }

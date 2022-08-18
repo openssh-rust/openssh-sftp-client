@@ -36,7 +36,10 @@ where
     R: AsyncRead,
     Buffer: ToBuffer + 'static + Send + Sync,
 {
-    pub(crate) fn new(
+    /// Must call [`ReadEnd::receive_server_hello_pinned`]
+    /// or [`ReadEnd::receive_server_hello`] after this
+    /// function call.
+    pub fn new(
         reader: R,
         reader_buffer_len: NonZeroUsize,
         shared_data: SharedData<Buffer, Q, Auxiliary>,
@@ -47,7 +50,7 @@ where
         }
     }
 
-    /// Must be called once right after `super::connect`
+    /// Must be called once right after [`ReadEnd::new`]
     /// to receive the hello message from the server.
     pub async fn receive_server_hello_pinned(
         mut self: Pin<&mut Self>,
