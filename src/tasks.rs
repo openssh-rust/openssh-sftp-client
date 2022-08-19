@@ -122,19 +122,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         let mut reusable_io_slices = ReusableIoSlices::new(write_end_buffer_size);
 
         loop {
-            flush_end_notify.notified().await;
-
-            tokio::select! {
-                _ = interval.tick() => (),
-                // tokio::sync::Notify is cancel safe, however
-                // cancelling it would lose the place in the queue.
-                //
-                // However, since flush_task is the only one who
-                // calls `flush_immediately.notified()`, it
-                // is totally fine to cancel here.
-                _ = auxiliary.flush_immediately.notified() => (),
-            };
-
+            // Flush the initial hello msg ASAP.
             let mut cnt = pending_requests.load(Ordering::Relaxed);
 
             loop {
@@ -172,6 +160,19 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
 
                 break Ok(());
             }
+
+            flush_end_notify.notified().await;
+
+            tokio::select! {
+                _ = interval.tick() => (),
+                // tokio::sync::Notify is cancel safe, however
+                // cancelling it would lose the place in the queue.
+                //
+                // However, since flush_task is the only one who
+                // calls `flush_immediately.notified()`, it
+                // is totally fine to cancel here.
+                _ = auxiliary.flush_immediately.notified() => (),
+            };
         }
     }
 

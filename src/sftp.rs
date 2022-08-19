@@ -35,9 +35,9 @@ impl Sftp {
     ) -> Result<Self, Error> {
         let write_end_buffer_size = options.get_write_end_buffer_size();
 
-        let write_end = connect(
-            MpscQueue::with_capacity(write_end_buffer_size.get()),
-            Auxiliary::new(options.get_max_pending_requests()),
+        let write_end = Self::connect(
+            write_end_buffer_size.get(),
+            options.get_max_pending_requests(),
         )
         .await?;
 
@@ -57,6 +57,17 @@ impl Sftp {
         Self::init(flush_task, read_task, write_end, rx, &options).await
     }
 
+    async fn connect(
+        write_end_buffer_size: usize,
+        max_pending_requests: u16,
+    ) -> Result<WriteEnd, Error> {
+        connect(
+            MpscQueue::with_capacity(write_end_buffer_size),
+            Auxiliary::new(max_pending_requests),
+        )
+        .await
+    }
+
     async fn init(
         flush_task: JoinHandle<Result<(), Error>>,
         read_task: JoinHandle<Result<(), Error>>,
@@ -73,17 +84,6 @@ impl Sftp {
             flush_task,
             read_task,
         };
-
-        // Flush the hello message.
-        //
-        // Cannot use wakeup_flush_task as it would increment requests_to_read
-        // by one, while the initial hello message is special and does not
-        // count as regular response.
-        let auxiliary = sftp.shared_data.get_auxiliary();
-
-        auxiliary.pending_requests.fetch_add(1, Ordering::Relaxed);
-        auxiliary.flush_end_notify.notify_one();
-        auxiliary.flush_immediately.notify_one();
 
         let extensions = if let Ok(extensions) = rx.await {
             extensions

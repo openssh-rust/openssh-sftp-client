@@ -8,6 +8,7 @@ use crate::*;
 ///    write buffer implementation.
 ///  - Optimize: Reduce monomorphization
 ///  - Optimize latency: `create_flush_task` first in `Sftp::new`
+///    and write the hello msg ASAP.
 pub mod unreleased {}
 
 /// Nothing has changed from [`v_0_11_0_rc_3`].
