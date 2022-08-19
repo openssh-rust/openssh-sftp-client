@@ -74,17 +74,6 @@ impl Sftp {
             read_task,
         };
 
-        // Flush the hello message.
-        //
-        // Cannot use wakeup_flush_task as it would increment requests_to_read
-        // by one, while the initial hello message is special and does not
-        // count as regular response.
-        let auxiliary = sftp.shared_data.get_auxiliary();
-
-        auxiliary.pending_requests.fetch_add(1, Ordering::Relaxed);
-        auxiliary.flush_end_notify.notify_one();
-        auxiliary.flush_immediately.notify_one();
-
         let extensions = if let Ok(extensions) = rx.await {
             extensions
         } else {
