@@ -35,9 +35,9 @@ impl Sftp {
     ) -> Result<Self, Error> {
         let write_end_buffer_size = options.get_write_end_buffer_size();
 
-        let write_end = connect(
-            MpscQueue::with_capacity(write_end_buffer_size.get()),
-            Auxiliary::new(options.get_max_pending_requests()),
+        let write_end = Self::connect(
+            write_end_buffer_size.get(),
+            options.get_max_pending_requests(),
         )
         .await?;
 
@@ -55,6 +55,17 @@ impl Sftp {
         );
 
         Self::init(flush_task, read_task, write_end, rx, &options).await
+    }
+
+    async fn connect(
+        write_end_buffer_size: usize,
+        max_pending_requests: u16,
+    ) -> Result<WriteEnd, Error> {
+        connect(
+            MpscQueue::with_capacity(write_end_buffer_size),
+            Auxiliary::new(max_pending_requests),
+        )
+        .await
     }
 
     async fn init(
