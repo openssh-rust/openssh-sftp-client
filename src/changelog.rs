@@ -2,14 +2,15 @@
 use crate::*;
 
 #[doc(hidden)]
-///
+pub mod unreleased {}
+
 /// ## Other change
 ///  - Bump `openssh_sftp_client_lowlevel` version and optimize
 ///    write buffer implementation.
 ///  - Optimize: Reduce monomorphization
 ///  - Optimize latency: `create_flush_task` first in `Sftp::new`
 ///    and write the hello msg ASAP.
-pub mod unreleased {}
+pub mod v_0_11_2 {}
 
 /// Nothing has changed from [`v_0_11_0_rc_3`].
 ///
