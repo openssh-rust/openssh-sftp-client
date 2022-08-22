@@ -2,6 +2,8 @@
 use crate::*;
 
 #[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Added
 ///  - new trait [`Queue`]
 ///  - [`ReadEnd::new`] is now public
@@ -17,7 +19,7 @@ use crate::*;
 ///    is created.
 ///  - [`ReadEnd`], [`WriteEnd`] and [`SharedData`] now takes an additional generic
 ///    parameter `Q`.
-pub mod unreleased {}
+pub mod v0_2_0 {}
 
 /// This is the first release!
 ///
