@@ -33,7 +33,7 @@ tokio = { version = "1.11.0", features = ["sync", "time", "rt"] }
 
 derive_destructure2 = "0.1.0"
 bytes = "1.2.1"
-tokio-io-utility = "0.6.7"
+tokio-io-utility = "0.7.1"
 tokio-util = { version = "0.7.0" }
 
 [dev-dependencies]
