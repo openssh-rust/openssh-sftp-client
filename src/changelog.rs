@@ -11,7 +11,7 @@ pub mod unreleased {}
 ///  - `openssh_sftp_protocol` to v0.22.0
 ///  - `openssh_sftp_error` to v0.2.0
 ///  - `openssh_sftp_client_lowlevel` to v0.3.0
-pub mod v_0_11_2 {}
+pub mod v_0_11_3 {}
 
 /// ## Other change
 ///  - Bump `openssh_sftp_client_lowlevel` version and optimize
