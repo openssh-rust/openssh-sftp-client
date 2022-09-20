@@ -38,7 +38,7 @@ impl<Buffer, Q, Auxiliary> WriteEnd<Buffer, Q, Auxiliary> {
     /// Create a [`WriteEnd`] from [`SharedData`].
     pub fn new(shared_data: SharedData<Buffer, Q, Auxiliary>) -> Self {
         Self {
-            serializer: Serializer::new(),
+            serializer: Serializer::default(),
             shared_data,
         }
     }
@@ -76,14 +76,25 @@ where
         Ok(())
     }
 
+    fn reset(serializer: &mut Serializer<WriteBuffer>) {
+        serializer.reset_counter();
+        // Reserve for the header
+        serializer.output.0.resize(4, 0);
+    }
+
     fn serialize<T>(serializer: &mut Serializer<WriteBuffer>, value: T) -> Result<Bytes, Error>
     where
         T: Serialize,
     {
-        serializer.reset();
+        Self::reset(serializer);
+
         value.serialize(&mut *serializer)?;
 
-        Ok(serializer.get_output()?.split())
+        let header = serializer.create_header(0)?;
+        // Write the header
+        serializer.output.0[..4].copy_from_slice(&header);
+
+        Ok(serializer.output.split())
     }
 
     /// Send requests.
@@ -494,6 +505,24 @@ where
         self.send_write_request_buffered_vectored2(id, handle, offset, &[io_slices])
     }
 
+    fn serialize_write_request<'a>(
+        serializer: &'a mut Serializer<WriteBuffer>,
+        request_id: u32,
+        handle: Cow<'_, Handle>,
+        offset: u64,
+        len: u32,
+    ) -> Result<&'a mut WriteBuffer, Error> {
+        Self::reset(serializer);
+
+        let header = Request::serialize_write_request(serializer, request_id, handle, offset, len)?;
+
+        let buffer = &mut serializer.output;
+        // Write the header
+        buffer.0[..4].copy_from_slice(&header);
+
+        Ok(buffer)
+    }
+
     /// Write will extend the file if writing beyond the end of the file.
     ///
     /// It is legal to write way beyond the end of the file, the semantics
@@ -532,7 +561,7 @@ where
             len as usize,
         );
 
-        let buffer = Request::serialize_write_request(
+        let buffer = Self::serialize_write_request(
             &mut self.serializer,
             ArenaArc::slot(&id.0),
             handle,
@@ -594,7 +623,7 @@ where
             .sum();
         let len: u32 = len.try_into()?;
 
-        let header = Request::serialize_write_request(
+        let header = Self::serialize_write_request(
             &mut self.serializer,
             ArenaArc::slot(&id.0),
             handle,
