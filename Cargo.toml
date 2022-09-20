@@ -1,6 +1,6 @@
 [package]
 name = "openssh-sftp-client"
-version = "0.11.2"
+version = "0.11.3"
 edition = "2018"
 
 authors = ["Jiahao XU <Jiahao_XU@outlook.com>"]
