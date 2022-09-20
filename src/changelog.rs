@@ -5,6 +5,15 @@ use crate::*;
 pub mod unreleased {}
 
 /// ## Other change
+///
+/// Bump dep
+///  - `ssh_format` to v0.13.0
+///  - `openssh_sftp_protocol` to v0.22.0
+///  - `openssh_sftp_error` to v0.2.0
+///  - `openssh_sftp_client_lowlevel` to v0.3.0
+pub mod v_0_11_2 {}
+
+/// ## Other change
 ///  - Bump `openssh_sftp_client_lowlevel` version and optimize
 ///    write buffer implementation.
 ///  - Optimize: Reduce monomorphization
