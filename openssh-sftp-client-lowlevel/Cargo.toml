@@ -13,7 +13,7 @@ keywords = ["ssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
-openssh-sftp-error = { version = "0.2.0", path = "../openssh-sftp-error" }
+openssh-sftp-error = { version = "0.2.0", features = ["bytes"], path = "../openssh-sftp-error" }
 concurrent_arena = "0.1.7"
 derive_destructure2 = "0.1.0"
 
