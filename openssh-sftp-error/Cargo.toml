@@ -18,3 +18,6 @@ awaitable = "0.3.3"
 openssh-sftp-protocol = "0.22.1"
 
 tokio = { version = "1.11.0", features = ["rt"] }
+
+[features]
+bytes = ["openssh-sftp-protocol/bytes"]
