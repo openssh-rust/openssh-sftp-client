@@ -4,7 +4,6 @@ use super::*;
 
 use awaitable_responses::ArenaArc;
 use connection::SharedData;
-use writer_buffered::WriteBuffer;
 
 use std::borrow::Cow;
 use std::convert::TryInto;
@@ -18,13 +17,13 @@ use crate::openssh_sftp_protocol::request::*;
 use crate::openssh_sftp_protocol::serde::Serialize;
 use crate::openssh_sftp_protocol::ssh_format::Serializer;
 use crate::openssh_sftp_protocol::Handle;
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].
 #[derive(Debug)]
 pub struct WriteEnd<Buffer, Q, Auxiliary = ()> {
-    serializer: Serializer<WriteBuffer>,
+    serializer: Serializer<BytesMut>,
     shared_data: SharedData<Buffer, Q, Auxiliary>,
 }
 
@@ -76,13 +75,13 @@ where
         Ok(())
     }
 
-    fn reset(serializer: &mut Serializer<WriteBuffer>) {
+    fn reset(serializer: &mut Serializer<BytesMut>) {
         serializer.reset_counter();
         // Reserve for the header
-        serializer.output.0.resize(4, 0);
+        serializer.output.resize(4, 0);
     }
 
-    fn serialize<T>(serializer: &mut Serializer<WriteBuffer>, value: T) -> Result<Bytes, Error>
+    fn serialize<T>(serializer: &mut Serializer<BytesMut>, value: T) -> Result<Bytes, Error>
     where
         T: Serialize,
     {
@@ -92,9 +91,9 @@ where
 
         let header = serializer.create_header(0)?;
         // Write the header
-        serializer.output.0[..4].copy_from_slice(&header);
+        serializer.output[..4].copy_from_slice(&header);
 
-        Ok(serializer.output.split())
+        Ok(serializer.output.split().freeze())
     }
 
     /// Send requests.
@@ -506,19 +505,19 @@ where
     }
 
     fn serialize_write_request<'a>(
-        serializer: &'a mut Serializer<WriteBuffer>,
+        serializer: &'a mut Serializer<BytesMut>,
         request_id: u32,
         handle: Cow<'_, Handle>,
         offset: u64,
         len: u32,
-    ) -> Result<&'a mut WriteBuffer, Error> {
+    ) -> Result<&'a mut BytesMut, Error> {
         Self::reset(serializer);
 
         let header = Request::serialize_write_request(serializer, request_id, handle, offset, len)?;
 
         let buffer = &mut serializer.output;
         // Write the header
-        buffer.0[..4].copy_from_slice(&header);
+        buffer[..4].copy_from_slice(&header);
 
         Ok(buffer)
     }
@@ -569,12 +568,14 @@ where
             len,
         )?;
 
-        for io_slices in bufs {
-            buffer.put_io_slices(io_slices);
-        }
+        bufs.iter()
+            .flat_map(|io_slices| io_slices.iter())
+            .for_each(|io_slice| {
+                buffer.put_slice(io_slice);
+            });
 
         id.0.reset(None);
-        self.shared_data.queue().push(buffer.split());
+        self.shared_data.queue().push(buffer.split().freeze());
 
         Ok(AwaitableStatus::new(id.into_inner()))
     }
@@ -630,7 +631,8 @@ where
             offset,
             len,
         )?
-        .split();
+        .split()
+        .freeze();
 
         id.0.reset(None);
         self.shared_data.queue().extend(header, data_slice);

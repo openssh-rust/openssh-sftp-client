@@ -28,7 +28,6 @@ mod queue;
 mod read_end;
 mod reader_buffered;
 mod write_end;
-mod writer_buffered;
 
 pub use openssh_sftp_error::Error;
 use openssh_sftp_error::{awaitable, openssh_sftp_protocol};
