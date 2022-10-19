@@ -1,5 +1,5 @@
 use super::{
-    lowlevel,
+    lowlevel::{self, Extensions},
     metadata::{MetaData, MetaDataBuilder, Permissions},
     Auxiliary, Buffer, Error, Id, OwnedHandle, Sftp, WriteEnd, WriteEndWithCachedId,
 };
@@ -127,7 +127,11 @@ impl<'s> Fs<'s> {
         async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<PathBuf, Error> {
             let path = this.concat_path_if_needed(path);
 
-            let f = if this.get_auxiliary().extensions().expand_path {
+            let f = if this
+                .get_auxiliary()
+                .extensions()
+                .contains(Extensions::EXPAND_PATH)
+            {
                 // This supports canonicalisation of relative paths and those that
                 // need tilde-expansion, i.e. “~”, “~/…” and “~user/…”.
                 //
@@ -168,7 +172,11 @@ impl<'s> Fs<'s> {
         dst: impl AsRef<Path>,
     ) -> Result<(), Error> {
         async fn inner(this: &mut Fs<'_>, src: &Path, dst: &Path) -> Result<(), Error> {
-            if !this.get_auxiliary().extensions().hardlink {
+            if !this
+                .get_auxiliary()
+                .extensions()
+                .contains(Extensions::HARDLINK)
+            {
                 return Err(Error::UnsupportedExtension(&"hardlink"));
             }
 
@@ -198,7 +206,11 @@ impl<'s> Fs<'s> {
         to: impl AsRef<Path>,
     ) -> Result<(), Error> {
         async fn inner(this: &mut Fs<'_>, from: &Path, to: &Path) -> Result<(), Error> {
-            let f = if this.get_auxiliary().extensions().posix_rename {
+            let f = if this
+                .get_auxiliary()
+                .extensions()
+                .contains(Extensions::POSIX_RENAME)
+            {
                 // posix rename is guaranteed to be atomic
                 WriteEnd::send_posix_rename_request
             } else {

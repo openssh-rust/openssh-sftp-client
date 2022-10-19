@@ -315,7 +315,7 @@ where
     ///
     /// # Precondition
     ///
-    /// Requires [`Extensions::limits`] to be true.
+    /// Requires `extensions::contains(Extensions::LIMITS)` to be true.
     pub fn send_limits_request(
         &mut self,
         id: Id<Buffer>,
@@ -332,7 +332,7 @@ where
     ///
     /// # Precondition
     ///
-    /// Requires [`Extensions::expand_path`] to be true.
+    /// Requires `extensions::contains(Extensions::EXPAND_PATH)` to be true.
     pub fn send_expand_path_request(
         &mut self,
         id: Id<Buffer>,
@@ -344,7 +344,7 @@ where
 
     /// # Precondition
     ///
-    /// Requires [`Extensions::fsync`] to be true.
+    /// Requires `extensions::contains(Extensions::FSYNC)` to be true.
     pub fn send_fsync_request(
         &mut self,
         id: Id<Buffer>,
@@ -356,7 +356,7 @@ where
 
     /// # Precondition
     ///
-    /// Requires [`Extensions::hardlink`] to be true.
+    /// Requires `extensions::contains(Extensions::HARDLINK)` to be true.
     pub fn send_hardlink_request(
         &mut self,
         id: Id<Buffer>,
@@ -369,7 +369,7 @@ where
 
     /// # Precondition
     ///
-    /// Requires [`Extensions::posix_rename`] to be true.
+    /// Requires `extensions::contains(Extensions::POSIX_RENAME)` to be true.
     pub fn send_posix_rename_request(
         &mut self,
         id: Id<Buffer>,
@@ -402,7 +402,7 @@ where
     ///
     /// # Precondition
     ///
-    /// Requires [`Extensions::copy_data`] to be true.
+    /// Requires `extensions::contains(Extensions::COPY_DATA)` to be true.
     ///
     /// For [openssh-portable], this is available from V_9_0_P1.
     ///

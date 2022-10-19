@@ -235,7 +235,7 @@ def_awaitable!(
     FileAttrs,
     |response| {
         match response {
-            Response::Header(ResponseInner::Attrs(attrs)) => Ok(*attrs),
+            Response::Header(ResponseInner::Attrs(attrs)) => Ok(attrs),
             _ => Err(Error::InvalidResponse(
                 &"Expected Attrs or err Status response",
             )),

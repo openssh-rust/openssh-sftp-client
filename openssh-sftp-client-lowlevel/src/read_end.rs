@@ -16,7 +16,7 @@ use std::pin::Pin;
 use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 use crate::openssh_sftp_protocol::response::{self, ServerVersion};
 use crate::openssh_sftp_protocol::serde::de::DeserializeOwned;
-use crate::openssh_sftp_protocol::ssh_format::from_bytes;
+use crate::openssh_sftp_protocol::ssh_format::{self, from_bytes};
 
 use pin_project::pin_project;
 use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt};
@@ -66,7 +66,8 @@ where
             .reader
             .read_exact_into_buffer(len as usize)
             .await?;
-        let server_version = ServerVersion::deserialize(&*drain)?;
+        let server_version =
+            ServerVersion::deserialize(&mut ssh_format::Deserializer::from_bytes(&*drain))?;
 
         if server_version.version != SSH2_FILEXFER_VERSION {
             Err(Error::UnsupportedSftpProtocol {
