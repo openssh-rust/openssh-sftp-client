@@ -1,8 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::io;
-use std::num::TryFromIntError;
-use std::process::ExitStatus;
+use std::{io, num::TryFromIntError, process::ExitStatus};
 
 use thiserror::Error;
 
