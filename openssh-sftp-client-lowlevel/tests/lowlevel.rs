@@ -780,7 +780,7 @@ async fn test_limits() {
 
     let id = write_end.create_response_id();
 
-    assert!(extensions.limits);
+    assert!(extensions.contains(lowlevel::Extensions::LIMITS));
     let awaitable = write_end.send_limits_request(id).unwrap();
 
     read_one_packet(&mut read_end).await;
@@ -805,7 +805,7 @@ async fn test_expand_path() {
 
     let id = write_end.create_response_id();
 
-    assert!(extensions.expand_path);
+    assert!(extensions.contains(lowlevel::Extensions::EXPAND_PATH));
     let awaitable = write_end
         .send_expand_path_request(id, Cow::Borrowed(path::Path::new("~")))
         .unwrap();
@@ -825,7 +825,7 @@ async fn test_expand_path() {
 #[tokio::test]
 async fn test_fsync() {
     let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
-    assert!(extensions.fsync);
+    assert!(extensions.contains(lowlevel::Extensions::FSYNC));
 
     let id = write_end.create_response_id();
 
@@ -866,7 +866,7 @@ async fn test_fsync() {
 #[tokio::test]
 async fn test_hardlink() {
     let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
-    assert!(extensions.hardlink);
+    assert!(extensions.contains(lowlevel::Extensions::HARDLINK));
 
     let id = write_end.create_response_id();
 
@@ -902,7 +902,7 @@ async fn test_hardlink() {
 #[tokio::test]
 async fn test_posix_rename() {
     let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
-    assert!(extensions.posix_rename);
+    assert!(extensions.contains(lowlevel::Extensions::POSIX_RENAME));
 
     let id = write_end.create_response_id();
 
@@ -938,7 +938,7 @@ async fn test_ext_copy_data() {
     let content = "Hello, World!\n";
 
     let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
-    assert!(extensions.copy_data);
+    assert!(extensions.contains(lowlevel::Extensions::COPY_DATA));
 
     let id = write_end.create_response_id();
 
