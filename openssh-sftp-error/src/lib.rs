@@ -9,7 +9,7 @@ use thiserror::Error;
 pub use awaitable;
 
 pub use openssh_sftp_protocol;
-pub use openssh_sftp_protocol::response::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
+pub use openssh_sftp_protocol::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
 use openssh_sftp_protocol::ssh_format;
 
 /// Error returned by
