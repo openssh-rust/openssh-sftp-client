@@ -4,7 +4,7 @@ use super::{awaitable_responses::AwaitableResponses, *};
 
 use std::{fmt::Debug, sync::Arc};
 
-use crate::openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
+use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
 // TODO:
 //  - Support for zero copy syscalls

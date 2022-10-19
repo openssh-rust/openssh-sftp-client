@@ -30,7 +30,6 @@ mod reader_buffered;
 mod write_end;
 
 pub use openssh_sftp_error::Error;
-use openssh_sftp_error::{awaitable, openssh_sftp_protocol};
 
 /// Default size of buffer for up/download in openssh-portable
 pub const OPENSSH_PORTABLE_DEFAULT_COPY_BUFLEN: usize = 32768;

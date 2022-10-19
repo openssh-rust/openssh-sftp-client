@@ -11,11 +11,11 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::openssh_sftp_protocol::file_attrs::FileAttrs;
-use crate::openssh_sftp_protocol::response::{NameEntry, ResponseInner, StatusCode};
-use crate::openssh_sftp_protocol::ssh_format;
-use crate::openssh_sftp_protocol::HandleOwned;
 use derive_destructure2::destructure;
+use openssh_sftp_protocol::file_attrs::FileAttrs;
+use openssh_sftp_protocol::response::{NameEntry, ResponseInner, StatusCode};
+use openssh_sftp_protocol::ssh_format;
+use openssh_sftp_protocol::HandleOwned;
 
 /// The data returned by [`WriteEnd::send_read_request`].
 #[derive(Debug, Clone)]
