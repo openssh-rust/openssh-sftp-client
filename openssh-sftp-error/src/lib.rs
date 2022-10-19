@@ -9,8 +9,8 @@ use thiserror::Error;
 pub use awaitable;
 
 pub use openssh_sftp_protocol;
-pub use openssh_sftp_protocol::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
 use openssh_sftp_protocol::ssh_format;
+pub use openssh_sftp_protocol::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
 
 /// Error returned by
 /// [`openssh-sftp-client-lowlevel`](https://docs.rs/openssh-sftp-client-lowlevel)
