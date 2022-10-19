@@ -122,7 +122,7 @@ impl Sftp {
         // is at least 9 bytes long.
         let default_max_packet_len = u32::MAX - 9;
 
-        let (read_len, write_len, packet_len) = if extensions.limits {
+        let (read_len, write_len, packet_len) = if extensions.contains(Extensions::LIMITS) {
             let mut limits = write_end
                 .send_request(|write_end, id| Ok(write_end.send_limits_request(id)?.wait()))
                 .await?;

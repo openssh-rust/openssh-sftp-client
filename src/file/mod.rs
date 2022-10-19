@@ -1,4 +1,4 @@
-use super::lowlevel::{self, CreateFlags, Data, FileAttrs, Handle};
+use super::lowlevel::{self, CreateFlags, Data, Extensions, FileAttrs, Handle};
 use super::{
     metadata::{MetaData, MetaDataBuilder, Permissions},
     Auxiliary, Error, Id, OwnedHandle, Sftp, WriteEnd,
@@ -341,7 +341,11 @@ impl<'s> File<'s> {
     ///
     /// This function is cancel safe.
     pub async fn sync_all(&mut self) -> Result<(), Error> {
-        if !self.get_auxiliary().extensions().fsync {
+        if !self
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::FSYNC)
+        {
             return Err(Error::UnsupportedExtension(&"fsync"));
         }
 
@@ -616,7 +620,12 @@ impl<'s> File<'s> {
     }
 
     async fn copy_to_impl(&mut self, dst: &mut Self, n: u64) -> Result<(), Error> {
-        if !self.inner.get_auxiliary().extensions().copy_data {
+        if !self
+            .inner
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::COPY_DATA)
+        {
             return Err(Error::UnsupportedExtension(&"copy_data"));
         }
 
