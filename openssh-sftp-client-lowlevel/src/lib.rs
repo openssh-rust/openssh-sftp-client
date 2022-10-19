@@ -16,20 +16,14 @@
 //!  - [`WriteEnd::send_hardlink_request`]
 //!  - [`WriteEnd::send_posix_rename_request`]
 
-#[cfg(doc)]
-/// Changelog for this crate.
-pub mod changelog;
-
-mod awaitable_responses;
-mod awaitables;
-mod buffer;
-mod connection;
-mod queue;
-mod read_end;
-mod reader_buffered;
-mod write_end;
-
 pub use openssh_sftp_error::Error;
+pub use openssh_sftp_protocol::{
+    file_attrs::{FileAttrs, FileType, Permissions, UnixTimeStamp},
+    open_options::{CreateFlags, OpenOptions},
+    request::OpenFileRequest,
+    response::{Extensions, Limits, NameEntry},
+    {ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError}, {Handle, HandleOwned},
+};
 
 /// Default size of buffer for up/download in openssh-portable
 pub const OPENSSH_PORTABLE_DEFAULT_COPY_BUFLEN: usize = 32768;
@@ -49,23 +43,14 @@ pub const OPENSSH_PORTABLE_DEFAULT_DOWNLOAD_BUFLEN: usize = 20480;
 /// Default length of upload buffer in openssh-portable
 pub const OPENSSH_PORTABLE_DEFAULT_UPLOAD_BUFLEN: usize = 20480;
 
+#[cfg(doc)]
+/// Changelog for this crate.
+pub mod changelog;
+
+mod awaitable_responses;
 pub use awaitable_responses::Id;
 
-pub use buffer::{Buffer, ToBuffer};
-
-pub use openssh_sftp_protocol::{
-    file_attrs::{FileAttrs, FileType, Permissions, UnixTimeStamp},
-    open_options::{CreateFlags, OpenOptions},
-    request::OpenFileRequest,
-    response::{Extensions, Limits, NameEntry},
-    {ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError}, {Handle, HandleOwned},
-};
-
-pub use connection::{connect, SharedData};
-
-pub use read_end::ReadEnd;
-pub use write_end::WriteEnd;
-
+mod awaitables;
 pub use awaitables::{
     AwaitableAttrs, AwaitableAttrsFuture, AwaitableData, AwaitableDataFuture, AwaitableHandle,
     AwaitableHandleFuture, AwaitableLimits, AwaitableLimitsFuture, AwaitableName,
@@ -73,4 +58,19 @@ pub use awaitables::{
     AwaitableStatusFuture, Data,
 };
 
+mod buffer;
+pub use buffer::{Buffer, ToBuffer};
+
+mod connection;
+pub use connection::{connect, SharedData};
+
+mod queue;
 pub use queue::Queue;
+
+mod read_end;
+pub use read_end::ReadEnd;
+
+mod reader_buffered;
+
+mod write_end;
+pub use write_end::WriteEnd;
