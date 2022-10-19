@@ -1,22 +1,18 @@
 #![forbid(unsafe_code)]
 
-use super::awaitable_responses::ArenaArc;
-use super::awaitable_responses::Response;
-use super::connection::SharedData;
-use super::reader_buffered::ReaderBuffered;
-use super::Error;
-use super::Extensions;
-use super::ToBuffer;
+use super::{
+    awaitable_responses::ArenaArc, awaitable_responses::Response, connection::SharedData,
+    reader_buffered::ReaderBuffered, Error, Extensions, ToBuffer,
+};
 
-use std::fmt::Debug;
-use std::io;
-use std::num::NonZeroUsize;
-use std::pin::Pin;
+use std::{io, num::NonZeroUsize, pin::Pin};
 
-use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
-use openssh_sftp_protocol::response::{self, ServerVersion};
-use openssh_sftp_protocol::serde::de::DeserializeOwned;
-use openssh_sftp_protocol::ssh_format::{self, from_bytes};
+use openssh_sftp_protocol::{
+    constants::SSH2_FILEXFER_VERSION,
+    response::{self, ServerVersion},
+    serde::de::DeserializeOwned,
+    ssh_format::{self, from_bytes},
+};
 
 use pin_project::pin_project;
 use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt};

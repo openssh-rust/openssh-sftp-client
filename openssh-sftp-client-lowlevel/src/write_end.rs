@@ -5,19 +5,19 @@ use super::*;
 use awaitable_responses::ArenaArc;
 use connection::SharedData;
 
-use std::borrow::Cow;
-use std::convert::TryInto;
-use std::fmt::Debug;
-use std::io::IoSlice;
-use std::ops::{Deref, DerefMut};
-use std::path::Path;
+use std::{
+    borrow::Cow,
+    convert::TryInto,
+    fmt::Debug,
+    io::IoSlice,
+    ops::{Deref, DerefMut},
+    path::Path,
+};
 
 use bytes::{BufMut, Bytes, BytesMut};
-use openssh_sftp_protocol::file_attrs::FileAttrs;
-use openssh_sftp_protocol::request::*;
-use openssh_sftp_protocol::serde::Serialize;
-use openssh_sftp_protocol::ssh_format::Serializer;
-use openssh_sftp_protocol::Handle;
+use openssh_sftp_protocol::{
+    file_attrs::FileAttrs, request::*, serde::Serialize, ssh_format::Serializer, Handle,
+};
 
 /// It is recommended to create at most one `WriteEnd` per thread
 /// using [`WriteEnd::clone`].

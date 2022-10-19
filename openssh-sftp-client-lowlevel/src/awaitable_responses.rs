@@ -5,7 +5,6 @@ use super::Error;
 use concurrent_arena::Arena;
 use derive_destructure2::destructure;
 use openssh_sftp_protocol::response::ResponseInner;
-use std::fmt::Debug;
 
 #[derive(Debug)]
 pub(crate) enum Response<Buffer> {

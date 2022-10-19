@@ -1,10 +1,12 @@
-use std::cmp::min;
-use std::future::Future;
-use std::io;
-use std::num::NonZeroUsize;
-use std::ops::Deref;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    cmp::min,
+    future::Future,
+    io,
+    num::NonZeroUsize,
+    ops::Deref,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use bytes::{Buf, BytesMut};
 

@@ -53,14 +53,13 @@ pub use awaitable_responses::Id;
 
 pub use buffer::{Buffer, ToBuffer};
 
-pub use openssh_sftp_protocol::file_attrs::{FileAttrs, FileType, Permissions, UnixTimeStamp};
-pub use openssh_sftp_protocol::open_options::{CreateFlags, OpenOptions};
-pub use openssh_sftp_protocol::request::OpenFileRequest;
-pub use openssh_sftp_protocol::response::{Extensions, Limits, NameEntry};
 pub use openssh_sftp_protocol::{
-    ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError,
+    file_attrs::{FileAttrs, FileType, Permissions, UnixTimeStamp},
+    open_options::{CreateFlags, OpenOptions},
+    request::OpenFileRequest,
+    response::{Extensions, Limits, NameEntry},
+    {ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError}, {Handle, HandleOwned},
 };
-pub use openssh_sftp_protocol::{Handle, HandleOwned};
 
 pub use connection::{connect, SharedData};
 

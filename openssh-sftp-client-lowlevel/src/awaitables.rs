@@ -1,21 +1,22 @@
 #![forbid(unsafe_code)]
 
 use super::*;
-use awaitable_responses::ArenaArc;
-use awaitable_responses::Response;
+use awaitable_responses::{ArenaArc, Response};
 
-use std::fmt::Debug;
-use std::future::Future;
-use std::mem::replace;
-use std::path::Path;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    mem::replace,
+    path::Path,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use derive_destructure2::destructure;
-use openssh_sftp_protocol::file_attrs::FileAttrs;
-use openssh_sftp_protocol::response::{NameEntry, ResponseInner, StatusCode};
-use openssh_sftp_protocol::ssh_format;
-use openssh_sftp_protocol::HandleOwned;
+use openssh_sftp_protocol::{
+    file_attrs::FileAttrs,
+    response::{NameEntry, ResponseInner, StatusCode},
+    ssh_format, HandleOwned,
+};
 
 /// The data returned by [`WriteEnd::send_read_request`].
 #[derive(Debug, Clone)]
