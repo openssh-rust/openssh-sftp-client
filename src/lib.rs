@@ -47,8 +47,9 @@
 /// Changelog for this crate.
 pub mod changelog;
 
+pub use error::{Error, UnixTimeStampError};
 use openssh_sftp_client_lowlevel as lowlevel;
-pub use openssh_sftp_error::{Error, UnixTimeStampError};
+pub use openssh_sftp_error as error;
 
 pub use lowlevel::UnixTimeStamp;
 
