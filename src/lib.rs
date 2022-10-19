@@ -48,9 +48,9 @@
 pub mod changelog;
 
 use openssh_sftp_client_lowlevel as lowlevel;
-pub use openssh_sftp_error::Error;
+pub use openssh_sftp_error::{Error, UnixTimeStampError};
 
-pub use lowlevel::{UnixTimeStamp, UnixTimeStampError};
+pub use lowlevel::UnixTimeStamp;
 
 use bytes::BytesMut;
 
