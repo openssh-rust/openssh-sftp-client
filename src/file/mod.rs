@@ -1,18 +1,22 @@
-use super::lowlevel::{self, CreateFlags, Data, Extensions, FileAttrs, Handle};
 use super::{
-    metadata::{MetaData, MetaDataBuilder, Permissions},
-    Auxiliary, Error, Id, OwnedHandle, Sftp, WriteEnd,
+    lowlevel::{self, CreateFlags, Data, Extensions, FileAttrs, Handle},
+    {
+        metadata::{MetaData, MetaDataBuilder, Permissions},
+        Auxiliary, Error, Id, OwnedHandle, Sftp, WriteEnd,
+    },
 };
 
-use std::borrow::Cow;
-use std::cmp::min;
-use std::convert::TryInto;
-use std::future::Future;
-use std::io::{self, IoSlice};
-use std::num::NonZeroU64;
-use std::path::Path;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    cmp::min,
+    convert::TryInto,
+    future::Future,
+    io::{self, IoSlice},
+    num::NonZeroU64,
+    path::Path,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use bytes::{Buf, Bytes, BytesMut};
 use tokio::io::AsyncSeek;

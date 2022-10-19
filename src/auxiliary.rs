@@ -1,7 +1,8 @@
 use super::lowlevel::Extensions;
 
-use once_cell::sync::OnceCell;
 use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+
+use once_cell::sync::OnceCell;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 

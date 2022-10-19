@@ -1,24 +1,26 @@
-use super::super::{BoxedWaitForCancellationFuture, Buffer, Data};
-use super::lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle};
-use super::utility::take_io_slices;
-use super::{Error, File, Id, WriteEnd};
+use super::{utility::take_io_slices, File};
+use crate::{
+    lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle},
+    BoxedWaitForCancellationFuture, Buffer, Data, Error, Id, WriteEnd,
+};
 
-use std::borrow::Cow;
-use std::cmp::{max, min};
-use std::collections::VecDeque;
-use std::convert::TryInto;
-use std::future::Future;
-use std::io::{self, IoSlice};
-use std::num::{NonZeroU32, NonZeroUsize};
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    cmp::{max, min},
+    collections::VecDeque,
+    convert::TryInto,
+    future::Future,
+    io::{self, IoSlice},
+    num::{NonZeroU32, NonZeroUsize},
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use bytes::{Buf, Bytes, BytesMut};
+use derive_destructure2::destructure;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use tokio_io_utility::ready;
-
-use derive_destructure2::destructure;
 
 /// The default length of the buffer used in [`TokioCompatFile`].
 pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };

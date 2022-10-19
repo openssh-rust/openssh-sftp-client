@@ -1,5 +1,7 @@
-use super::lowlevel::{FileAttrs, FileType as SftpFileType, Permissions as SftpPermissions};
-use super::UnixTimeStamp;
+use super::{
+    lowlevel::{FileAttrs, FileType as SftpFileType, Permissions as SftpPermissions},
+    UnixTimeStamp,
+};
 
 /// Builder of [`MetaData`].
 #[derive(Debug, Default, Copy, Clone)]

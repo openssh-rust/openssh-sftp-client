@@ -1,5 +1,4 @@
-use std::io::IoSlice;
-use std::ops::Deref;
+use std::{io::IoSlice, ops::Deref};
 
 use bytes::Bytes;
 use tokio_io_utility::IoSliceExt;
