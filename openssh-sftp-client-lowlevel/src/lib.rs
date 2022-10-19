@@ -16,13 +16,13 @@
 //!  - [`WriteEnd::send_hardlink_request`]
 //!  - [`WriteEnd::send_posix_rename_request`]
 
-pub use openssh_sftp_error::Error;
+pub use openssh_sftp_error::{Error, SftpErrMsg, SftpErrorKind, UnixTimeStampError};
 pub use openssh_sftp_protocol::{
     file_attrs::{FileAttrs, FileType, Permissions, UnixTimeStamp},
     open_options::{CreateFlags, OpenOptions},
     request::OpenFileRequest,
     response::{Extensions, Limits, NameEntry},
-    {ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError}, {Handle, HandleOwned},
+    Handle, HandleOwned,
 };
 
 /// Default size of buffer for up/download in openssh-portable
