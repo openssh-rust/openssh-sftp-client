@@ -3,7 +3,9 @@
 use std::{io, num::TryFromIntError, process::ExitStatus};
 
 pub use awaitable_error::Error as AwaitableError;
-pub use openssh_sftp_protocol_error::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
+pub use openssh_sftp_protocol_error::{
+    ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError,
+};
 pub use ssh_format_error::Error as SshFormatError;
 use thiserror::Error;
 
