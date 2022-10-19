@@ -7,13 +7,13 @@ pub use openssh_sftp_protocol_error::{
     ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind, UnixTimeStampError,
 };
 pub use ssh_format_error::Error as SshFormatError;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 /// Error returned by
 /// [`openssh-sftp-client-lowlevel`](https://docs.rs/openssh-sftp-client-lowlevel)
 /// and [`openssh-sftp-client`](https://docs.rs/openssh-sftp-client)
 #[non_exhaustive]
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 pub enum Error {
     /// Server speaks sftp protocol other than protocol 3.
     #[error("Server does not support sftp protocol v3: It only support sftp protocol newer than {version}.")]
@@ -75,9 +75,9 @@ pub enum Error {
         response_id: u32,
     },
 
-    /// (OriginalError, RecursiveError)
-    #[error("(OriginalError, RecursiveError): {0:#?}.")]
-    RecursiveErrors(Box<(Error, Error)>),
+    /// Raised error when cleaning up.
+    #[error(transparent)]
+    RecursiveErrors(Box<RecursiveError>),
 
     /// Sftp server error
     #[error("Sftp server reported error kind {0:#?}, msg: {1}")]
@@ -97,4 +97,16 @@ pub enum Error {
     /// tokio join error
     #[error("Failed to join tokio task")]
     TaskJoinError(#[from] tokio::task::JoinError),
+}
+
+#[derive(Debug, ThisError)]
+#[error("OriginalError: {original_error}, curr err raised when cleaning up: {occuring_error}.")]
+pub struct RecursiveError {
+    /// Original error
+    pub original_error: Error,
+
+    /// Current error raised when performing cleanup
+    /// for original error.
+    #[source]
+    pub occuring_error: Error,
 }

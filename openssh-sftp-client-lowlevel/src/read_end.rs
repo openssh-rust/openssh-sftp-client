@@ -7,13 +7,13 @@ use super::{
 
 use std::{io, num::NonZeroUsize, pin::Pin};
 
+use openssh_sftp_error::RecursiveError;
 use openssh_sftp_protocol::{
     constants::SSH2_FILEXFER_VERSION,
     response::{self, ServerVersion},
     serde::de::DeserializeOwned,
     ssh_format::{self, from_bytes},
 };
-
 use pin_project::pin_project;
 use tokio::io::{copy_buf, sink, AsyncBufReadExt, AsyncRead, AsyncReadExt};
 use tokio_io_utility::{read_exact_to_bytes, read_exact_to_vec};
@@ -85,10 +85,10 @@ where
     async fn consume_packet(self: Pin<&mut Self>, len: u32, err: Error) -> Result<(), Error> {
         let reader = self.project().reader;
         if let Err(consumption_err) = copy_buf(&mut reader.take(len as u64), &mut sink()).await {
-            Err(Error::RecursiveErrors(Box::new((
-                err,
-                consumption_err.into(),
-            ))))
+            Err(Error::RecursiveErrors(Box::new(RecursiveError {
+                original_error: err,
+                occuring_error: consumption_err.into(),
+            })))
         } else {
             Err(err)
         }
