@@ -14,10 +14,8 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 
 [dependencies]
 thiserror = "1.0.29"
-awaitable = "0.4.0"
-openssh-sftp-protocol = "0.23.0"
+awaitable-error = "0.1.0"
+openssh-sftp-protocol-error = "0.1.0"
+ssh_format_error = "0.1.0"
 
 tokio = { version = "1.11.0", features = ["rt"] }
-
-[features]
-bytes = ["openssh-sftp-protocol/bytes"]

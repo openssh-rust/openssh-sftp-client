@@ -2,13 +2,10 @@
 
 use std::{io, num::TryFromIntError, process::ExitStatus};
 
+pub use awaitable_error::Error as AwaitableError;
+pub use openssh_sftp_protocol_error::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
+pub use ssh_format_error::Error as SshFormatError;
 use thiserror::Error;
-
-pub use awaitable;
-
-pub use openssh_sftp_protocol;
-use openssh_sftp_protocol::ssh_format;
-pub use openssh_sftp_protocol::{ErrMsg as SftpErrMsg, ErrorCode as SftpErrorKind};
 
 /// Error returned by
 /// [`openssh-sftp-client-lowlevel`](https://docs.rs/openssh-sftp-client-lowlevel)
@@ -57,11 +54,11 @@ pub enum Error {
 
     /// Failed to serialize/deserialize the message: {0}.
     #[error("Failed to serialize/deserialize the message: {0}.")]
-    FormatError(#[from] ssh_format::Error),
+    FormatError(#[from] SshFormatError),
 
     /// Error when waiting for response
     #[error("Error when waiting for response: {0}.")]
-    AwaitableError(#[from] awaitable::Error),
+    AwaitableError(#[from] AwaitableError),
 
     /// Sftp protocol can only send and receive at most [`u32::MAX`] data in one request.
     #[error("Sftp protocol can only send and receive at most u32::MAX data in one request.")]
