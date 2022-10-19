@@ -4,10 +4,12 @@ use super::{
     Auxiliary, Buffer, Error, Id, OwnedHandle, Sftp, WriteEnd, WriteEndWithCachedId,
 };
 
-use std::borrow::Cow;
-use std::cmp::min;
-use std::convert::TryInto;
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    cmp::min,
+    convert::TryInto,
+    path::{Path, PathBuf},
+};
 
 use bytes::BytesMut;
 

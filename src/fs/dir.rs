@@ -1,10 +1,14 @@
-use super::super::metadata::{FileType, MetaData};
-use super::lowlevel::NameEntry;
+use crate::{
+    lowlevel::NameEntry,
+    metadata::{FileType, MetaData},
+};
 
-use std::ops::{Deref, DerefMut};
-use std::path::Path;
-use std::slice::{Iter, IterMut};
-use std::vec::IntoIter;
+use std::{
+    ops::{Deref, DerefMut},
+    path::Path,
+    slice::{Iter, IterMut},
+    vec::IntoIter,
+};
 
 /// Entries returned by the [`ReadDir`].
 ///

@@ -1,10 +1,14 @@
-use super::lowlevel::{Handle, HandleOwned};
-use super::{Error, Id, WriteEnd, WriteEndWithCachedId};
+use super::{
+    lowlevel::{Handle, HandleOwned},
+    {Error, Id, WriteEnd, WriteEndWithCachedId},
+};
 
-use std::borrow::Cow;
-use std::future::Future;
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::{
+    borrow::Cow,
+    future::Future,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use derive_destructure2::destructure;
 

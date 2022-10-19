@@ -1,8 +1,10 @@
 use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd};
 
-use std::future::Future;
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
+use std::{
+    future::Future,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+};
 
 #[derive(Debug)]
 pub(super) struct WriteEndWithCachedId<'s> {

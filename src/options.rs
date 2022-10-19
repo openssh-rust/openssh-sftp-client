@@ -1,5 +1,7 @@
-use std::num::{NonZeroU16, NonZeroUsize};
-use std::time::Duration;
+use std::{
+    num::{NonZeroU16, NonZeroUsize},
+    time::Duration,
+};
 
 #[cfg(feature = "ci-tests")]
 use std::num::NonZeroU32;
