@@ -63,7 +63,7 @@ where
             .read_exact_into_buffer(len as usize)
             .await?;
         let server_version =
-            ServerVersion::deserialize(&mut ssh_format::Deserializer::from_bytes(&*drain))?;
+            ServerVersion::deserialize(&mut ssh_format::Deserializer::from_bytes(&drain))?;
 
         if server_version.version != SSH2_FILEXFER_VERSION {
             Err(Error::UnsupportedSftpProtocol {
@@ -79,7 +79,7 @@ where
         size: usize,
     ) -> Result<T, Error> {
         let drain = self.project().reader.read_exact_into_buffer(size).await?;
-        Ok(from_bytes(&*drain)?.0)
+        Ok(from_bytes(&drain)?.0)
     }
 
     async fn consume_packet(self: Pin<&mut Self>, len: u32, err: Error) -> Result<(), Error> {
@@ -96,7 +96,7 @@ where
 
     async fn read_into_box(self: Pin<&mut Self>, len: usize) -> Result<Box<[u8]>, Error> {
         let mut vec = Vec::new();
-        read_exact_to_vec(&mut self.project().reader, &mut vec, len as usize).await?;
+        read_exact_to_vec(&mut self.project().reader, &mut vec, len).await?;
 
         Ok(vec.into_boxed_slice())
     }
@@ -198,7 +198,7 @@ where
     pub async fn read_in_one_packet_pinned(mut self: Pin<&mut Self>) -> Result<(), Error> {
         let this = self.as_mut().project();
         let drain = this.reader.read_exact_into_buffer(9).await?;
-        let (len, packet_type, response_id): (u32, u8, u32) = from_bytes(&*drain)?.0;
+        let (len, packet_type, response_id): (u32, u8, u32) = from_bytes(&drain)?.0;
 
         let len = len - 5;
 
