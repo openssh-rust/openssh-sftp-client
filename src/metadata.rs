@@ -103,7 +103,10 @@ impl MetaData {
     /// Return `None` if the server did not return
     /// the last access time.
     pub fn accessed(&self) -> Option<UnixTimeStamp> {
-        self.0.get_time().map(|(atime, _mtime)| atime)
+        self.0
+            .get_time()
+            .map(|(atime, _mtime)| atime)
+            .map(UnixTimeStamp)
     }
 
     /// Returns the last modification time.
@@ -111,7 +114,10 @@ impl MetaData {
     /// Return `None` if the server did not return
     /// the last modification time.
     pub fn modified(&self) -> Option<UnixTimeStamp> {
-        self.0.get_time().map(|(_atime, mtime)| mtime)
+        self.0
+            .get_time()
+            .map(|(_atime, mtime)| mtime)
+            .map(UnixTimeStamp)
     }
 }
 
