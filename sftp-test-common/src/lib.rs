@@ -55,7 +55,7 @@ pub fn get_sftp_path() -> &'static Path {
 
 pub async fn launch_sftp() -> (process::Child, PipeWrite, PipeRead) {
     let mut child = process::Command::new(get_sftp_path())
-        .args(&["-e", "-l", "DEBUG"])
+        .args(["-e", "-l", "DEBUG"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
