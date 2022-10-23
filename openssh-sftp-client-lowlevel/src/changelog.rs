@@ -16,7 +16,7 @@ pub mod v0_4_0 {}
 /// ## Internal
 ///  - Rm WriteBuffer: ssh_format now supports BytesMut as SerOutput
 ///  - Enable feature "bytes" of dep [`openssh-sftp-error`] which
-///    enables "bytes" of dep [`ssh_format`].
+///    enables "bytes" of dep `ssh_format`.
 ///
 /// ## Other
 ///  - Bump [`openssh-sftp-protocol`] to v0.22.1
