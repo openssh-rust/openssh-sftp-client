@@ -4,6 +4,13 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// ## Changed
+///  - Ensure stable api: Create newtype wrapper of UnixTimeStamp (#53)
+///
+/// ## Other
+///  - Bump [`openssh-sftp-error`] to v0.3.0
+pub mod v_0_12_0 {}
+
 /// ## Other change
 ///
 /// Bump dep

@@ -4,6 +4,28 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// ## Changed
+///  - Fix [`openssh-sftp-error`]: Ensure stable api (#49)
+///  - Create newtype RecursiveError: Impls error::Error (#52)
+///
+/// ## Other
+///  - Bump [`openssh-sftp-protocol`] to v0.23.0
+///  - Bump dep awaitable to v0.4.0 (#48)
+pub mod v0_4_0 {}
+
+/// ## Internal
+///  - Rm WriteBuffer: ssh_format now supports BytesMut as SerOutput
+///  - Enable feature "bytes" of dep [`openssh-sftp-error`] which
+///    enables "bytes" of dep [`ssh_format`].
+///
+/// ## Other
+///  - Bump [`openssh-sftp-protocol`] to v0.22.1
+pub mod v0_3_1 {}
+
+/// ## Other
+///  - Bump [`openssh-sftp-protocol`] to v0.22.0
+pub mod v0_3_0 {}
+
 /// ## Added
 ///  - new trait [`Queue`]
 ///  - [`ReadEnd::new`] is now public
