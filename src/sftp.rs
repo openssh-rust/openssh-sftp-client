@@ -1,8 +1,10 @@
-use super::{
+use crate::{
     auxiliary,
     file::{File, OpenOptions},
     fs::Fs,
-    lowlevel, tasks, Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
+    lowlevel, tasks,
+    utils::assert_send,
+    Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
 };
 
 use auxiliary::Auxiliary;
@@ -33,28 +35,31 @@ impl Sftp {
         stdout: R,
         options: SftpOptions,
     ) -> Result<Self, Error> {
-        let write_end_buffer_size = options.get_write_end_buffer_size();
+        assert_send(async move {
+            let write_end_buffer_size = options.get_write_end_buffer_size();
 
-        let write_end = Self::connect(
-            write_end_buffer_size.get(),
-            options.get_max_pending_requests(),
-        )
-        .await?;
+            let write_end = assert_send(Self::connect(
+                write_end_buffer_size.get(),
+                options.get_max_pending_requests(),
+            ))
+            .await?;
 
-        let flush_task = create_flush_task(
-            stdin,
-            SharedData::clone(&write_end),
-            write_end_buffer_size,
-            options.get_flush_interval(),
-        );
+            let flush_task = create_flush_task(
+                stdin,
+                SharedData::clone(&write_end),
+                write_end_buffer_size,
+                options.get_flush_interval(),
+            );
 
-        let (rx, read_task) = create_read_task(
-            stdout,
-            options.get_read_end_buffer_size(),
-            SharedData::clone(&write_end),
-        );
+            let (rx, read_task) = create_read_task(
+                stdout,
+                options.get_read_end_buffer_size(),
+                SharedData::clone(&write_end),
+            );
 
-        Self::init(flush_task, read_task, write_end, rx, &options).await
+            Self::init(flush_task, read_task, write_end, rx, &options).await
+        })
+        .await
     }
 
     async fn connect(
