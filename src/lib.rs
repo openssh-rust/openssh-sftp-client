@@ -79,6 +79,8 @@ use cache::WriteEndWithCachedId;
 mod handle;
 use handle::OwnedHandle;
 
+mod utils;
+
 /// Module contains types for manipulating files.
 pub mod file;
 

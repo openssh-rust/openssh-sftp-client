@@ -46,8 +46,9 @@ impl<'s> OwnedHandle<'s> {
 
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
-        F: Future<Output = Result<(Id, R), Error>> + 'static,
+        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error> + Send,
+        F: Future<Output = Result<(Id, R), Error>> + Send + 'static,
+        R: Send,
     {
         let handle = &self.handle;
 
