@@ -253,8 +253,9 @@ impl<'s> File<'s> {
 
     async fn send_writable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
-        F: Future<Output = Result<(Id, R), Error>> + 'static,
+        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error> + Send,
+        F: Future<Output = Result<(Id, R), Error>> + Send + 'static,
+        R: Send,
     {
         self.check_for_writable()?;
 
@@ -279,8 +280,9 @@ impl<'s> File<'s> {
 
     async fn send_readable_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error>,
-        F: Future<Output = Result<(Id, R), Error>> + 'static,
+        Func: FnOnce(&mut WriteEnd, Cow<'_, Handle>, Id) -> Result<F, Error> + Send,
+        F: Future<Output = Result<(Id, R), Error>> + Send + 'static,
+        R: Send,
     {
         self.check_for_readable()?;
 

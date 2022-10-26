@@ -61,12 +61,12 @@ impl<'s> WriteEndWithCachedId<'s> {
     /// * `f` - the future must be cancel safe.
     pub(super) async fn cancel_if_task_failed<R, E, F>(&mut self, future: F) -> Result<R, Error>
     where
-        F: Future<Output = Result<R, E>>,
-        E: Into<Error>,
+        F: Future<Output = Result<R, E>> + Send,
+        E: Into<Error> + Send,
     {
         async fn inner<R>(
             this: &mut WriteEndWithCachedId<'_>,
-            future: Pin<&mut (dyn Future<Output = Result<R, Error>>)>,
+            future: Pin<&mut (dyn Future<Output = Result<R, Error>> + Send)>,
         ) -> Result<R, Error> {
             let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
             let auxiliary = this.sftp.auxiliary();
@@ -101,8 +101,8 @@ impl<'s> WriteEndWithCachedId<'s> {
 impl<'s> WriteEndWithCachedId<'s> {
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
-        Func: FnOnce(&mut WriteEnd, Id) -> Result<F, Error>,
-        F: Future<Output = Result<(Id, R), Error>> + 'static,
+        Func: FnOnce(&mut WriteEnd, Id) -> Result<F, Error> + Send,
+        F: Future<Output = Result<(Id, R), Error>> + Send + 'static,
     {
         let id = self.get_id_mut();
         let write_end = &mut self.inner;
@@ -112,7 +112,7 @@ impl<'s> WriteEndWithCachedId<'s> {
 
         async fn inner<R>(
             this: &mut WriteEndWithCachedId<'_>,
-            future: Pin<&mut (dyn Future<Output = Result<(Id, R), Error>>)>,
+            future: Pin<&mut (dyn Future<Output = Result<(Id, R), Error>> + Send)>,
         ) -> Result<R, Error> {
             // Requests is already added to write buffer, so wakeup
             // the `flush_task`.
