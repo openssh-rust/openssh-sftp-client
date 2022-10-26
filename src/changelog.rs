@@ -4,6 +4,10 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// ## Fixed
+///  - `Sftp::new` now returns future that implemens `Send`
+pub mod v_0_12_1 {}
+
 /// ## Changed
 ///  - Ensure stable api: Create newtype wrapper of UnixTimeStamp (#53)
 ///
