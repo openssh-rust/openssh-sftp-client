@@ -2,9 +2,7 @@ use crate::{
     auxiliary,
     file::{File, OpenOptions},
     fs::Fs,
-    lowlevel, tasks,
-    utils::assert_send,
-    Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
+    lowlevel, tasks, Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
 };
 
 use auxiliary::Auxiliary;
@@ -19,6 +17,7 @@ use tokio::{
     sync::oneshot::Receiver,
     task::JoinHandle,
 };
+use tokio_io_utility::assert_send;
 
 /// A file-oriented channel to a remote host.
 #[derive(Debug, destructure)]
