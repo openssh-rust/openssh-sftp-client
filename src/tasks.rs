@@ -1,7 +1,6 @@
 use super::{lowlevel::Extensions, Error, ReadEnd, SharedData};
 
 use std::{
-    io,
     num::NonZeroUsize,
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
@@ -10,77 +9,26 @@ use std::{
 
 use bytes::Bytes;
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite},
     pin,
     sync::oneshot,
     task::{spawn, JoinHandle},
     time,
 };
-use tokio_io_utility::{init_maybeuninit_io_slices_mut, ReusableIoSlices};
+use tokio_io_utility::{write_all_bytes, ReusableIoSlices};
 
 async fn flush(
     shared_data: &SharedData,
-    mut writer: Pin<&mut (dyn AsyncWrite + Send)>,
+    writer: Pin<&mut (dyn AsyncWrite + Send)>,
     buffer: &mut Vec<Bytes>,
     reusable_io_slices: &mut ReusableIoSlices,
 ) -> Result<(), Error> {
-    static EMPTY_BYTES: Bytes = Bytes::from_static(b"");
-
     shared_data.queue().swap(buffer);
 
     // `Queue` implementation for `MpscQueue` already removes
-    // all empty `Bytes`s so that:
-    //  - We can check for `io::ErrorKind::WriteZero` error easily
-    //  - It won't occupy precise slot in `reusable_io_slices` so that
-    //    we can group as many non-zero IoSlice in one write.
-    //  - Avoid conserion from/to `VecDeque` unless necessary,
-    //    which might allocate.
-    //  - Simplify the loop below.
-
-    if buffer.is_empty() {
-        return Ok(());
-    }
-
-    let mut start = 0;
-
-    // do-while style loop, because on the first iteration
-    // start < buffer.len()
-    'outer: loop {
-        let uninit_io_slices = reusable_io_slices.get_mut();
-
-        // start < buffer.len()
-        // io_slices.is_empty() == false
-        let io_slices = init_maybeuninit_io_slices_mut(
-            uninit_io_slices,
-            buffer[start..].iter().map(|bytes| io::IoSlice::new(bytes)),
-        );
-
-        let mut n = writer.write_vectored(io_slices).await?;
-
-        if n == 0 {
-            return Err(Error::from(io::Error::from(io::ErrorKind::WriteZero)));
-        }
-
-        // On first iteration, start < buffer.len()
-        while n >= buffer[start].len() {
-            n -= buffer[start].len();
-            // Release `Bytes` so that the memory they occupied
-            // can be reused in `BytesMut`.
-            buffer[start] = EMPTY_BYTES.clone();
-            start += 1;
-
-            if start == buffer.len() {
-                debug_assert_eq!(n, 0);
-                break 'outer;
-            }
-        }
-
-        // start < buffer.len(),
-        // n < buffer[start].len()
-        buffer[start] = buffer[start].slice(n..);
-    }
-
-    buffer.clear();
+    // all empty `Bytes`s so that precond of write_all_bytes
+    // is satisfied.
+    write_all_bytes(writer, buffer, reusable_io_slices).await?;
 
     Ok(())
 }
