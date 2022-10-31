@@ -8,6 +8,7 @@ use std::{
 };
 
 use bytes::Bytes;
+use scopeguard::defer;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     pin,
@@ -152,6 +153,14 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
 
         pin!(read_end);
 
+        defer! {
+            // Order the shutdown of flush_task.
+            auxiliary.shutdown_stage.store(2, Ordering::Relaxed);
+
+            auxiliary.flush_immediately.notify_one();
+            auxiliary.flush_end_notify.notify_one();
+        }
+
         // Receive version and extensions
         let extensions = read_end.as_mut().receive_server_hello_pinned().await?;
 
@@ -176,12 +185,6 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
                 // All responses is read in and there is no
                 // write_end/shared_data left.
                 cancel_guard.disarm();
-
-                // Order the shutdown of flush_task.
-                auxiliary.shutdown_stage.store(2, Ordering::Relaxed);
-
-                auxiliary.flush_immediately.notify_one();
-                auxiliary.flush_end_notify.notify_one();
 
                 break Ok(());
             }
