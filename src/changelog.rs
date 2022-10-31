@@ -5,6 +5,10 @@ use crate::*;
 pub mod unreleased {}
 
 /// ## Fixed
+///  - Fix `read_task`: Order shutdown of flush_task on err/panic
+pub mod v_0_12_2 {}
+
+/// ## Fixed
 ///  - `Sftp::new` now returns future that implemens `Send`
 pub mod v_0_12_1 {}
 
