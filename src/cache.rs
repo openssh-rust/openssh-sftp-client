@@ -84,8 +84,10 @@ impl<'s> WriteEndWithCachedId<'s> {
         }
 
         tokio::select! {
-            res = future => res,
+            biased;
+
             _ = cancel_token.cancelled() => cancel_err(),
+            res = future => res,
         }
     }
 

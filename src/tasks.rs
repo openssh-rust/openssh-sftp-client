@@ -113,6 +113,8 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
             flush_end_notify.notified().await;
 
             tokio::select! {
+                biased;
+
                 _ = interval.tick() => (),
                 // tokio::sync::Notify is cancel safe, however
                 // cancelling it would lose the place in the queue.
