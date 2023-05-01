@@ -36,6 +36,8 @@ bytes = "1.2.1"
 tokio-io-utility = "0.7.4"
 tokio-util = "0.7.0"
 
+futures-core = "0.3.28"
+
 scopeguard = "1.1.0"
 
 [dev-dependencies]
