@@ -1,14 +1,25 @@
 use crate::{
     lowlevel::NameEntry,
     metadata::{FileType, MetaData},
+    Error,
 };
 
+use super::Dir;
+
 use std::{
-    ops::{Deref, DerefMut},
+    borrow::Cow,
+    future::Future,
     path::Path,
-    slice::{Iter, IterMut},
+    pin::Pin,
+    task::{ready, Context, Poll},
     vec::IntoIter,
 };
+
+use futures_core::stream::{FusedStream, Stream};
+use pin_project::pin_project;
+use tokio_util::sync::WaitForCancellationFutureOwned;
+
+type ResponseFuture = crate::lowlevel::AwaitableNameEntriesFuture<crate::Buffer>;
 
 /// Entries returned by the [`ReadDir`].
 ///
@@ -40,82 +51,115 @@ impl DirEntry {
 }
 
 /// Reads the the entries in a directory.
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct ReadDir(pub(super) Box<[DirEntry]>);
+#[derive(Debug)]
+#[pin_project]
+pub struct ReadDir<'s> {
+    dir: Dir<'s>,
 
-impl ReadDir {
-    pub(super) fn new(entries: Box<[NameEntry]>) -> Self {
-        let ptr = Box::into_raw(entries);
+    // future and entries contain the state
+    //
+    // Invariant:
+    //  - entries.is_none() => future.is_none()
+    //  - If entries.is_some(), then future.is_none() ^ entries.unwrap().as_slice().is_empty()
+    future: Option<ResponseFuture>,
+    entries: Option<IntoIter<NameEntry>>,
 
-        // Safety: DirEntry is transparent
-        ReadDir(unsafe { Box::from_raw(ptr as *mut [DirEntry]) })
+    // cancellation_fut is not only cancel-safe, but also can be polled after
+    // it is ready.
+    //
+    // Once it is ready, all polls after that immediately return Poll::Ready(())
+    #[pin]
+    cancellation_fut: WaitForCancellationFutureOwned,
+}
+
+impl<'s> ReadDir<'s> {
+    pub(super) fn new(dir: Dir<'s>) -> Self {
+        Self {
+            cancellation_fut: dir.0.get_auxiliary().cancel_token.clone().cancelled_owned(),
+            dir,
+            future: None,
+            entries: Some(Vec::new().into_iter()),
+        }
     }
 
-    /// Return slice of [`DirEntry`]s.
-    pub fn as_slice(&self) -> &[DirEntry] {
-        &self.0
-    }
+    fn new_request(dir: &mut Dir<'_>) -> Result<ResponseFuture, Error> {
+        let owned_handle = &mut dir.0;
 
-    /// Return mutable slice of [`DirEntry`]s.
-    pub fn as_mut_slice(&mut self) -> &mut [DirEntry] {
-        &mut self.0
-    }
+        let id = owned_handle.get_id_mut();
+        let handle = &owned_handle.handle;
+        let write_end = &mut owned_handle.write_end.inner;
 
-    /// Return boxed slice of [`DirEntry`]s.
-    pub fn into_inner(self) -> Box<[DirEntry]> {
-        self.0
-    }
+        let future = write_end
+            .send_readdir_request(id, Cow::Borrowed(handle))?
+            .wait();
 
-    /// Return an iterator over immutable [`DirEntry`].
-    pub fn iter(&self) -> Iter<'_, DirEntry> {
-        self.into_iter()
-    }
+        // Requests is already added to write buffer, so wakeup
+        // the `flush_task` if necessary.
+        owned_handle.get_auxiliary().wakeup_flush_task();
 
-    /// Return an iterator over mutable [`DirEntry`].
-    pub fn iter_mut(&mut self) -> IterMut<'_, DirEntry> {
-        self.into_iter()
+        Ok(future)
     }
 }
 
-impl Deref for ReadDir {
-    type Target = [DirEntry];
+impl Stream for ReadDir<'_> {
+    type Item = Result<DirEntry, Error>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        let future = this.future;
+
+        let entries = match &mut *this.entries {
+            Some(entries) => entries,
+            None => return Poll::Ready(None),
+        };
+
+        if entries.as_slice().is_empty() {
+            let dir = &mut *this.dir;
+            let cancellation_fut = this.cancellation_fut;
+
+            let fut = match future {
+                Some(future) => future,
+                None => {
+                    *future = Some(Self::new_request(dir)?);
+                    future.as_mut().unwrap()
+                }
+            };
+
+            let res = {
+                let fut = async move {
+                    tokio::select! {
+                        biased;
+
+                        _ = cancellation_fut => Err(crate::BoxedWaitForCancellationFuture::cancel_error()),
+                        res = fut => res,
+                    }
+                };
+
+                tokio::pin!(fut);
+
+                ready!(fut.poll(cx))
+            };
+            *future = None; // future is ready, reset it to None
+            let (id, ret) = res?;
+
+            this.dir.0.cache_id_mut(id);
+            if ret.is_empty() {
+                *this.entries = None;
+                return Poll::Ready(None);
+            } else {
+                *entries = Vec::from(ret).into_iter();
+            }
+        }
+
+        debug_assert!(future.is_none());
+        debug_assert!(!entries.as_slice().is_empty());
+
+        Poll::Ready(entries.next().map(DirEntry).map(Ok))
     }
 }
 
-impl DerefMut for ReadDir {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<'a> IntoIterator for &'a ReadDir {
-    type Item = &'a DirEntry;
-    type IntoIter = Iter<'a, DirEntry>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a mut ReadDir {
-    type Item = &'a mut DirEntry;
-    type IntoIter = IterMut<'a, DirEntry>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
-    }
-}
-
-impl IntoIterator for ReadDir {
-    type Item = DirEntry;
-    type IntoIter = IntoIter<DirEntry>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let vec: Vec<DirEntry> = self.into_inner().into();
-        vec.into_iter()
+impl FusedStream for ReadDir<'_> {
+    fn is_terminated(&self) -> bool {
+        self.entries.is_none()
     }
 }
