@@ -46,3 +46,4 @@ tokio = { version = "1.11.0", features = ["rt", "macros"] }
 tempfile = "3.1.0"
 pretty_assertions = "1.1.0"
 sftp-test-common = { path = "sftp-test-common" }
+futures-util = "0.3.28"
