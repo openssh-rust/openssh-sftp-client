@@ -1,14 +1,16 @@
 use openssh_sftp_client::*;
 
-use std::cmp::{max, min};
-use std::convert::identity;
-use std::convert::TryInto;
-use std::fs;
-use std::future::ready;
-use std::io::IoSlice;
-use std::num::{NonZeroU32, NonZeroU64};
-use std::path::PathBuf;
-use std::stringify;
+use std::{
+    cmp::{max, min},
+    convert::identity,
+    convert::TryInto,
+    fs,
+    future::ready,
+    io::IoSlice,
+    num::{NonZeroU32, NonZeroU64},
+    path::PathBuf,
+    stringify,
+};
 
 use sftp_test_common::*;
 
@@ -121,40 +123,44 @@ macro_rules! def_write_all_test {
                 let max_len = max(sftp.max_write_len(), sftp.max_read_len()) as usize;
                 let content = b"HELLO, WORLD!\n".repeat(max_len / 8);
 
-                let mut file = sftp
-                    .options()
-                    .write(true)
-                    .read(true)
-                    .create(true)
-                    .open(&path)
-                    .await
-                    .map($file_converter)
-                    .unwrap();
-
-                let len = content.len();
-
-                eprintln!("{}", msg);
-
                 {
-                    let $file_var = &mut file;
-                    let $content_var = &content;
+                    let file = sftp
+                        .options()
+                        .write(true)
+                        .read(true)
+                        .create(true)
+                        .open(&path)
+                        .await
+                        .map($file_converter)
+                        .unwrap();
 
-                    $test_block;
+                    tokio::pin!(file);
+
+                    let len = content.len();
+
+                    eprintln!("{}", msg);
+
+                    {
+                        let $file_var = &mut file;
+                        let $content_var = &content;
+
+                        $test_block;
+                    }
+
+                    eprintln!("Verifing the write");
+
+                    file.rewind().await.unwrap();
+
+                    let buffer = file
+                        .as_mut()
+                        .as_mut_file()
+                        .read_all(len, BytesMut::with_capacity(len))
+                        .await
+                        .unwrap();
+
+                    assert_eq!(&*buffer, &content);
                 }
 
-                eprintln!("Verifing the write");
-
-                file.rewind().await.unwrap();
-
-                let buffer = file
-                    .read_all(len, BytesMut::with_capacity(len))
-                    .await
-                    .unwrap();
-
-                assert_eq!(&*buffer, &content);
-
-                // remove the file
-                drop(file);
                 sftp.fs().remove_file(&path).await.unwrap();
 
                 eprintln!("Closing sftp and child");
@@ -233,9 +239,13 @@ async fn sftp_tokio_compact_file_basics() {
     let read_entire_file = || async {
         let mut buffer = Vec::with_capacity(content.len());
 
-        let mut file: file::TokioCompatFile = sftp.open(&path).await.unwrap().into();
+        let file = sftp
+            .open(&path)
+            .await
+            .map(file::TokioCompatFile::from)
+            .unwrap();
+        tokio::pin!(file);
         file.read_to_end(&mut buffer).await.unwrap();
-        file.close().await.unwrap();
 
         buffer
     };
@@ -243,40 +253,38 @@ async fn sftp_tokio_compact_file_basics() {
     {
         let mut fs = sftp.fs();
 
-        let mut file = sftp
+        let file = sftp
             .options()
             .write(true)
             .create_new(true)
             .open(&path)
             .await
-            .map(file::TokioCompatFile::new)
+            .map(file::TokioCompatFile::from)
             .unwrap();
+        tokio::pin!(file);
 
         // Create new file (fail if already exists) and write to it.
         debug_assert_eq!(file.write(content).await.unwrap(), content.len());
 
         file.flush().await.unwrap();
-        file.close().await.unwrap();
 
         debug_assert_eq!(&*read_entire_file().await, &*content);
 
         // Create new file with Trunc and write to it.
         //
         // Sftp::Create opens the file truncated.
-        let mut file = sftp
+        let file = sftp
             .create(&path)
             .await
-            .map(file::TokioCompatFile::new)
+            .map(file::TokioCompatFile::from)
             .unwrap();
+        tokio::pin!(file);
         debug_assert_eq!(file.write(content).await.unwrap(), content.len());
 
-        // close also flush the internal future buffers, but using a
+        // Flush the internal future buffers, but using a
         // different implementation from `TokioCompatFile::poll_flush`
         // since it is executed in async context.
-        //
-        // Call `close` without calling `flush` first would force
-        // `close` to do all the flush work, thus testing its implementation
-        file.close().await.unwrap();
+        file.flush().await.unwrap();
 
         debug_assert_eq!(&*read_entire_file().await, &*content);
 
@@ -292,7 +300,7 @@ async fn sftp_tokio_compact_file_basics() {
 def_write_all_test!(
     sftp_tokio_compact_file_write_all,
     sftp_options_with_max_rw_len(),
-    file::TokioCompatFile::new,
+    file::TokioCompatFile::from,
     file,
     content,
     {
@@ -303,7 +311,7 @@ def_write_all_test!(
 def_write_all_test!(
     sftp_tokio_compact_file_write_vectored_all,
     sftp_options_with_max_rw_len(),
-    file::TokioCompatFile::new,
+    file::TokioCompatFile::from,
     file,
     content,
     {

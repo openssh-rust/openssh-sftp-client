@@ -58,9 +58,7 @@ pub use unix_timestamp::UnixTimeStamp;
 
 mod sftp;
 pub use sftp::Sftp;
-
-mod cancel_utility;
-use cancel_utility::BoxedWaitForCancellationFuture;
+use sftp::SftpHandle;
 
 mod options;
 pub use options::SftpOptions;
@@ -95,3 +93,7 @@ type ReadEnd<R> = lowlevel::ReadEnd<R, Buffer, MpscQueue, Auxiliary>;
 type SharedData = lowlevel::SharedData<Buffer, MpscQueue, Auxiliary>;
 type Id = lowlevel::Id<Buffer>;
 type Data = lowlevel::Data<Buffer>;
+
+fn cancel_error() -> Error {
+    Error::BackgroundTaskFailure(&"read/flush task failed")
+}

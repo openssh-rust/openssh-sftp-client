@@ -1,7 +1,8 @@
-use super::{utility::take_io_slices, File};
 use crate::{
+    cancel_error,
+    file::{utility::take_io_slices, File},
     lowlevel::{AwaitableDataFuture, AwaitableStatusFuture, Handle},
-    BoxedWaitForCancellationFuture, Buffer, Data, Error, Id, WriteEnd,
+    Buffer, Data, Error, Id, WriteEnd,
 };
 
 use std::{
@@ -19,8 +20,10 @@ use std::{
 
 use bytes::{Buf, Bytes, BytesMut};
 use derive_destructure2::destructure;
+use pin_project::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use tokio_io_utility::ready;
+use tokio_util::sync::WaitForCancellationFutureOwned;
 
 /// The default length of the buffer used in [`TokioCompatFile`].
 pub const DEFAULT_BUFLEN: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(4096) };
@@ -32,7 +35,7 @@ fn sftp_to_io_error(sftp_err: Error) -> io::Error {
     }
 }
 
-fn send_request<Func, R>(file: &mut File<'_>, f: Func) -> Result<R, Error>
+fn send_request<Func, R>(file: &mut File, f: Func) -> Result<R, Error>
 where
     Func: FnOnce(&mut WriteEnd, Id, Cow<'_, Handle>, u64) -> Result<R, Error>,
 {
@@ -56,22 +59,27 @@ where
 /// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
-pub struct TokioCompatFile<'s> {
-    inner: File<'s>,
+#[pin_project]
+pub struct TokioCompatFile {
+    inner: File,
 
     buffer_len: NonZeroUsize,
     buffer: BytesMut,
 
     read_future: Option<AwaitableDataFuture<Buffer>>,
-    read_cancellation_future: BoxedWaitForCancellationFuture<'s>,
-
     write_futures: VecDeque<AwaitableStatusFuture<Buffer>>,
-    write_cancellation_future: BoxedWaitForCancellationFuture<'s>,
+
+    /// cancellation_fut is not only cancel-safe, but also can be polled after
+    /// it is ready.
+    ///
+    /// Once it is ready, all polls after that immediately return Poll::Ready(())
+    #[pin]
+    cancellation_future: WaitForCancellationFutureOwned,
 }
 
-impl<'s> TokioCompatFile<'s> {
+impl TokioCompatFile {
     /// Create a [`TokioCompatFile`] using [`DEFAULT_BUFLEN`].
-    pub fn new(inner: File<'s>) -> Self {
+    pub fn new(inner: File) -> Self {
         Self::with_capacity(inner, DEFAULT_BUFLEN)
     }
 
@@ -79,47 +87,23 @@ impl<'s> TokioCompatFile<'s> {
     ///
     /// * `buffer_len` - buffer len to be used in [`AsyncBufRead`]
     ///   and the minimum length to read in [`AsyncRead`].
-    pub fn with_capacity(inner: File<'s>, buffer_len: NonZeroUsize) -> Self {
+    pub fn with_capacity(inner: File, buffer_len: NonZeroUsize) -> Self {
         Self {
+            cancellation_future: inner.get_auxiliary().cancel_token.clone().cancelled_owned(),
+
             inner,
 
             buffer: BytesMut::new(),
             buffer_len,
 
             read_future: None,
-            read_cancellation_future: BoxedWaitForCancellationFuture::new(),
-
             write_futures: VecDeque::new(),
-            write_cancellation_future: BoxedWaitForCancellationFuture::new(),
         }
     }
 
     /// Return the inner [`File`].
-    pub fn into_inner(self) -> File<'s> {
+    pub fn into_inner(self) -> File {
         self.destructure().0
-    }
-
-    /// Flush the write buffer, wait for the status report and send
-    /// the close request if this is the last reference.
-    ///
-    /// # Cancel Safety
-    ///
-    /// This function is cancel safe.
-    pub async fn close(mut self) -> Result<(), Error> {
-        let need_flush = self.need_flush;
-        let write_end = &mut self.inner.inner.write_end;
-
-        // Only flush if there are pending requests
-        if need_flush && write_end.sftp().get_pending_requests() != 0 {
-            write_end.sftp().trigger_flushing();
-        }
-
-        while let Some(future) = self.write_futures.pop_front() {
-            let id = write_end.cancel_if_task_failed(future).await?.0;
-            write_end.cache_id_mut(id);
-        }
-
-        self.into_inner().close().await
     }
 
     /// Return capacity of the internal buffer
@@ -164,9 +148,11 @@ impl<'s> TokioCompatFile<'s> {
     /// An empty buffer returned indicates that the stream has reached EOF.
     ///
     /// This function does not change the offset into the file.
-    pub async fn fill_buf(&mut self) -> Result<(), Error> {
-        if self.buffer.is_empty() {
-            let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
+    pub async fn fill_buf(mut self: Pin<&mut Self>) -> Result<(), Error> {
+        let this = self.as_mut().project();
+
+        if this.buffer.is_empty() {
+            let buffer_len = this.buffer_len.get().try_into().unwrap_or(u32::MAX);
             let buffer_len = NonZeroU32::new(buffer_len).unwrap();
 
             self.read_into_buffer(buffer_len).await?;
@@ -209,20 +195,20 @@ impl<'s> TokioCompatFile<'s> {
     ///
     /// This function does not change the offset into the file.
     pub fn poll_read_into_buffer(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         amt: NonZeroU32,
     ) -> Poll<Result<(), Error>> {
         // Dereference it here once so that there will be only
         // one mutable borrow to self.
-        let this = &mut *self;
+        let this = self.project();
 
-        this.check_for_readable()?;
+        this.inner.check_for_readable()?;
 
-        let max_read_len = this.max_read_len_impl();
+        let max_read_len = this.inner.max_read_len_impl();
         let amt = min(amt.get(), max_read_len);
 
-        let future = if let Some(future) = &mut this.read_future {
+        let future = if let Some(future) = this.read_future {
             // Get the active future.
             //
             // The future might read more/less than remaining,
@@ -235,24 +221,25 @@ impl<'s> TokioCompatFile<'s> {
             let cap = this.buffer.capacity();
             let buffer = this.buffer.split_off(cap - (amt as usize));
 
-            let future = send_request(&mut this.inner, |write_end, id, handle, offset| {
+            let future = send_request(this.inner, |write_end, id, handle, offset| {
                 write_end.send_read_request(id, handle, offset, amt, Some(buffer))
             })?
             .wait();
 
             // Store it in this.read_future
-            this.read_future = Some(future);
+            *this.read_future = Some(future);
             this.read_future
                 .as_mut()
                 .expect("FileFuture::Data is just assigned to self.future!")
         };
 
-        this.read_cancellation_future
-            .poll_for_task_failure(cx, this.inner.get_auxiliary())?;
+        if this.cancellation_future.poll(cx).is_ready() {
+            return Poll::Ready(Err(cancel_error()));
+        }
 
         // Wait for the future
         let res = ready!(Pin::new(future).poll(cx));
-        this.read_future = None;
+        *this.read_future = None;
         let (id, data) = res?;
 
         this.inner.inner.cache_id_mut(id);
@@ -290,31 +277,36 @@ impl<'s> TokioCompatFile<'s> {
     /// An empty buffer returned indicates that the stream has reached EOF.
     ///
     /// This function does not change the offset into the file.
-    pub async fn read_into_buffer(&mut self, amt: NonZeroU32) -> Result<(), Error> {
+    pub async fn read_into_buffer(self: Pin<&mut Self>, amt: NonZeroU32) -> Result<(), Error> {
         #[must_use]
-        struct ReadIntoBuffer<'a, 's>(&'a mut TokioCompatFile<'s>, NonZeroU32);
+        struct ReadIntoBuffer<'a>(Pin<&'a mut TokioCompatFile>, NonZeroU32);
 
-        impl Future for ReadIntoBuffer<'_, '_> {
+        impl Future for ReadIntoBuffer<'_> {
             type Output = Result<(), Error>;
 
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 let amt = self.1;
-                Pin::new(&mut *self.0).poll_read_into_buffer(cx, amt)
+                self.0.as_mut().poll_read_into_buffer(cx, amt)
             }
         }
 
         ReadIntoBuffer(self, amt).await
     }
+
+    /// Return the inner file
+    pub fn as_mut_file(self: Pin<&mut Self>) -> &mut File {
+        self.project().inner
+    }
 }
 
-impl<'s> From<File<'s>> for TokioCompatFile<'s> {
-    fn from(inner: File<'s>) -> Self {
+impl From<File> for TokioCompatFile {
+    fn from(inner: File) -> Self {
         Self::new(inner)
     }
 }
 
-impl<'s> From<TokioCompatFile<'s>> for File<'s> {
-    fn from(file: TokioCompatFile<'s>) -> Self {
+impl From<TokioCompatFile> for File {
+    fn from(file: TokioCompatFile) -> Self {
         file.into_inner()
     }
 }
@@ -323,77 +315,83 @@ impl<'s> From<TokioCompatFile<'s>> for File<'s> {
 /// same underlying file handle as the existing File instance.
 ///
 /// Reads, writes, and seeks can be performed independently.
-impl Clone for TokioCompatFile<'_> {
+impl Clone for TokioCompatFile {
     fn clone(&self) -> Self {
         Self::with_capacity(self.inner.clone(), self.buffer_len)
     }
 }
 
-impl<'s> Deref for TokioCompatFile<'s> {
-    type Target = File<'s>;
+impl Deref for TokioCompatFile {
+    type Target = File;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl DerefMut for TokioCompatFile<'_> {
+impl DerefMut for TokioCompatFile {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl AsyncSeek for TokioCompatFile<'_> {
+impl AsyncSeek for TokioCompatFile {
     fn start_seek(mut self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
-        let prev_offset = self.offset();
-        Pin::new(&mut self.inner).start_seek(position)?;
-        let new_offset = self.offset();
+        let this = self.as_mut().project();
+
+        let prev_offset = this.inner.offset();
+        Pin::new(&mut *this.inner).start_seek(position)?;
+        let new_offset = this.inner.offset();
 
         if new_offset != prev_offset {
             // Reset future since they are invalidated by change of offset.
-            self.read_future = None;
+            *this.read_future = None;
 
             // Reset buffer or consume buffer if necessary.
             if new_offset < prev_offset {
-                self.buffer.clear();
+                this.buffer.clear();
             } else if let Ok(offset) = (new_offset - prev_offset).try_into() {
                 self.consume(offset);
             } else {
-                self.buffer.clear();
+                this.buffer.clear();
             }
         }
 
         Ok(())
     }
 
-    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        Pin::new(&mut self.inner).poll_complete(cx)
+    fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        Pin::new(self.project().inner).poll_complete(cx)
     }
 }
 
-impl AsyncBufRead for TokioCompatFile<'_> {
+impl AsyncBufRead for TokioCompatFile {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        if self.buffer.is_empty() {
-            let buffer_len = self.buffer_len.get().try_into().unwrap_or(u32::MAX);
+        let this = self.as_mut().project();
+
+        if this.buffer.is_empty() {
+            let buffer_len = this.buffer_len.get().try_into().unwrap_or(u32::MAX);
             let buffer_len = NonZeroU32::new(buffer_len).unwrap();
 
             ready!(self.as_mut().poll_read_into_buffer(cx, buffer_len))
                 .map_err(sftp_to_io_error)?;
         }
 
-        Poll::Ready(Ok(&Pin::into_inner(self).buffer))
+        Poll::Ready(Ok(self.project().buffer))
     }
 
-    fn consume(mut self: Pin<&mut Self>, amt: usize) {
-        let buffer = &mut self.buffer;
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        let this = self.project();
+
+        let buffer = this.buffer;
         let amt = min(buffer.len(), amt);
 
         buffer.advance(amt);
-        self.offset += amt as u64;
+        this.inner.offset += amt as u64;
     }
 }
 
-impl AsyncRead for TokioCompatFile<'_> {
+impl AsyncRead for TokioCompatFile {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -446,7 +444,7 @@ impl AsyncRead for TokioCompatFile<'_> {
 ///
 /// Calling [`AsyncWrite::poll_flush`] on [`TokioCompatFile`] would wait on
 /// writes in the order they are sent.
-impl AsyncWrite for TokioCompatFile<'_> {
+impl AsyncWrite for TokioCompatFile {
     fn poll_write(
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
@@ -470,11 +468,9 @@ impl AsyncWrite for TokioCompatFile<'_> {
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let buf = &buf[..(n as usize)];
 
-        // Dereference it here once so that there will be only
-        // one mutable borrow to self.
-        let this = &mut *self;
+        let this = self.as_mut().project();
 
-        let file = &mut this.inner;
+        let file = this.inner;
 
         let future = send_request(file, |write_end, id, handle, offset| {
             write_end.send_write_request_buffered(id, handle, offset, Cow::Borrowed(buf))
@@ -483,9 +479,9 @@ impl AsyncWrite for TokioCompatFile<'_> {
         .wait();
 
         // Since a new request is buffered, flushing is required.
-        self.need_flush = true;
+        file.need_flush = true;
 
-        self.write_futures.push_back(future);
+        this.write_futures.push_back(future);
 
         // Adjust offset and reset self.future
         Poll::Ready(
@@ -494,27 +490,27 @@ impl AsyncWrite for TokioCompatFile<'_> {
         )
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.check_for_writable_io_err()?;
 
-        let this = &mut *self;
+        let this = self.project();
 
         if this.write_futures.is_empty() {
             return Poll::Ready(Ok(()));
         }
 
         // Flush only if there is pending awaitable writes
-        if this.need_flush {
+        if this.inner.need_flush {
             // Only flush if there are pending requests
-            if this.inner.sftp().get_pending_requests() != 0 {
-                this.inner.sftp().trigger_flushing();
+            if this.inner.auxiliary().get_pending_requests() != 0 {
+                this.inner.auxiliary().trigger_flushing();
             }
             this.inner.need_flush = false;
         }
 
-        this.write_cancellation_future
-            .poll_for_task_failure(cx, this.inner.get_auxiliary())
-            .map_err(sftp_to_io_error)?;
+        if this.cancellation_future.poll(cx).is_ready() {
+            return Poll::Ready(Err(sftp_to_io_error(cancel_error())));
+        }
 
         loop {
             let res = if let Some(future) = this.write_futures.front_mut() {
@@ -564,9 +560,9 @@ impl AsyncWrite for TokioCompatFile<'_> {
 
         // Dereference it here once so that there will be only
         // one mutable borrow to self.
-        let this = &mut *self;
+        let this = self.as_mut().project();
 
-        let file = &mut this.inner;
+        let file = this.inner;
 
         let future = send_request(file, |write_end, id, handle, offset| {
             write_end.send_write_request_buffered_vectored2(id, handle, offset, &buffers)
@@ -575,9 +571,9 @@ impl AsyncWrite for TokioCompatFile<'_> {
         .wait();
 
         // Since a new request is buffered, flushing is required.
-        self.need_flush = true;
+        file.need_flush = true;
 
-        self.write_futures.push_back(future);
+        this.write_futures.push_back(future);
 
         // Adjust offset and reset self.future
         Poll::Ready(

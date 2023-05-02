@@ -1,9 +1,7 @@
-use super::{
+use crate::{
     lowlevel::{self, CreateFlags, Data, Extensions, FileAttrs, Handle},
-    {
-        metadata::{MetaData, MetaDataBuilder, Permissions},
-        Auxiliary, Error, Id, OwnedHandle, Sftp, WriteEnd,
-    },
+    metadata::{MetaData, MetaDataBuilder, Permissions},
+    Auxiliary, Error, Id, OwnedHandle, SftpHandle, WriteEnd, WriteEndWithCachedId,
 };
 
 use std::{
@@ -29,17 +27,17 @@ mod utility;
 use utility::{take_bytes, take_io_slices};
 
 /// Options and flags which can be used to configure how a file is opened.
-#[derive(Debug, Copy, Clone)]
-pub struct OpenOptions<'s> {
-    sftp: &'s Sftp,
+#[derive(Debug, Clone)]
+pub struct OpenOptions {
+    sftp: SftpHandle,
     options: lowlevel::OpenOptions,
     truncate: bool,
     create: bool,
     create_new: bool,
 }
 
-impl<'s> OpenOptions<'s> {
-    pub(super) fn new(sftp: &'s Sftp) -> Self {
+impl OpenOptions {
+    pub(super) fn new(sftp: SftpHandle) -> Self {
         Self {
             sftp,
             options: lowlevel::OpenOptions::new(),
@@ -129,43 +127,54 @@ impl<'s> OpenOptions<'s> {
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
-    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File<'s>, Error> {
-        async fn inner<'s>(this: &OpenOptions<'s>, path: &Path) -> Result<File<'s>, Error> {
-            let filename = Cow::Borrowed(path);
+    pub async fn open(&self, path: impl AsRef<Path>) -> Result<File, Error> {
+        OpenOptions::open_inner(
+            self.options,
+            self.truncate,
+            self.create,
+            self.create_new,
+            path.as_ref(),
+            self.sftp.clone().write_end(),
+        )
+        .await
+    }
 
-            let params = if this.create || this.create_new {
-                let flags = if this.create_new {
-                    CreateFlags::Excl
-                } else if this.truncate {
-                    CreateFlags::Trunc
-                } else {
-                    CreateFlags::None
-                };
+    pub(super) async fn open_inner(
+        options: lowlevel::OpenOptions,
+        truncate: bool,
+        create: bool,
+        create_new: bool,
+        filename: &Path,
+        mut write_end: WriteEndWithCachedId,
+    ) -> Result<File, Error> {
+        let filename = Cow::Borrowed(filename);
 
-                this.options.create(filename, flags, FileAttrs::new())
+        let params = if create || create_new {
+            let flags = if create_new {
+                CreateFlags::Excl
+            } else if truncate {
+                CreateFlags::Trunc
             } else {
-                this.options.open(filename)
+                CreateFlags::None
             };
 
-            let mut write_end = this.sftp.write_end();
+            options.create(filename, flags, FileAttrs::new())
+        } else {
+            options.open(filename)
+        };
 
-            let handle = write_end
-                .send_request(|write_end, id| {
-                    Ok(write_end.send_open_file_request(id, params)?.wait())
-                })
-                .await?;
+        let handle = write_end
+            .send_request(|write_end, id| Ok(write_end.send_open_file_request(id, params)?.wait()))
+            .await?;
 
-            Ok(File {
-                inner: OwnedHandle::new(write_end, handle),
+        Ok(File {
+            inner: OwnedHandle::new(write_end, handle),
 
-                is_readable: this.options.get_read(),
-                is_writable: this.options.get_write(),
-                need_flush: false,
-                offset: 0,
-            })
-        }
-
-        inner(self, path.as_ref()).await
+            is_readable: options.get_read(),
+            is_writable: options.get_write(),
+            need_flush: false,
+            offset: 0,
+        })
     }
 }
 
@@ -178,8 +187,8 @@ impl<'s> OpenOptions<'s> {
 /// If you want a file that implements [`tokio::io::AsyncRead`] and
 /// [`tokio::io::AsyncWrite`], checkout [`TokioCompatFile`].
 #[derive(Debug)]
-pub struct File<'s> {
-    inner: OwnedHandle<'s>,
+pub struct File {
+    inner: OwnedHandle,
 
     is_readable: bool,
     is_writable: bool,
@@ -187,7 +196,7 @@ pub struct File<'s> {
     offset: u64,
 }
 
-impl<'s> Clone for File<'s> {
+impl Clone for File {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -199,7 +208,11 @@ impl<'s> Clone for File<'s> {
     }
 }
 
-impl<'s> File<'s> {
+impl File {
+    fn auxiliary(&self) -> &Auxiliary {
+        self.inner.get_auxiliary()
+    }
+
     fn max_write_len_impl(&self) -> u32 {
         self.get_auxiliary().limits().write_len
     }
@@ -212,7 +225,7 @@ impl<'s> File<'s> {
 }
 
 #[cfg(feature = "ci-tests")]
-impl<'s> File<'s> {
+impl File {
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests
     pub fn max_write_len(&self) -> u32 {
@@ -226,8 +239,8 @@ impl<'s> File<'s> {
     }
 }
 
-impl<'s> File<'s> {
-    fn get_auxiliary(&self) -> &'s Auxiliary {
+impl File {
+    fn get_auxiliary(&self) -> &Auxiliary {
         self.inner.get_auxiliary()
     }
 
@@ -297,11 +310,6 @@ impl<'s> File<'s> {
     /// This function is cancel safe.
     pub async fn close(self) -> Result<(), Error> {
         self.inner.close().await
-    }
-
-    /// Return the underlying sftp.
-    pub fn sftp(&self) -> &'s Sftp {
-        self.inner.write_end.sftp()
     }
 
     /// Change the metadata of a file or a directory.
@@ -713,9 +721,14 @@ impl<'s> File<'s> {
     pub async fn copy_all_to(&mut self, dst: &mut Self) -> Result<(), Error> {
         self.copy_to_impl(dst, 0).await
     }
+
+    /// No-op to be compatible with [`TokioCompatFile::as_mut_file`]
+    pub fn as_mut_file(&mut self) -> &mut File {
+        self
+    }
 }
 
-impl AsyncSeek for File<'_> {
+impl AsyncSeek for File {
     /// start_seek only adjust local offset since sftp protocol
     /// does not provides a seek function.
     ///
