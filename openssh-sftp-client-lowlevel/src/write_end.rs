@@ -212,10 +212,14 @@ where
             .map(AwaitableHandle::new)
     }
 
-    /// Return all entries in the directory specified by the `handle`, including
+    /// Return entries in the directory specified by the `handle`, including
     /// `.` and `..`.
     ///
     /// The `filename` only contains the basename.
+    ///
+    /// **NOTE that it does not return all entries in one response.**
+    /// You would have to keep calling `send_readdir_request` until it returns
+    /// an empty `Box`.
     pub fn send_readdir_request(
         &mut self,
         id: Id<Buffer>,

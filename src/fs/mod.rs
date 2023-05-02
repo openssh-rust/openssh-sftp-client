@@ -374,15 +374,10 @@ impl<'s> Fs<'s> {
 #[derive(Debug, Clone)]
 pub struct Dir<'s>(OwnedHandle<'s>);
 
-impl Dir<'_> {
+impl<'s> Dir<'s> {
     /// Read dir.
-    pub async fn read_dir(&mut self) -> Result<ReadDir, Error> {
-        self.0
-            .send_request(|write_end, handle, id| {
-                Ok(write_end.send_readdir_request(id, handle)?.wait())
-            })
-            .await
-            .map(ReadDir::new)
+    pub fn read_dir(self) -> ReadDir<'s> {
+        ReadDir::new(self)
     }
 
     /// Close dir.

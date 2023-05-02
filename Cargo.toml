@@ -34,7 +34,10 @@ tokio = { version = "1.11.0", features = ["sync", "time", "rt", "macros"] }
 derive_destructure2 = "0.1.0"
 bytes = "1.2.1"
 tokio-io-utility = "0.7.4"
-tokio-util = "0.7.0"
+tokio-util = "0.7.8"
+
+pin-project = "1.0.10"
+futures-core = "0.3.28"
 
 scopeguard = "1.1.0"
 
@@ -43,3 +46,4 @@ tokio = { version = "1.11.0", features = ["rt", "macros"] }
 tempfile = "3.1.0"
 pretty_assertions = "1.1.0"
 sftp-test-common = { path = "sftp-test-common" }
+futures-util = "0.3.28"

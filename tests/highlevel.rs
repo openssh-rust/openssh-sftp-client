@@ -4,6 +4,7 @@ use std::cmp::{max, min};
 use std::convert::identity;
 use std::convert::TryInto;
 use std::fs;
+use std::future::ready;
 use std::io::IoSlice;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
@@ -12,6 +13,7 @@ use std::stringify;
 use sftp_test_common::*;
 
 use bytes::BytesMut;
+use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_io_utility::write_vectored_all;
 
@@ -378,19 +380,28 @@ async fn sftp_dir_basics() {
         fs.create_dir(&path.join("dir")).await.unwrap();
         sftp.create(&path.join("file")).await.unwrap();
 
-        for entry in fs.open_dir(&path).await.unwrap().read_dir().await.unwrap() {
-            let filename = entry.filename().as_os_str();
+        fs.open_dir(&path)
+            .await
+            .unwrap()
+            .read_dir()
+            .for_each(|res| {
+                let entry = res.unwrap();
 
-            if filename == "." || filename == ".." {
-                continue;
-            } else if filename == "dir" {
-                assert!(entry.file_type().unwrap().is_dir());
-            } else if filename == "file" {
-                assert!(entry.file_type().unwrap().is_file());
-            } else {
-                unreachable!("Unreachable!");
-            }
-        }
+                let filename = entry.filename().as_os_str();
+
+                if filename == "." || filename == ".." {
+                    return ready(());
+                } else if filename == "dir" {
+                    assert!(entry.file_type().unwrap().is_dir());
+                } else if filename == "file" {
+                    assert!(entry.file_type().unwrap().is_file());
+                } else {
+                    unreachable!("Unreachable!");
+                }
+
+                ready(())
+            })
+            .await;
 
         fs.remove_file(&path.join("file")).await.unwrap();
         fs.remove_dir(&path.join("dir")).await.unwrap();
