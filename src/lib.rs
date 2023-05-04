@@ -57,8 +57,8 @@ mod unix_timestamp;
 pub use unix_timestamp::UnixTimeStamp;
 
 mod sftp;
-pub use sftp::Sftp;
 use sftp::SftpHandle;
+pub use sftp::{Sftp, SftpAuxiliaryData};
 
 mod options;
 pub use options::SftpOptions;

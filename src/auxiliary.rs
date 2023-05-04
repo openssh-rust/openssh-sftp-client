@@ -1,4 +1,4 @@
-use super::lowlevel::Extensions;
+use crate::{lowlevel::Extensions, SftpAuxiliaryData};
 
 use std::sync::atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
@@ -51,10 +51,12 @@ pub(super) struct Auxiliary {
     /// Use AtomicU64 in case the user keep creating new [`sftp::SftpHandle`]
     /// and then [`std::mem::forget`] them.
     pub(super) active_user_count: AtomicU64,
+
+    pub(super) _auxiliary: SftpAuxiliaryData,
 }
 
 impl Auxiliary {
-    pub(super) fn new(max_pending_requests: u16) -> Self {
+    pub(super) fn new(max_pending_requests: u16, auxiliary: SftpAuxiliaryData) -> Self {
         Self {
             conn_info: OnceCell::new(),
 
@@ -71,6 +73,8 @@ impl Auxiliary {
 
             shutdown_stage: AtomicU8::new(0),
             active_user_count: AtomicU64::new(1),
+
+            _auxiliary: auxiliary,
         }
     }
 

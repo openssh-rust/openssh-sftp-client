@@ -9,7 +9,7 @@ use auxiliary::Auxiliary;
 use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
-use std::{convert::TryInto, ops::Deref, path::Path};
+use std::{any::Any, convert::TryInto, ops::Deref, path::Path, sync::Arc};
 
 use derive_destructure2::destructure;
 use tokio::{
@@ -67,6 +67,18 @@ pub struct Sftp {
     read_task: JoinHandle<Result<(), Error>>,
 }
 
+/// Auxiliary data for [`Sftp`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SftpAuxiliaryData {
+    /// No auxiliary data.
+    None,
+    /// Store any `Box`ed value.
+    Boxed(Box<dyn Any + Send + Sync + 'static>),
+    /// Store any `Arc`ed value.
+    Arced(Arc<dyn Any + Send + Sync + 'static>),
+}
+
 impl Sftp {
     /// Create [`Sftp`].
     pub async fn new<W: AsyncWrite + Send + 'static, R: AsyncRead + Send + 'static>(
@@ -74,12 +86,40 @@ impl Sftp {
         stdout: R,
         options: SftpOptions,
     ) -> Result<Self, Error> {
+        Self::new_with_auxiliary(stdin, stdout, options, SftpAuxiliaryData::None).await
+    }
+
+    /// Create [`Sftp`] with some auxiliary data.
+    ///
+    /// The auxiliary data will be dropped after all sftp requests has been
+    /// sent(flush_task), all responses processed (read_task) and [`Sftp`] has
+    /// been dropped.
+    ///
+    /// This can be used to store `openssh::RemoteChild` to keep the sftp
+    /// session alive while close it when sftp is done.
+    ///
+    /// If you want to manually wait on the `openssh::RemoteChild` or get that
+    /// type back, you can simply use [`SftpAuxiliaryData::Arced`] and then
+    /// stores an [`Arc`] elsewhere.
+    ///
+    /// Once the sftp tasks is completed and [`Sftp`] is dropped, you can call
+    /// [`Arc::try_unwrap`] to get back the exclusive ownership of it.
+    pub async fn new_with_auxiliary<
+        W: AsyncWrite + Send + 'static,
+        R: AsyncRead + Send + 'static,
+    >(
+        stdin: W,
+        stdout: R,
+        options: SftpOptions,
+        auxiliary: SftpAuxiliaryData,
+    ) -> Result<Self, Error> {
         assert_send(async move {
             let write_end_buffer_size = options.get_write_end_buffer_size();
 
             let write_end = assert_send(Self::connect(
                 write_end_buffer_size.get(),
                 options.get_max_pending_requests(),
+                auxiliary,
             ))
             .await?;
 
@@ -104,10 +144,11 @@ impl Sftp {
     async fn connect(
         write_end_buffer_size: usize,
         max_pending_requests: u16,
+        auxiliary: SftpAuxiliaryData,
     ) -> Result<WriteEnd, Error> {
         connect(
             MpscQueue::with_capacity(write_end_buffer_size),
-            Auxiliary::new(max_pending_requests),
+            Auxiliary::new(max_pending_requests, auxiliary),
         )
         .await
     }
