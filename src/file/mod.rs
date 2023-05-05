@@ -392,6 +392,8 @@ impl File {
     /// * `n` - number of bytes to read in
     ///
     /// If the [`File`] has reached EOF or `n == 0`, then `None` is returned.
+    ///
+    /// NOTE that the returned buffer might be smaller than `n`.
     pub async fn read(&mut self, n: u32, buffer: BytesMut) -> Result<Option<BytesMut>, Error> {
         if n == 0 {
             return Ok(None);
@@ -421,6 +423,8 @@ impl File {
     }
 
     /// Write data into the file.
+    ///
+    /// NOTE that this API might only writes part of the `buf`.
     pub async fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
@@ -454,6 +458,8 @@ impl File {
     }
 
     /// Write from multiple buffer at once.
+    ///
+    /// NOTE that this API might only writes part of the `buf`.
     pub async fn write_vectorized(&mut self, bufs: &[IoSlice<'_>]) -> Result<usize, Error> {
         if bufs.is_empty() {
             return Ok(0);
@@ -488,6 +494,8 @@ impl File {
     }
 
     /// Zero copy write.
+    ///
+    /// NOTE that this API might only writes part of the `buf`.
     pub async fn write_zero_copy(&mut self, bytes_slice: &[Bytes]) -> Result<usize, Error> {
         if bytes_slice.is_empty() {
             return Ok(0);
