@@ -424,7 +424,7 @@ impl File {
 
     /// Write data into the file.
     ///
-    /// NOTE that this API might only writes part of the `buf`.
+    /// NOTE that this API might only write part of the `buf`.
     pub async fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
         if buf.is_empty() {
             return Ok(0);
@@ -459,7 +459,7 @@ impl File {
 
     /// Write from multiple buffer at once.
     ///
-    /// NOTE that this API might only writes part of the `buf`.
+    /// NOTE that this API might only write part of the `buf`.
     pub async fn write_vectorized(&mut self, bufs: &[IoSlice<'_>]) -> Result<usize, Error> {
         if bufs.is_empty() {
             return Ok(0);
@@ -495,7 +495,7 @@ impl File {
 
     /// Zero copy write.
     ///
-    /// NOTE that this API might only writes part of the `buf`.
+    /// NOTE that this API might only write part of the `buf`.
     pub async fn write_zero_copy(&mut self, bytes_slice: &[Bytes]) -> Result<usize, Error> {
         if bytes_slice.is_empty() {
             return Ok(0);
