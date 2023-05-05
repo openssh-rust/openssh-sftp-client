@@ -5,6 +5,38 @@ use crate::*;
 pub mod unreleased {}
 
 /// ## Fixed
+///  - Fixed #62 [`fs::ReadDir`]: Return all entries instead of just a subset.
+///
+/// ## Added
+///  - [`file::File::as_mut_file`]
+///  - [`SftpAuxiliaryData`]
+///  - [`Sftp::new_with_auxiliary`]
+///
+/// ## Changed
+///  - Remove lifetime from [`file::OpenOptions`].
+///  - Remove lifetime from [`file::File`].
+///  - Remove lifetime from [`file::TokioCompatFile`].
+///  - Remove lifetime from [`fs::Fs`].
+///  - Remove lifetime from [`fs::Dir`].
+///  - Remove lifetime from [`fs::ReadDir`].
+///  - Remove lifetime `'s` from [`fs::DirBuilder`].
+///  - [`fs::ReadDir`] now implements `futures_core::{Stream, FusedStream}`
+///    instead of the {iterator, slice}-based interface.
+///  - Remove `file::File::sftp`.
+///  - Remove `file::TokioCompatFile::close`.
+///  - [`file::TokioCompatFile::fill_buf`] now takes `self: Pin<&mut Self>`
+///    instead of `&mut self`.
+///  - [`file::TokioCompatFile::read_into_buffer`] now takes
+///    `self: Pin<&mut Self>` instead of `&mut self`.
+///
+/// ## Other changes
+///  - Clarify [`file::File::read`].
+///  - Clarify [`file::File::write`].
+///  - Clarify [`file::File::write_vectorized`].
+///  - Clarify [`file::File::write_zero_copy`].
+pub mod v_0_13_0 {}
+
+/// ## Fixed
 ///  - Fix `read_task`: Order shutdown of flush_task on err/panic
 pub mod v_0_12_2 {}
 
