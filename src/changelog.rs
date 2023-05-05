@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - [`SftpAuxiliaryData::PinnedFuture`]
 #[doc(hidden)]
 pub mod unreleased {}
 
