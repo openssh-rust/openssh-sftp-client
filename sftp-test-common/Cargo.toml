@@ -4,6 +4,7 @@
 name = "sftp-test-common"
 version = "0.0.0"
 publish = false
+edition = "2018"
 
 [dependencies]
 tokio = { version = "1.11.0", features = ["process"] }
