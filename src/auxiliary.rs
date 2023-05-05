@@ -1,6 +1,6 @@
-use super::lowlevel::Extensions;
+use crate::{lowlevel::Extensions, SftpAuxiliaryData};
 
-use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use once_cell::sync::OnceCell;
 use tokio::sync::Notify;
@@ -45,10 +45,18 @@ pub(super) struct Auxiliary {
     /// 1 means the read task should shutdown
     /// 2 means the flush task should shutdown
     pub(super) shutdown_stage: AtomicU8,
+
+    /// Number of handles that can issue new requests.
+    ///
+    /// Use AtomicU64 in case the user keep creating new [`sftp::SftpHandle`]
+    /// and then [`std::mem::forget`] them.
+    pub(super) active_user_count: AtomicU64,
+
+    pub(super) _auxiliary: SftpAuxiliaryData,
 }
 
 impl Auxiliary {
-    pub(super) fn new(max_pending_requests: u16) -> Self {
+    pub(super) fn new(max_pending_requests: u16, auxiliary: SftpAuxiliaryData) -> Self {
         Self {
             conn_info: OnceCell::new(),
 
@@ -64,6 +72,9 @@ impl Auxiliary {
             requests_to_read: AtomicUsize::new(0),
 
             shutdown_stage: AtomicU8::new(0),
+            active_user_count: AtomicU64::new(1),
+
+            _auxiliary: auxiliary,
         }
     }
 
@@ -112,5 +123,31 @@ impl Auxiliary {
 
         self.flush_immediately.notify_one();
         self.flush_end_notify.notify_one();
+    }
+
+    /// Triggers the flushing of the internal buffer in `flush_task`.
+    ///
+    /// If there are pending requests, then flushing would happen immediately.
+    ///
+    /// If not, then the next time a request is queued in the write buffer, it
+    /// will be immediately flushed.
+    pub(super) fn trigger_flushing(&self) {
+        self.flush_immediately.notify_one();
+    }
+
+    /// Return number of pending requests in the write buffer.
+    pub(super) fn get_pending_requests(&self) -> usize {
+        self.pending_requests.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn inc_active_user_count(&self) {
+        self.active_user_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(super) fn dec_active_user_count(&self) {
+        if self.active_user_count.fetch_sub(1, Ordering::Relaxed) == 1 {
+            // self.active_user_count is now equal to 0, ready for shutdown.
+            self.order_shutdown()
+        }
     }
 }

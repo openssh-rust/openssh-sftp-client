@@ -1,4 +1,5 @@
 use crate::{
+    cancel_error,
     lowlevel::NameEntry,
     metadata::{FileType, MetaData},
     Error,
@@ -53,8 +54,8 @@ impl DirEntry {
 /// Reads the the entries in a directory.
 #[derive(Debug)]
 #[pin_project]
-pub struct ReadDir<'s> {
-    dir: Dir<'s>,
+pub struct ReadDir {
+    dir: Dir,
 
     // future and entries contain the state
     //
@@ -64,16 +65,16 @@ pub struct ReadDir<'s> {
     future: Option<ResponseFuture>,
     entries: Option<IntoIter<NameEntry>>,
 
-    // cancellation_fut is not only cancel-safe, but also can be polled after
-    // it is ready.
-    //
-    // Once it is ready, all polls after that immediately return Poll::Ready(())
+    /// cancellation_fut is not only cancel-safe, but also can be polled after
+    /// it is ready.
+    ///
+    /// Once it is ready, all polls after that immediately return Poll::Ready(())
     #[pin]
     cancellation_fut: WaitForCancellationFutureOwned,
 }
 
-impl<'s> ReadDir<'s> {
-    pub(super) fn new(dir: Dir<'s>) -> Self {
+impl ReadDir {
+    pub(super) fn new(dir: Dir) -> Self {
         Self {
             cancellation_fut: dir.0.get_auxiliary().cancel_token.clone().cancelled_owned(),
             dir,
@@ -82,7 +83,7 @@ impl<'s> ReadDir<'s> {
         }
     }
 
-    fn new_request(dir: &mut Dir<'_>) -> Result<ResponseFuture, Error> {
+    fn new_request(dir: &mut Dir) -> Result<ResponseFuture, Error> {
         let owned_handle = &mut dir.0;
 
         let id = owned_handle.get_id_mut();
@@ -101,7 +102,7 @@ impl<'s> ReadDir<'s> {
     }
 }
 
-impl Stream for ReadDir<'_> {
+impl Stream for ReadDir {
     type Item = Result<DirEntry, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -130,7 +131,7 @@ impl Stream for ReadDir<'_> {
                     tokio::select! {
                         biased;
 
-                        _ = cancellation_fut => Err(crate::BoxedWaitForCancellationFuture::cancel_error()),
+                        _ = cancellation_fut => Err(cancel_error()),
                         res = fut => res,
                     }
                 };
@@ -158,7 +159,7 @@ impl Stream for ReadDir<'_> {
     }
 }
 
-impl FusedStream for ReadDir<'_> {
+impl FusedStream for ReadDir {
     fn is_terminated(&self) -> bool {
         self.entries.is_none()
     }

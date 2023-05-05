@@ -1,7 +1,8 @@
-use super::{
+use crate::{
+    file::OpenOptions,
     lowlevel::{self, Extensions},
     metadata::{MetaData, MetaDataBuilder, Permissions},
-    Auxiliary, Buffer, Error, Id, OwnedHandle, Sftp, WriteEnd, WriteEndWithCachedId,
+    Auxiliary, Buffer, Error, Id, OwnedHandle, WriteEnd, WriteEndWithCachedId,
 };
 
 use std::{
@@ -26,13 +27,13 @@ type SendMetadataRequest = fn(&mut WriteEnd, Id, Cow<'_, Path>) -> Result<Awaita
 
 /// A struct used to perform operations on remote filesystem.
 #[derive(Debug, Clone)]
-pub struct Fs<'s> {
-    write_end: WriteEndWithCachedId<'s>,
+pub struct Fs {
+    write_end: WriteEndWithCachedId,
     cwd: Box<Path>,
 }
 
-impl<'s> Fs<'s> {
-    pub(super) fn new(write_end: WriteEndWithCachedId<'s>, cwd: PathBuf) -> Self {
+impl Fs {
+    pub(super) fn new(write_end: WriteEndWithCachedId, cwd: PathBuf) -> Self {
         Self {
             write_end,
             cwd: cwd.into_boxed_path(),
@@ -41,11 +42,6 @@ impl<'s> Fs<'s> {
 
     fn get_auxiliary(&self) -> &Auxiliary {
         self.write_end.get_auxiliary()
-    }
-
-    /// Return the underlying sftp.
-    pub fn sftp(&self) -> &'s Sftp {
-        self.write_end.sftp()
     }
 
     /// Return current working dir.
@@ -71,10 +67,10 @@ impl<'s> Fs<'s> {
     }
 }
 
-impl<'s> Fs<'s> {
+impl Fs {
     /// Open a remote dir
-    pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir<'_>, Error> {
-        async fn inner<'s>(this: &mut Fs<'s>, path: &Path) -> Result<Dir<'s>, Error> {
+    pub async fn open_dir(&mut self, path: impl AsRef<Path>) -> Result<Dir, Error> {
+        async fn inner(this: &mut Fs, path: &Path) -> Result<Dir, Error> {
             let path = this.concat_path_if_needed(path);
 
             this.write_end
@@ -87,7 +83,7 @@ impl<'s> Fs<'s> {
     }
 
     /// Create a directory builder.
-    pub fn dir_builder(&mut self) -> DirBuilder<'_, 's> {
+    pub fn dir_builder(&mut self) -> DirBuilder<'_> {
         DirBuilder {
             fs: self,
             metadata_builder: MetaDataBuilder::new(),
@@ -96,7 +92,7 @@ impl<'s> Fs<'s> {
 
     /// Creates a new, empty directory at the provided path.
     pub async fn create_dir(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<(), Error> {
+        async fn inner(this: &mut Fs, path: &Path) -> Result<(), Error> {
             this.dir_builder().create(path).await
         }
 
@@ -126,7 +122,7 @@ impl<'s> Fs<'s> {
     /// Returns the canonical, absolute form of a path with all intermediate
     /// components normalized and symbolic links resolved.
     pub async fn canonicalize(&mut self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {
-        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<PathBuf, Error> {
+        async fn inner(this: &mut Fs, path: &Path) -> Result<PathBuf, Error> {
             let path = this.concat_path_if_needed(path);
 
             let f = if this
@@ -173,7 +169,7 @@ impl<'s> Fs<'s> {
         src: impl AsRef<Path>,
         dst: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        async fn inner(this: &mut Fs<'_>, src: &Path, dst: &Path) -> Result<(), Error> {
+        async fn inner(this: &mut Fs, src: &Path, dst: &Path) -> Result<(), Error> {
             if !this
                 .get_auxiliary()
                 .extensions()
@@ -207,7 +203,7 @@ impl<'s> Fs<'s> {
         from: impl AsRef<Path>,
         to: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        async fn inner(this: &mut Fs<'_>, from: &Path, to: &Path) -> Result<(), Error> {
+        async fn inner(this: &mut Fs, from: &Path, to: &Path) -> Result<(), Error> {
             let f = if this
                 .get_auxiliary()
                 .extensions()
@@ -227,7 +223,7 @@ impl<'s> Fs<'s> {
 
     /// Reads a symbolic link, returning the file that the link points to.
     pub async fn read_link(&mut self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {
-        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<PathBuf, Error> {
+        async fn inner(this: &mut Fs, path: &Path) -> Result<PathBuf, Error> {
             let path = this.concat_path_if_needed(path);
 
             this.write_end
@@ -266,7 +262,7 @@ impl<'s> Fs<'s> {
         path: impl AsRef<Path>,
         perm: Permissions,
     ) -> Result<(), Error> {
-        async fn inner(this: &mut Fs<'_>, path: &Path, perm: Permissions) -> Result<(), Error> {
+        async fn inner(this: &mut Fs, path: &Path, perm: Permissions) -> Result<(), Error> {
             this.set_metadata_impl(path, MetaDataBuilder::new().permissions(perm).create())
                 .await
         }
@@ -302,10 +298,18 @@ impl<'s> Fs<'s> {
 
     /// Reads the entire contents of a file into a bytes.
     pub async fn read(&mut self, path: impl AsRef<Path>) -> Result<BytesMut, Error> {
-        async fn inner(this: &mut Fs<'_>, path: &Path) -> Result<BytesMut, Error> {
+        async fn inner(this: &mut Fs, path: &Path) -> Result<BytesMut, Error> {
             let path = this.concat_path_if_needed(path);
 
-            let mut file = this.write_end.sftp().open(path).await?;
+            let mut file = OpenOptions::open_inner(
+                lowlevel::OpenOptions::new().read(true),
+                false,
+                false,
+                false,
+                path.as_ref(),
+                this.write_end.clone(),
+            )
+            .await?;
             let max_read_len = file.max_read_len_impl();
 
             let cap_to_reserve: usize = if let Some(len) = file.metadata().await?.len() {
@@ -354,15 +358,20 @@ impl<'s> Fs<'s> {
         path: impl AsRef<Path>,
         content: impl AsRef<[u8]>,
     ) -> Result<(), Error> {
-        async fn inner(this: &mut Fs<'_>, path: &Path, content: &[u8]) -> Result<(), Error> {
+        async fn inner(this: &mut Fs, path: &Path, content: &[u8]) -> Result<(), Error> {
             let path = this.concat_path_if_needed(path);
 
-            this.write_end
-                .sftp()
-                .create(path)
-                .await?
-                .write_all(content)
-                .await
+            OpenOptions::open_inner(
+                lowlevel::OpenOptions::new().write(true),
+                true,
+                true,
+                false,
+                path.as_ref(),
+                this.write_end.clone(),
+            )
+            .await?
+            .write_all(content)
+            .await
         }
 
         inner(self, path.as_ref(), content.as_ref()).await
@@ -372,11 +381,11 @@ impl<'s> Fs<'s> {
 /// Remote Directory
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Dir<'s>(OwnedHandle<'s>);
+pub struct Dir(OwnedHandle);
 
-impl<'s> Dir<'s> {
+impl Dir {
     /// Read dir.
-    pub fn read_dir(self) -> ReadDir<'s> {
+    pub fn read_dir(self) -> ReadDir {
         ReadDir::new(self)
     }
 
@@ -388,12 +397,12 @@ impl<'s> Dir<'s> {
 
 /// Builder for new directory to create.
 #[derive(Debug)]
-pub struct DirBuilder<'a, 's> {
-    fs: &'a mut Fs<'s>,
+pub struct DirBuilder<'a> {
+    fs: &'a mut Fs,
     metadata_builder: MetaDataBuilder,
 }
 
-impl DirBuilder<'_, '_> {
+impl DirBuilder<'_> {
     /// Reset builder back to default.
     pub fn reset(&mut self) -> &mut Self {
         self.metadata_builder = MetaDataBuilder::new();
@@ -413,10 +422,10 @@ impl DirBuilder<'_, '_> {
     }
 }
 
-impl DirBuilder<'_, '_> {
+impl DirBuilder<'_> {
     /// Creates the specified directory with the configured options.
     pub async fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-        async fn inner(this: &mut DirBuilder<'_, '_>, path: &Path) -> Result<(), Error> {
+        async fn inner(this: &mut DirBuilder<'_>, path: &Path) -> Result<(), Error> {
             let fs = &mut this.fs;
 
             let path = fs.concat_path_if_needed(path);

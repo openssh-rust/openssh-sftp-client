@@ -14,12 +14,12 @@ use derive_destructure2::destructure;
 
 /// Remote Directory
 #[derive(Debug, Clone, destructure)]
-pub(super) struct OwnedHandle<'s> {
-    pub(super) write_end: WriteEndWithCachedId<'s>,
+pub(super) struct OwnedHandle {
+    pub(super) write_end: WriteEndWithCachedId,
     pub(super) handle: Arc<HandleOwned>,
 }
 
-impl Drop for OwnedHandle<'_> {
+impl Drop for OwnedHandle {
     fn drop(&mut self) {
         let write_end = &mut self.write_end;
         let handle = &self.handle;
@@ -36,8 +36,8 @@ impl Drop for OwnedHandle<'_> {
     }
 }
 
-impl<'s> OwnedHandle<'s> {
-    pub(super) fn new(write_end: WriteEndWithCachedId<'s>, handle: HandleOwned) -> Self {
+impl OwnedHandle {
+    pub(super) fn new(write_end: WriteEndWithCachedId, handle: HandleOwned) -> Self {
         Self {
             write_end,
             handle: Arc::new(handle),
@@ -83,15 +83,15 @@ impl<'s> OwnedHandle<'s> {
     }
 }
 
-impl<'s> Deref for OwnedHandle<'s> {
-    type Target = WriteEndWithCachedId<'s>;
+impl Deref for OwnedHandle {
+    type Target = WriteEndWithCachedId;
 
     fn deref(&self) -> &Self::Target {
         &self.write_end
     }
 }
 
-impl DerefMut for OwnedHandle<'_> {
+impl DerefMut for OwnedHandle {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.write_end
     }

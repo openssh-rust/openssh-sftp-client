@@ -1,4 +1,4 @@
-use super::{Auxiliary, BoxedWaitForCancellationFuture, Error, Id, Sftp, WriteEnd};
+use crate::{cancel_error, Auxiliary, Error, Id, WriteEnd};
 
 use std::{
     future::Future,
@@ -7,23 +7,29 @@ use std::{
 };
 
 #[derive(Debug)]
-pub(super) struct WriteEndWithCachedId<'s> {
-    sftp: &'s Sftp,
+pub(super) struct WriteEndWithCachedId {
     pub(super) inner: WriteEnd,
     id: Option<Id>,
 }
 
-impl Clone for WriteEndWithCachedId<'_> {
+impl Clone for WriteEndWithCachedId {
     fn clone(&self) -> Self {
+        self.inner.get_auxiliary().inc_active_user_count();
+
         Self {
-            sftp: self.sftp,
             inner: self.inner.clone(),
             id: None,
         }
     }
 }
 
-impl Deref for WriteEndWithCachedId<'_> {
+impl Drop for WriteEndWithCachedId {
+    fn drop(&mut self) {
+        self.inner.get_auxiliary().dec_active_user_count();
+    }
+}
+
+impl Deref for WriteEndWithCachedId {
     type Target = WriteEnd;
 
     fn deref(&self) -> &Self::Target {
@@ -31,17 +37,16 @@ impl Deref for WriteEndWithCachedId<'_> {
     }
 }
 
-impl DerefMut for WriteEndWithCachedId<'_> {
+impl DerefMut for WriteEndWithCachedId {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<'s> WriteEndWithCachedId<'s> {
-    pub(super) fn new(sftp: &'s Sftp, inner: WriteEnd) -> Self {
+impl WriteEndWithCachedId {
+    pub(super) fn new(write_end: WriteEnd) -> Self {
         Self {
-            sftp,
-            inner,
+            inner: write_end,
             id: None,
         }
     }
@@ -74,8 +79,8 @@ impl<'s> WriteEndWithCachedId<'s> {
         &mut self,
         future: Pin<&mut (dyn Future<Output = Result<R, Error>> + Send)>,
     ) -> Result<R, Error> {
-        let cancel_err = || Err(BoxedWaitForCancellationFuture::cancel_error());
-        let auxiliary = self.sftp.auxiliary();
+        let cancel_err = || Err(cancel_error());
+        let auxiliary = self.inner.get_auxiliary();
 
         let cancel_token = &auxiliary.cancel_token;
 
@@ -91,16 +96,12 @@ impl<'s> WriteEndWithCachedId<'s> {
         }
     }
 
-    pub(super) fn get_auxiliary(&self) -> &'s Auxiliary {
-        self.sftp.auxiliary()
-    }
-
-    pub(super) fn sftp(&self) -> &'s Sftp {
-        self.sftp
+    pub(super) fn get_auxiliary(&self) -> &Auxiliary {
+        self.inner.get_auxiliary()
     }
 }
 
-impl<'s> WriteEndWithCachedId<'s> {
+impl WriteEndWithCachedId {
     pub(super) async fn send_request<Func, F, R>(&mut self, f: Func) -> Result<R, Error>
     where
         Func: FnOnce(&mut WriteEnd, Id) -> Result<F, Error> + Send,
@@ -113,7 +114,7 @@ impl<'s> WriteEndWithCachedId<'s> {
         tokio::pin!(future);
 
         async fn inner<R>(
-            this: &mut WriteEndWithCachedId<'_>,
+            this: &mut WriteEndWithCachedId,
             future: Pin<&mut (dyn Future<Output = Result<(Id, R), Error>> + Send)>,
         ) -> Result<R, Error> {
             // Requests is already added to write buffer, so wakeup
