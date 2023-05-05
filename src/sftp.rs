@@ -9,7 +9,9 @@ use auxiliary::Auxiliary;
 use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
-use std::{any::Any, convert::TryInto, ops::Deref, path::Path, sync::Arc};
+use std::{
+    any::Any, convert::TryInto, fmt, future::Future, ops::Deref, path::Path, pin::Pin, sync::Arc,
+};
 
 use derive_destructure2::destructure;
 use tokio::{
@@ -68,15 +70,29 @@ pub struct Sftp {
 }
 
 /// Auxiliary data for [`Sftp`].
-#[derive(Debug)]
 #[non_exhaustive]
 pub enum SftpAuxiliaryData {
     /// No auxiliary data.
     None,
     /// Store any `Box`ed value.
     Boxed(Box<dyn Any + Send + Sync + 'static>),
+    /// Store any `Pin`ed `Future`.
+    PinnedFuture(Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>),
     /// Store any `Arc`ed value.
     Arced(Arc<dyn Any + Send + Sync + 'static>),
+}
+
+impl fmt::Debug for SftpAuxiliaryData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use SftpAuxiliaryData::*;
+
+        match self {
+            None => f.write_str("None"),
+            Boxed(_) => f.write_str("Boxed(boxed_any)"),
+            PinnedFuture(_) => f.write_str("PinnedFuture"),
+            Arced(_) => f.write_str("Arced(arced_any)"),
+        }
+    }
 }
 
 impl Sftp {
