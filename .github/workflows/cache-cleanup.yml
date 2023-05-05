@@ -23,7 +23,7 @@ jobs:
           )
           gh pr list --state closed -L 20  --json headRefName --jq '.[]|.headRefName' | (
               while IFS='$\n' read -r branch; do
-                  BRANCH="branch" ./cleanup-cache.sh
+                  BRANCH="$branch" ./cleanup-cache.sh
               done
           )
         env:
