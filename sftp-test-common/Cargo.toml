@@ -2,11 +2,8 @@
 # and not intended to be published to crates.io
 [package]
 name = "sftp-test-common"
-version = "0.1.0"
-edition = "2018"
-
-authors = ["Jiahao XU <Jiahao_XU@outlook.com>"]
-license = "MIT"
+version = "0.0.0"
+publish = false
 
 [dependencies]
 tokio = { version = "1.11.0", features = ["process"] }
