@@ -1,10 +1,12 @@
 #[allow(unused_imports)]
 use crate::*;
 
-/// ## Added
-///  - [`SftpAuxiliaryData::PinnedFuture`]
 #[doc(hidden)]
 pub mod unreleased {}
+
+/// ## Added
+///  - [`SftpAuxiliaryData::PinnedFuture`]
+pub mod v_0_13_1 {}
 
 /// ## Fixed
 ///  - Fixed #62 [`fs::ReadDir`]: Return all entries instead of just a subset.
