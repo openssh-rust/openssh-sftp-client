@@ -31,7 +31,7 @@ async fn flush(read_end: &mut ReadEnd) {
     let mut stdin_locked = stdin.lock().await;
 
     for byte in bytes {
-        stdin_locked.write_all(&*byte).await.unwrap();
+        stdin_locked.write_all(&byte).await.unwrap();
     }
 }
 
@@ -40,9 +40,7 @@ async fn connect_with_extensions() -> (WriteEnd, ReadEnd, process::Child, Extens
 
     let buffer_size = NonZeroUsize::new(1000).unwrap();
 
-    let write_end = lowlevel::connect(MpscQueue::default(), Mutex::new(stdin))
-        .await
-        .unwrap();
+    let write_end = lowlevel::connect(MpscQueue::default(), Mutex::new(stdin)).unwrap();
 
     let mut read_end = ReadEnd::new(stdout, buffer_size, write_end.deref().clone());
 

@@ -94,7 +94,7 @@ impl<Buffer: Send + Sync, Q, Auxiliary> SharedData<Buffer, Q, Auxiliary> {
 /// This function is not cancel safe.
 ///
 /// After dropping the future, the connection would be in a undefined state.
-pub async fn connect<Buffer, Q, Auxiliary>(
+pub fn connect<Buffer, Q, Auxiliary>(
     queue: Q,
     auxiliary: Auxiliary,
 ) -> Result<WriteEnd<Buffer, Q, Auxiliary>, Error>
@@ -106,7 +106,7 @@ where
 
     // Send hello message
     let mut write_end = WriteEnd::new(shared_data);
-    write_end.send_hello(SSH2_FILEXFER_VERSION).await?;
+    write_end.send_hello(SSH2_FILEXFER_VERSION)?;
 
     Ok(write_end)
 }

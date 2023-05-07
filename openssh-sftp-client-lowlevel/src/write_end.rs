@@ -67,7 +67,7 @@ where
     Buffer: Send + Sync,
     Q: Queue,
 {
-    pub(crate) async fn send_hello(&mut self, version: u32) -> Result<(), Error> {
+    pub(crate) fn send_hello(&mut self, version: u32) -> Result<(), Error> {
         self.shared_data
             .queue()
             .push(Self::serialize(&mut self.serializer, Hello { version })?);
