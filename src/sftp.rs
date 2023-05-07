@@ -111,12 +111,8 @@ impl Sftp {
     /// sent(flush_task), all responses processed (read_task) and [`Sftp`] has
     /// been dropped.
     ///
-    /// This can be used to store `openssh::RemoteChild` to keep the sftp
-    /// session alive while close it when sftp is done.
-    ///
-    /// If you want to manually wait on the `openssh::RemoteChild` or get that
-    /// type back, you can simply use [`SftpAuxiliaryData::Arced`] and then
-    /// stores an [`Arc`] elsewhere.
+    /// If you want to get back the data, you can simply use
+    /// [`SftpAuxiliaryData::Arced`] and then stores an [`Arc`] elsewhere.
     ///
     /// Once the sftp tasks is completed and [`Sftp`] is dropped, you can call
     /// [`Arc::try_unwrap`] to get back the exclusive ownership of it.
