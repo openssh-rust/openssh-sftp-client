@@ -101,10 +101,6 @@ pub enum Error {
     #[cfg(feature = "openssh")]
     #[error("Failed to create sftp from session: {0}")]
     RemoteChildSpawnError(#[from] openssh::Error),
-
-    #[cfg(feature = "openssh")]
-    #[error("Unexpected sftp subsystem behavior: {0}")]
-    UnexpectedSftpSubsystemBehavior(&'static &'static str),
 }
 
 #[derive(Debug, ThisError)]
