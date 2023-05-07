@@ -1,4 +1,5 @@
  - Make `openssh_sftp_client_lowlevel::connect` a normal function, it doesn't have to be `async` function
  - Use [`buf-list`](https://docs.rs/buf-list) to archive zero-copy using `Sink` trait
  - Cleanup dependabot
- - Add logging support
+ - Add optional logging support
+ - Await on `openssh::RemoteChild::wait` and `Session::close`
