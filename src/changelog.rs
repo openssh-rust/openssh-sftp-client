@@ -5,6 +5,10 @@ use crate::*;
 ///  - `OpensshSession`
 ///  - `SftpAuxiliaryData::ArcedOpensshSession`
 ///  - `Sftp::from_session`
+///
+/// ## Improved
+///  - Keep waiting on other tasks on failure in [`Sftp::close`]
+///    to collect as much information about the failure as possible.
 #[doc(hidden)]
 pub mod unreleased {}
 
