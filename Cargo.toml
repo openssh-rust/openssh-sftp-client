@@ -20,7 +20,7 @@ members = [
 ]
 
 [features]
-openssh = []
+openssh = ["dep:openssh"]
 # This feature is for internal testing only!!!
 __ci-tests = ["openssh"]
 
@@ -45,6 +45,8 @@ pin-project = "1.0.10"
 futures-core = "0.3.28"
 
 scopeguard = "1.1.0"
+
+openssh = { version = "0.9.9", default-features = false, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.11.0", features = ["rt", "macros"] }
