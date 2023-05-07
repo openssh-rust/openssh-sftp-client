@@ -145,8 +145,7 @@ impl Sftp {
                 write_end_buffer_size.get(),
                 options.get_max_pending_requests(),
                 auxiliary,
-            ))
-            .await?;
+            ))?;
 
             let flush_task = create_flush_task(
                 stdin,
@@ -166,7 +165,7 @@ impl Sftp {
         .await
     }
 
-    async fn connect(
+    fn connect(
         write_end_buffer_size: usize,
         max_pending_requests: u16,
         auxiliary: SftpAuxiliaryData,
@@ -175,7 +174,6 @@ impl Sftp {
             MpscQueue::with_capacity(write_end_buffer_size),
             Auxiliary::new(max_pending_requests, auxiliary),
         )
-        .await
     }
 
     async fn init(
