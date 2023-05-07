@@ -3,10 +3,7 @@ use std::sync::Arc;
 use openssh::Stdio;
 use tokio::{sync::oneshot, task::JoinHandle};
 
-use crate::{
-    error::{Error, RecursiveError},
-    Sftp, SftpAuxiliaryData, SftpOptions,
-};
+use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 
 /// The openssh session
 #[derive(Debug)]
@@ -61,10 +58,7 @@ impl Sftp {
 
             match (original_error, occuring_error) {
                 (Some(original_error), Some(occuring_error)) => {
-                    Some(Error::RecursiveErrors(Box::new(RecursiveError {
-                        original_error,
-                        occuring_error,
-                    })))
+                    Some(original_error.error_on_cleanup(occuring_error))
                 }
                 (Some(err), None) | (None, Some(err)) => Some(err),
                 (None, None) => None,

@@ -2,7 +2,9 @@ use crate::{
     auxiliary,
     file::{File, OpenOptions},
     fs::Fs,
-    lowlevel, tasks, Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
+    lowlevel, tasks,
+    utils::{ErrorExt, ResultExt},
+    Error, MpscQueue, SftpOptions, SharedData, WriteEnd, WriteEndWithCachedId,
 };
 
 use auxiliary::Auxiliary;
@@ -10,7 +12,14 @@ use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
 use std::{
-    any::Any, convert::TryInto, fmt, future::Future, ops::Deref, path::Path, pin::Pin, sync::Arc,
+    any::Any,
+    convert::{identity, TryInto},
+    fmt,
+    future::Future,
+    ops::Deref,
+    path::Path,
+    pin::Pin,
+    sync::Arc,
 };
 
 use derive_destructure2::destructure;
@@ -307,31 +316,46 @@ impl Sftp {
             _ => None,
         };
 
-        // Drop handle.
-        drop(handle);
-
-        // Wait for responses for all requests buffered and sent.
-        read_task.await??;
-
-        // read_task would order the shutdown of read_task,
-        // so we just need to wait for it here.
-        flush_task.await??;
-
-        #[cfg(feature = "openssh")]
-        if let Some(session) = session {
-            Arc::try_unwrap(session)
-                .unwrap()
-                .recover_session_err()
-                .await?;
-        }
-
         #[cfg(not(feature = "openssh"))]
         {
             // Help session infer generic T in Option<T>
             let _: Option<()> = session;
         }
 
-        Ok(())
+        // Drop handle.
+        drop(handle);
+
+        // Wait for responses for all requests buffered and sent.
+        let read_task_error = read_task.await.flatten().err();
+
+        // read_task would order the shutdown of read_task,
+        // so we just need to wait for it here.
+        let flush_task_error = flush_task.await.flatten().err();
+
+        let session_error: Option<Error> = match session {
+            #[cfg(feature = "openssh")]
+            Some(session) => Arc::try_unwrap(session)
+                .unwrap()
+                .recover_session_err()
+                .await
+                .err(),
+
+            #[cfg(not(feature = "openssh"))]
+            Some(_) => unreachable!(),
+
+            None => None,
+        };
+
+        match (read_task_error, flush_task_error, session_error) {
+            (Some(err1), Some(err2), Some(err3)) => {
+                Err(err1.error_on_cleanup(err2).error_on_cleanup(err3))
+            }
+            (Some(err1), Some(err2), None)
+            | (Some(err1), None, Some(err2))
+            | (None, Some(err1), Some(err2)) => Err(err1.error_on_cleanup(err2)),
+            (Some(err), None, None) | (None, Some(err), None) | (None, None, Some(err)) => Err(err),
+            (None, None, None) => Ok(()),
+        }
     }
 
     /// Return a new [`OpenOptions`] object.
