@@ -12,6 +12,13 @@ repository = "https://github.com/openssh-rust/openssh-sftp-client"
 keywords = ["ssh", "multiplex", "async", "network", "sftp"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
 
+[features]
+openssh = ["dep:openssh"]
+
+[package.metadata.docs.rs]
+features = ["openssh"]
+rustdoc-args = ["--cfg", "docsrs"]
+
 [dependencies]
 thiserror = "1.0.29"
 awaitable-error = "0.1.0"
@@ -19,3 +26,5 @@ openssh-sftp-protocol-error = "0.1.0"
 ssh_format_error = "0.1.0"
 
 tokio = { version = "1.11.0", features = ["rt"] }
+
+openssh = { version = "0.9.9", default-features = false, optional = true }
