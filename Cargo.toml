@@ -54,3 +54,4 @@ tempfile = "3.1.0"
 pretty_assertions = "1.1.0"
 sftp-test-common = { path = "sftp-test-common" }
 futures-util = "0.3.28"
+openssh = { version = "0.9.9", features = ["native-mux"] }

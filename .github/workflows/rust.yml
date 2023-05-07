@@ -83,6 +83,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: 'recursive'
+
     - name: Install toolchain
       run: rustup toolchain install stable --no-self-update --profile minimal
 
@@ -99,4 +100,43 @@ jobs:
         restore-keys: ${{ runner.os }}-cargo-index-
     - uses: mozilla-actions/sccache-action@v0.0.3
 
-    - run: ./run_tests.sh
+    - name: Compile tests
+      run: cargo test --all-features --workspace --no-run
+
+    - name: Test ssh connectivity
+      run: |
+        # Wait for startup of openssh-server
+        timeout 15 ./wait_for_sshd_start_up.sh
+        chmod 600 .test-key
+        mkdir /tmp/openssh-rs
+        ssh -i .test-key -v -p 2222 -l test-user 127.0.0.1 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/openssh-rs/known_hosts whoami
+    - name: Set up ssh-agent
+      run: |
+        eval $(ssh-agent)
+        echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+        echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
+        cat .test-key | ssh-add -
+
+    - name: Run tests
+      run: ./run_tests.sh
+      env:
+        XDG_RUNTIME_DIR: /tmp
+
+    - name: ssh container log
+      run: docker logs $(docker ps | grep openssh-server | awk '{print $1}')
+      if: ${{ failure() }}
+    - run: docker exec $(docker ps | grep openssh-server | awk '{print $1}') ls -R /config/logs/
+      if: ${{ failure() }}
+    - run: docker exec $(docker ps | grep openssh-server | awk '{print $1}') cat /config/logs/openssh/current
+      name: ssh server log
+      if: ${{ failure() }}
+    services:
+      openssh:
+        image: linuxserver/openssh-server:amd64-latest
+        ports:
+          - 2222:2222
+        env:
+          USER_NAME: test-user
+          PUBLIC_KEY: |-
+            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGzHvK2pKtSlZXP9tPYOOBb/xn0IiC9iLMS355AYUPC7
+          DOCKER_MODS: linuxserver/mods:openssh-server-ssh-tunnel
