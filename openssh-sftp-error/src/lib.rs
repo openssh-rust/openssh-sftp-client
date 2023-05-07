@@ -75,9 +75,13 @@ pub enum Error {
         response_id: u32,
     },
 
-    /// Raised error when cleaning up.
+    /// Raised 2 errors when cleaning up.
     #[error(transparent)]
     RecursiveErrors(Box<RecursiveError>),
+
+    /// Raised 3 errors when cleaning up.
+    #[error(transparent)]
+    RecursiveErrors3(Box<RecursiveError3>),
 
     /// Sftp server error
     #[error("Sftp server reported error kind {0:#?}, msg: {1}")]
@@ -113,4 +117,18 @@ pub struct RecursiveError {
     /// for original error.
     #[source]
     pub occuring_error: Error,
+}
+
+#[derive(Debug, ThisError)]
+#[error("err1: {err1}, err2: {err2}, err3: {err3}.")]
+pub struct RecursiveError3 {
+    /// First error raised.
+    pub err1: Error,
+
+    /// Second error raised.
+    pub err2: Error,
+
+    /// Third error raised.
+    #[source]
+    pub err3: Error,
 }
