@@ -20,8 +20,13 @@ members = [
 ]
 
 [features]
+openssh = []
 # This feature is for internal testing only!!!
-ci-tests = []
+ci-tests = ["openssh"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 openssh-sftp-error = { version = "0.3.0", path = "openssh-sftp-error" }

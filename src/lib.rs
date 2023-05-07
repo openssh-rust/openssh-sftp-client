@@ -42,6 +42,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(doc)]
 /// Changelog for this crate.
