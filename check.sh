@@ -2,7 +2,7 @@
 
 run_check() {
     cargo fmt --all -- --check
-    cargo clippy --all --no-deps
+    cargo clippy --all-features --all --no-deps
     cargo doc --no-deps
 }
 
