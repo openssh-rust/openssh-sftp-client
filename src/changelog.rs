@@ -2,9 +2,10 @@
 use crate::*;
 
 /// ## Added
-///  - `OpensshSession`
-///  - `SftpAuxiliaryData::ArcedOpensshSession`
-///  - `Sftp::from_session`
+///  - `OpensshSession`, which is enabled by feature `openssh`
+///  - `SftpAuxiliaryData::ArcedOpensshSession`, which is enabled by feature `openssh`
+///  - `Sftp::from_session`, which is enabled by feature `openssh`
+///  - Logging support, enabled by feature `tracing`
 ///
 /// ## Improved
 ///  - Keep waiting on other tasks on failure in [`Sftp::close`]

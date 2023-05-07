@@ -2,7 +2,7 @@
 
 use super::{awaitable_responses::AwaitableResponses, *};
 
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt, sync::Arc};
 
 use openssh_sftp_protocol::constants::SSH2_FILEXFER_VERSION;
 
@@ -24,6 +24,12 @@ struct SharedDataInner<Buffer, Q, Auxiliary> {
 ///    any unsent but processed or unprocessed responses.
 #[derive(Debug)]
 pub struct SharedData<Buffer, Q, Auxiliary = ()>(Arc<SharedDataInner<Buffer, Q, Auxiliary>>);
+
+impl<Buffer, Q, Auxiliary> fmt::Pointer for SharedData<Buffer, Q, Auxiliary> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Pointer::fmt(&self.0, f)
+    }
+}
 
 impl<Buffer, Q, Auxiliary> Clone for SharedData<Buffer, Q, Auxiliary> {
     fn clone(&self) -> Self {

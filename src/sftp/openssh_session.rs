@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use openssh::Stdio;
+use openssh::{ChildStdin, ChildStdout, Error as OpensshError, Session, Stdio};
 use tokio::{sync::oneshot, task::JoinHandle};
 
 use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
@@ -8,6 +8,80 @@ use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 /// The openssh session
 #[derive(Debug)]
 pub struct OpensshSession(JoinHandle<Option<Error>>);
+
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(name = "session_task", skip(tx))
+)]
+async fn create_session_task(
+    session: Session,
+    tx: oneshot::Sender<Result<(ChildStdin, ChildStdout), OpensshError>>,
+) -> Option<Error> {
+    #[cfg(feature = "tracing")]
+    tracing::info!("Connecting to sftp subsystem, session = {session:?}");
+
+    let res = session
+        .subsystem("sftp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .await;
+
+    let mut child = match res {
+        Ok(child) => child,
+        Err(err) => {
+            #[cfg(feature = "tracing")]
+            tracing::error!(
+                "Failed to connect to remote sftp subsystem: {err}, session = {session:?}"
+            );
+
+            tx.send(Err(err)).unwrap(); // Err
+            return None;
+        }
+    };
+
+    #[cfg(feature = "tracing")]
+    tracing::info!("Connection to sftp subsystem established, session = {session:?}");
+
+    let stdin = child.stdin().take().unwrap();
+    let stdout = child.stdout().take().unwrap();
+    tx.send(Ok((stdin, stdout))).unwrap(); // Ok
+
+    let original_error = match child.wait().await {
+        Ok(exit_status) => {
+            if !exit_status.success() {
+                Some(Error::SftpServerFailure(exit_status))
+            } else {
+                None
+            }
+        }
+        Err(err) => Some(err.into()),
+    };
+
+    #[cfg(feature = "tracing")]
+    if let Some(err) = &original_error {
+        tracing::error!(
+            "Waiting on remote sftp subsystem to exit failed: {err}, session = {session:?}"
+        );
+    }
+
+    let session_str = format!("{session:?}");
+    let occuring_error = session.close().await.err().map(Error::from);
+
+    #[cfg(feature = "tracing")]
+    if let Some(err) = &occuring_error {
+        tracing::error!("Closing session failed: {err}, session = {session_str}");
+    }
+
+    match (original_error, occuring_error) {
+        (Some(original_error), Some(occuring_error)) => {
+            Some(original_error.error_on_cleanup(occuring_error))
+        }
+        (Some(err), None) | (None, Some(err)) => Some(err),
+        (None, None) => None,
+    }
+}
 
 impl Sftp {
     /// Create [`Sftp`] from [`openssh::Session`].
@@ -22,48 +96,7 @@ impl Sftp {
     ) -> Result<Self, Error> {
         let (tx, rx) = oneshot::channel();
 
-        let handle = tokio::spawn(async move {
-            let res = session
-                .subsystem("sftp")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .spawn()
-                .await;
-
-            let mut child = match res {
-                Ok(child) => child,
-                Err(err) => {
-                    tx.send(Err(err)).unwrap(); // Err
-                    return None;
-                }
-            };
-
-            let stdin = child.stdin().take().unwrap();
-            let stdout = child.stdout().take().unwrap();
-            tx.send(Ok((stdin, stdout))).unwrap(); // Ok
-
-            let original_error = match child.wait().await {
-                Ok(exit_status) => {
-                    if !exit_status.success() {
-                        Some(Error::SftpServerFailure(exit_status))
-                    } else {
-                        None
-                    }
-                }
-                Err(err) => Some(err.into()),
-            };
-
-            let occuring_error = session.close().await.err().map(Error::from);
-
-            match (original_error, occuring_error) {
-                (Some(original_error), Some(occuring_error)) => {
-                    Some(original_error.error_on_cleanup(occuring_error))
-                }
-                (Some(err), None) | (None, Some(err)) => Some(err),
-                (None, None) => None,
-            }
-        });
+        let handle = tokio::spawn(create_session_task(session, tx));
 
         let msg = "Task failed without sending anything, so it must have panicked";
 
