@@ -1,6 +1,15 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
+/// ## Improved
+///  - If `Sftp` is created using `Sftp::from_session`, then dropping it would
+///    also drop the `openssh::RemoteChild` and `openssh::Session` immediately
+///    after sftp graceful shutdown is done to prevent any leak.
+pub mod v_0_13_3 {}
+
 /// ## Added
 ///  - `OpensshSession`, which is enabled by feature `openssh`
 ///  - `SftpAuxiliaryData::ArcedOpensshSession`, which is enabled by feature `openssh`
@@ -11,8 +20,7 @@ use crate::*;
 ///  - Keep waiting on other tasks on failure in [`Sftp::close`]
 ///    to collect as much information about the failure as possible.
 ///  - Add [`error::RecursiveError3`] for reting 3 errs in [`Sftp::close`]
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_13_2 {}
 
 /// ## Added
 ///  - [`SftpAuxiliaryData::PinnedFuture`]
