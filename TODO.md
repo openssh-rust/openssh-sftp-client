@@ -3,3 +3,4 @@
  - Use [`buf-list`](https://docs.rs/buf-list) to archive zero-copy using `Sink` trait
  - Cleanup dependabot
  - Add optional logging support
+ - Improve `Sftp::close`: Return all errors if possible

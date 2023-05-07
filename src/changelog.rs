@@ -2,9 +2,9 @@
 use crate::*;
 
 /// ## Added
-///  - [`OpensshSession`]
-///  - [`SftpAuxiliaryData::ArcedOpensshSession`]
-///  - [`Sftp::from_session`]
+///  - `OpensshSession`
+///  - `SftpAuxiliaryData::ArcedOpensshSession`
+///  - `Sftp::from_session`
 #[doc(hidden)]
 pub mod unreleased {}
 
