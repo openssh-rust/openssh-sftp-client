@@ -4,6 +4,7 @@ run_check() {
     cargo fmt --all -- --check
     cargo clippy --all --no-deps
     cargo doc --no-deps
+    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --no-deps --all-features
 }
 
 set -euxo pipefail

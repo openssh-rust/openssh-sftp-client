@@ -55,7 +55,9 @@ jobs:
       with:
         submodules: 'recursive'
     - name: Install toolchain
-      run: rustup toolchain install stable --component rustfmt,clippy --no-self-update --profile minimal
+      run: |
+        rustup toolchain install stable --component rustfmt,clippy --no-self-update --profile minimal
+        rustup toolchain install nightly --no-self-update --profile minimal
 
     - name: Create Cargo.lock for caching
       run: cargo update
