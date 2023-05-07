@@ -289,6 +289,11 @@ impl Sftp {
     }
 
     /// Close sftp connection
+    ///
+    /// If sftp is created using [`Sftp::from_session`], then calling this
+    /// function would also await on [`openssh::RemoteChild::wait`] and
+    /// [`openssh::Session::close`] and propagate their error in
+    /// [`Sftp::close`].
     pub async fn close(self) -> Result<(), Error> {
         let Self {
             handle,

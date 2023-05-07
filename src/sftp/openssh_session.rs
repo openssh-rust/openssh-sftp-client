@@ -41,6 +41,11 @@ impl fmt::Debug for OpensshSession {
 
 impl Sftp {
     /// Create [`Sftp`] from [`openssh::Session`].
+    ///
+    /// Calling [`Sftp::close`] on sftp instances created using this function
+    /// would also await on [`openssh::RemoteChild::wait`] and
+    /// [`openssh::Session::close`] and propagate their error in
+    /// [`Sftp::close`].
     pub async fn from_session(
         session: openssh::Session,
         options: SftpOptions,
