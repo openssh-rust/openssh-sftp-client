@@ -6,6 +6,7 @@ use std::{
     future::ready,
     io::IoSlice,
     num::{NonZeroU32, NonZeroU64},
+    path::Path,
     path::PathBuf,
     stringify,
 };
@@ -623,7 +624,7 @@ async fn connects_with_name() -> Vec<(Session, &'static str)> {
 
 #[tokio::test]
 async fn sftp_test_from_sessions() {
-    let path = gen_path("sftp_test_from_sessions");
+    let path = Path::new("sftp_test_from_sessions");
 
     let content = b"HELLO, WORLD!\n".repeat(200);
 
