@@ -9,6 +9,7 @@ use crate::*;
 /// ## Improved
 ///  - Keep waiting on other tasks on failure in [`Sftp::close`]
 ///    to collect as much information about the failure as possible.
+///  - Add [`error::RecursiveError3`] for reting 3 errs in [`Sftp::close`]
 #[doc(hidden)]
 pub mod unreleased {}
 

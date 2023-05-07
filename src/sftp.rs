@@ -12,14 +12,7 @@ use lowlevel::{connect, Extensions};
 use tasks::{create_flush_task, create_read_task};
 
 use std::{
-    any::Any,
-    convert::{identity, TryInto},
-    fmt,
-    future::Future,
-    ops::Deref,
-    path::Path,
-    pin::Pin,
-    sync::Arc,
+    any::Any, convert::TryInto, fmt, future::Future, ops::Deref, path::Path, pin::Pin, sync::Arc,
 };
 
 use derive_destructure2::destructure;
@@ -347,9 +340,7 @@ impl Sftp {
         };
 
         match (read_task_error, flush_task_error, session_error) {
-            (Some(err1), Some(err2), Some(err3)) => {
-                Err(err1.error_on_cleanup(err2).error_on_cleanup(err3))
-            }
+            (Some(err1), Some(err2), Some(err3)) => Err(err1.error_on_cleanup3(err2, err3)),
             (Some(err1), Some(err2), None)
             | (Some(err1), None, Some(err2))
             | (None, Some(err1), Some(err2)) => Err(err1.error_on_cleanup(err2)),
