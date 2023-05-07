@@ -96,6 +96,74 @@ impl fmt::Debug for SftpAuxiliaryData {
 }
 
 impl Sftp {
+    /// Create [`Sftp`] from [`openssh::Session`].
+    #[cfg(feature = "openssh")]
+    pub async fn from_session(
+        session: openssh::Session,
+        options: SftpOptions,
+    ) -> Result<Self, Error> {
+        use std::{
+            future::{pending, poll_fn},
+            task::Poll,
+        };
+
+        use once_cell::sync::OnceCell;
+        use openssh::Stdio;
+
+        let mut stdio = Arc::new(OnceCell::new());
+        let stdio_cloned = Arc::clone(&stdio);
+
+        let mut future = Box::pin(async move {
+            let res = session
+                .subsystem("sftp")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .await;
+
+            let mut child = match res {
+                Ok(child) => child,
+                Err(err) => {
+                    stdio_cloned.set(Err(err)).unwrap(); // Err
+                    drop(stdio_cloned);
+                    return;
+                }
+            };
+
+            let stdin = child.stdin().take().unwrap();
+            let stdout = child.stdout().take().unwrap();
+            stdio_cloned.set(Ok((stdin, stdout))).unwrap(); // Ok
+            drop(stdio_cloned);
+
+            // Wait forever until being dropped
+            pending::<()>().await;
+
+            // Use child, session after await to keep them alive
+            drop(child);
+            #[allow(clippy::drop_non_drop)]
+            drop(session);
+        });
+
+        let (stdin, stdout) = poll_fn(|cx| {
+            let _ = future.as_mut().poll(cx);
+            if let Some(once_cell) = Arc::get_mut(&mut stdio) {
+                // future must have set some value before dropping stdio_cloned
+                return Poll::Ready(once_cell.take().unwrap());
+            }
+            Poll::Pending
+        })
+        .await?;
+
+        Sftp::new_with_auxiliary(
+            stdin,
+            stdout,
+            options,
+            SftpAuxiliaryData::PinnedFuture(future),
+        )
+        .await
+    }
+
     /// Create [`Sftp`].
     pub async fn new<W: AsyncWrite + Send + 'static, R: AsyncRead + Send + 'static>(
         stdin: W,
