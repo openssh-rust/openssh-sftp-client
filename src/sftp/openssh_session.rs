@@ -9,6 +9,12 @@ use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 #[derive(Debug)]
 pub struct OpensshSession(JoinHandle<Option<Error>>);
 
+impl Drop for OpensshSession {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 #[cfg_attr(
     feature = "tracing",
     tracing::instrument(name = "session_task", skip(tx))
@@ -116,8 +122,8 @@ impl Sftp {
 }
 
 impl OpensshSession {
-    pub(super) async fn recover_session_err(self) -> Result<(), Error> {
-        if let Some(err) = self.0.await? {
+    pub(super) async fn recover_session_err(mut self) -> Result<(), Error> {
+        if let Some(err) = (&mut self.0).await? {
             Err(err)
         } else {
             Ok(())
