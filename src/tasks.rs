@@ -26,6 +26,12 @@ async fn flush(
 ) -> Result<(), Error> {
     shared_data.queue().swap(buffer);
 
+    #[cfg(feature = "tracing")]
+    tracing::debug!(
+        "Flushing out {} bytes, shared_data = {shared_data:p}",
+        buffer.len()
+    );
+
     // `Queue` implementation for `MpscQueue` already removes
     // all empty `Bytes`s so that precond of write_all_bytes
     // is satisfied.
@@ -49,6 +55,10 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
     write_end_buffer_size: NonZeroUsize,
     flush_interval: Duration,
 ) -> JoinHandle<Result<(), Error>> {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(name = "flush_task", skip(writer, shared_data), err)
+    )]
     async fn inner(
         mut writer: Pin<&mut (dyn AsyncWrite + Send)>,
         shared_data: SharedData,
@@ -71,10 +81,18 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         let mut reusable_io_slices = ReusableIoSlices::new(write_end_buffer_size);
 
         loop {
+            #[cfg(feature = "tracing")]
+            tracing::debug!(
+                "Flushing out the initial hello msg from shared_data = {shared_data:p}"
+            );
+
             // Flush the initial hello msg ASAP.
             let mut cnt = pending_requests.load(Ordering::Relaxed);
 
             loop {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Trigger read_task from shared_data = {shared_data:p}");
+
                 read_end_notify.notify_one();
 
                 // Wait until another thread is done or cancelled flushing
@@ -95,6 +113,9 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
             }
 
             if shutdown_stage.load(Ordering::Relaxed) == 2 {
+                #[cfg(feature = "tracing")]
+                tracing::info!("flush_task graceful shutdown, shared_data = {shared_data:p}");
+
                 // Read tasks have read in all responses, thus
                 // write task can exit now.
                 //
@@ -139,6 +160,10 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
     read_end_buffer_size: NonZeroUsize,
     shared_data: SharedData,
 ) -> (oneshot::Receiver<Extensions>, JoinHandle<Result<(), Error>>) {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(name = "read_task", skip(stdout, tx, shared_data), err)
+    )]
     async fn inner(
         stdout: Pin<&mut (dyn AsyncRead + Send)>,
         read_end_buffer_size: NonZeroUsize,
@@ -156,12 +181,20 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
         pin!(read_end);
 
         defer! {
+            #[cfg(feature = "tracing")]
+            tracing::info!(
+                "Requesting graceful shutdown of flush_task from read_task, shared_data = {shared_data:p}"
+            );
+
             // Order the shutdown of flush_task.
             auxiliary.shutdown_stage.store(2, Ordering::Relaxed);
 
             auxiliary.flush_immediately.notify_one();
             auxiliary.flush_end_notify.notify_one();
         }
+
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Receiving version and extensions, shared_data = {shared_data:p}");
 
         // Receive version and extensions
         let extensions = read_end.as_mut().receive_server_hello_pinned().await?;
@@ -172,6 +205,11 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
             read_end_notify.notified().await;
 
             let mut cnt = requests_to_read.load(Ordering::Relaxed);
+
+            #[cfg(feature = "tracing")]
+            tracing::debug!(
+                "Attempting to read {cnt} responses in read_task, shared_data = {shared_data:p}"
+            );
 
             while cnt != 0 {
                 // If attempt to read in more than new_requests_submit, then
