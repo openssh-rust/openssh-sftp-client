@@ -58,6 +58,8 @@ mod unix_timestamp;
 pub use unix_timestamp::UnixTimeStamp;
 
 mod sftp;
+#[cfg(feature = "openssh")]
+pub use sftp::OpensshSession;
 use sftp::SftpHandle;
 pub use sftp::{Sftp, SftpAuxiliaryData};
 

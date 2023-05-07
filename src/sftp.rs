@@ -21,6 +21,12 @@ use tokio::{
 };
 use tokio_io_utility::assert_send;
 
+#[cfg(feature = "openssh")]
+mod openssh_session;
+
+#[cfg(feature = "openssh")]
+pub use openssh_session::OpensshSession;
+
 #[derive(Debug, destructure)]
 pub(super) struct SftpHandle(SharedData);
 
@@ -80,6 +86,9 @@ pub enum SftpAuxiliaryData {
     PinnedFuture(Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>),
     /// Store any `Arc`ed value.
     Arced(Arc<dyn Any + Send + Sync + 'static>),
+    /// Store [`OpensshSession`] with in an `Arc`.
+    #[cfg(feature = "openssh")]
+    ArcedOpensshSession(Arc<OpensshSession>),
 }
 
 impl fmt::Debug for SftpAuxiliaryData {
@@ -91,79 +100,13 @@ impl fmt::Debug for SftpAuxiliaryData {
             Boxed(_) => f.write_str("Boxed(boxed_any)"),
             PinnedFuture(_) => f.write_str("PinnedFuture"),
             Arced(_) => f.write_str("Arced(arced_any)"),
+            #[cfg(feature = "openssh")]
+            ArcedOpensshSession(session) => write!(f, "ArcedOpensshSession({session:?})"),
         }
     }
 }
 
 impl Sftp {
-    /// Create [`Sftp`] from [`openssh::Session`].
-    #[cfg(feature = "openssh")]
-    pub async fn from_session(
-        session: openssh::Session,
-        options: SftpOptions,
-    ) -> Result<Self, Error> {
-        use std::{
-            future::{pending, poll_fn},
-            task::Poll,
-        };
-
-        use once_cell::sync::OnceCell;
-        use openssh::Stdio;
-
-        let mut stdio = Arc::new(OnceCell::new());
-        let stdio_cloned = Arc::clone(&stdio);
-
-        let mut future = Box::pin(async move {
-            let res = session
-                .subsystem("sftp")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .spawn()
-                .await;
-
-            let mut child = match res {
-                Ok(child) => child,
-                Err(err) => {
-                    stdio_cloned.set(Err(err)).unwrap(); // Err
-                    drop(stdio_cloned);
-                    return;
-                }
-            };
-
-            let stdin = child.stdin().take().unwrap();
-            let stdout = child.stdout().take().unwrap();
-            stdio_cloned.set(Ok((stdin, stdout))).unwrap(); // Ok
-            drop(stdio_cloned);
-
-            // Wait forever until being dropped
-            pending::<()>().await;
-
-            // Use child, session after await to keep them alive
-            drop(child);
-            #[allow(clippy::drop_non_drop)]
-            drop(session);
-        });
-
-        let (stdin, stdout) = poll_fn(|cx| {
-            let _ = future.as_mut().poll(cx);
-            if let Some(once_cell) = Arc::get_mut(&mut stdio) {
-                // future must have set some value before dropping stdio_cloned
-                return Poll::Ready(once_cell.take().unwrap());
-            }
-            Poll::Pending
-        })
-        .await?;
-
-        Sftp::new_with_auxiliary(
-            stdin,
-            stdout,
-            options,
-            SftpAuxiliaryData::PinnedFuture(future),
-        )
-        .await
-    }
-
     /// Create [`Sftp`].
     pub async fn new<W: AsyncWrite + Send + 'static, R: AsyncRead + Send + 'static>(
         stdin: W,
@@ -353,6 +296,12 @@ impl Sftp {
             read_task,
         } = self;
 
+        let session = match &handle.get_auxiliary().auxiliary_data {
+            #[cfg(feature = "openssh")]
+            SftpAuxiliaryData::ArcedOpensshSession(session) => Some(Arc::clone(session)),
+            _ => None,
+        };
+
         // Drop handle.
         drop(handle);
 
@@ -362,6 +311,20 @@ impl Sftp {
         // read_task would order the shutdown of read_task,
         // so we just need to wait for it here.
         flush_task.await??;
+
+        #[cfg(feature = "openssh")]
+        if let Some(session) = session {
+            Arc::try_unwrap(session)
+                .unwrap()
+                .recover_session_err()
+                .await?;
+        }
+
+        #[cfg(not(feature = "openssh"))]
+        {
+            // Help session infer generic T in Option<T>
+            let _: Option<()> = session;
+        }
 
         Ok(())
     }
