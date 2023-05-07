@@ -97,6 +97,10 @@ pub enum Error {
     /// tokio join error
     #[error("Failed to join tokio task")]
     TaskJoinError(#[from] tokio::task::JoinError),
+
+    #[cfg(feature = "openssh")]
+    #[error("Failed to create sftp from session: {0}")]
+    RemoteChildSpawnError(#[from] openssh::Error),
 }
 
 #[derive(Debug, ThisError)]

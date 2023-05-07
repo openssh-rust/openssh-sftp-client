@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-#[cfg(feature = "ci-tests")]
+#[cfg(feature = "__ci-tests")]
 use std::num::NonZeroU32;
 
 /// Options when creating [`super::Sftp`].
@@ -14,9 +14,9 @@ pub struct SftpOptions {
     flush_interval: Option<Duration>,
     max_pending_requests: Option<NonZeroU16>,
 
-    #[cfg(feature = "ci-tests")]
+    #[cfg(feature = "__ci-tests")]
     max_read_len: Option<NonZeroU32>,
-    #[cfg(feature = "ci-tests")]
+    #[cfg(feature = "__ci-tests")]
     max_write_len: Option<NonZeroU32>,
 }
 
@@ -29,9 +29,9 @@ impl SftpOptions {
             flush_interval: None,
             max_pending_requests: None,
 
-            #[cfg(feature = "ci-tests")]
+            #[cfg(feature = "__ci-tests")]
             max_read_len: None,
-            #[cfg(feature = "ci-tests")]
+            #[cfg(feature = "__ci-tests")]
             max_write_len: None,
         }
     }
@@ -120,7 +120,7 @@ impl SftpOptions {
     }
 }
 
-#[cfg(feature = "ci-tests")]
+#[cfg(feature = "__ci-tests")]
 impl SftpOptions {
     /// Set `max_read_len`.
     ///
@@ -151,7 +151,7 @@ impl SftpOptions {
     }
 }
 
-#[cfg(not(feature = "ci-tests"))]
+#[cfg(not(feature = "__ci-tests"))]
 impl SftpOptions {
     pub(super) const fn get_max_read_len(&self) -> Option<u32> {
         None

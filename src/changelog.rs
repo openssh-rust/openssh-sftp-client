@@ -1,6 +1,10 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - `OpensshSession`
+///  - `SftpAuxiliaryData::ArcedOpensshSession`
+///  - `Sftp::from_session`
 #[doc(hidden)]
 pub mod unreleased {}
 

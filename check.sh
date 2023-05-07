@@ -2,7 +2,7 @@
 
 run_check() {
     cargo fmt --all -- --check
-    cargo clippy --all --no-deps
+    cargo clippy --all-features --all --no-deps
     cargo doc --no-deps
 }
 
@@ -17,3 +17,6 @@ for workspace in openssh-sftp-error openssh-sftp-client-lowlevel; do
 done
 
 run_check
+
+export RUSTDOCFLAGS="--cfg docsrs"
+exec cargo +nightly doc --no-deps --features openssh

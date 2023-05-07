@@ -224,7 +224,7 @@ impl File {
     }
 }
 
-#[cfg(feature = "ci-tests")]
+#[cfg(feature = "__ci-tests")]
 impl File {
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests

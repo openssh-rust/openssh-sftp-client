@@ -42,6 +42,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(doc)]
 /// Changelog for this crate.
@@ -57,6 +58,8 @@ mod unix_timestamp;
 pub use unix_timestamp::UnixTimeStamp;
 
 mod sftp;
+#[cfg(feature = "openssh")]
+pub use sftp::OpensshSession;
 use sftp::SftpHandle;
 pub use sftp::{Sftp, SftpAuxiliaryData};
 

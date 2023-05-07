@@ -1,25 +1,24 @@
-use openssh_sftp_client::*;
-
 use std::{
+    borrow::Cow,
     cmp::{max, min},
-    convert::identity,
-    convert::TryInto,
-    fs,
+    convert::{identity, TryInto},
+    env, fs,
     future::ready,
     io::IoSlice,
     num::{NonZeroU32, NonZeroU64},
+    path::Path,
     path::PathBuf,
     stringify,
 };
 
-use sftp_test_common::*;
-
 use bytes::BytesMut;
 use futures_util::StreamExt;
+use openssh::{KnownHosts, Session, SessionBuilder};
+use openssh_sftp_client::*;
+use pretty_assertions::assert_eq;
+use sftp_test_common::*;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_io_utility::write_vectored_all;
-
-use pretty_assertions::assert_eq;
 
 async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
     let (child, stdin, stdout) = launch_sftp().await;
@@ -590,4 +589,90 @@ async fn sftp_file_copy_to() {
     // close sftp and child
     sftp.close().await.unwrap();
     assert!(child.wait().await.unwrap().success());
+}
+
+// Test of `Sftp::from_session`
+
+fn addr() -> Cow<'static, str> {
+    std::env::var("TEST_HOST")
+        .map(Cow::Owned)
+        .unwrap_or(Cow::Borrowed("ssh://test-user@127.0.0.1:2222"))
+}
+
+fn get_known_hosts_path() -> PathBuf {
+    let mut path = env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| "/tmp".into());
+    path.push("openssh-rs/known_hosts");
+    path
+}
+
+async fn connects_with_name() -> Vec<(Session, &'static str)> {
+    let mut sessions = Vec::with_capacity(2);
+
+    let mut builder = SessionBuilder::default();
+
+    builder
+        .user_known_hosts_file(get_known_hosts_path())
+        .known_hosts_check(KnownHosts::Accept);
+
+    sessions.push((builder.connect(&addr()).await.unwrap(), "process-mux"));
+    sessions.push((builder.connect_mux(&addr()).await.unwrap(), "native-mux"));
+
+    sessions
+}
+
+#[tokio::test]
+async fn sftp_test_from_sessions() {
+    let path = Path::new("sftp_test_from_sessions");
+
+    let content = b"HELLO, WORLD!\n".repeat(200);
+
+    for (session, _name) in connects_with_name().await {
+        let sftp = Sftp::from_session(session, Default::default())
+            .await
+            .unwrap();
+
+        let content = &content[..min(sftp.max_write_len() as usize, content.len())];
+
+        {
+            let mut fs = sftp.fs();
+
+            // Create new file (fail if already exists) and write to it.
+            debug_assert_eq!(
+                sftp.options()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)
+                    .await
+                    .unwrap()
+                    .write(content)
+                    .await
+                    .unwrap(),
+                content.len()
+            );
+
+            debug_assert_eq!(&*fs.read(&path).await.unwrap(), content);
+
+            // Create new file with Trunc and write to it.
+            //
+            // Sftp::Create opens the file truncated.
+            debug_assert_eq!(
+                sftp.create(&path)
+                    .await
+                    .unwrap()
+                    .write(content)
+                    .await
+                    .unwrap(),
+                content.len()
+            );
+
+            debug_assert_eq!(&*fs.read(&path).await.unwrap(), content);
+
+            // remove the file
+            fs.remove_file(&path).await.unwrap();
+        }
+
+        sftp.close().await.unwrap();
+    }
 }

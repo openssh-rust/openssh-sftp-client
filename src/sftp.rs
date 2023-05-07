@@ -21,6 +21,12 @@ use tokio::{
 };
 use tokio_io_utility::assert_send;
 
+#[cfg(feature = "openssh")]
+mod openssh_session;
+
+#[cfg(feature = "openssh")]
+pub use openssh_session::OpensshSession;
+
 #[derive(Debug, destructure)]
 pub(super) struct SftpHandle(SharedData);
 
@@ -80,6 +86,9 @@ pub enum SftpAuxiliaryData {
     PinnedFuture(Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>),
     /// Store any `Arc`ed value.
     Arced(Arc<dyn Any + Send + Sync + 'static>),
+    /// Store [`OpensshSession`] with in an `Arc`.
+    #[cfg(feature = "openssh")]
+    ArcedOpensshSession(Arc<OpensshSession>),
 }
 
 impl fmt::Debug for SftpAuxiliaryData {
@@ -91,6 +100,8 @@ impl fmt::Debug for SftpAuxiliaryData {
             Boxed(_) => f.write_str("Boxed(boxed_any)"),
             PinnedFuture(_) => f.write_str("PinnedFuture"),
             Arced(_) => f.write_str("Arced(arced_any)"),
+            #[cfg(feature = "openssh")]
+            ArcedOpensshSession(session) => write!(f, "ArcedOpensshSession({session:?})"),
         }
     }
 }
@@ -111,12 +122,8 @@ impl Sftp {
     /// sent(flush_task), all responses processed (read_task) and [`Sftp`] has
     /// been dropped.
     ///
-    /// This can be used to store `openssh::RemoteChild` to keep the sftp
-    /// session alive while close it when sftp is done.
-    ///
-    /// If you want to manually wait on the `openssh::RemoteChild` or get that
-    /// type back, you can simply use [`SftpAuxiliaryData::Arced`] and then
-    /// stores an [`Arc`] elsewhere.
+    /// If you want to get back the data, you can simply use
+    /// [`SftpAuxiliaryData::Arced`] and then stores an [`Arc`] elsewhere.
     ///
     /// Once the sftp tasks is completed and [`Sftp`] is dropped, you can call
     /// [`Arc::try_unwrap`] to get back the exclusive ownership of it.
@@ -282,12 +289,23 @@ impl Sftp {
     }
 
     /// Close sftp connection
+    ///
+    /// If sftp is created using `Sftp::from_session`, then calling this
+    /// function would also await on `openssh::RemoteChild::wait` and
+    /// `openssh::Session::close` and propagate their error in
+    /// [`Sftp::close`].
     pub async fn close(self) -> Result<(), Error> {
         let Self {
             handle,
             flush_task,
             read_task,
         } = self;
+
+        let session = match &handle.get_auxiliary().auxiliary_data {
+            #[cfg(feature = "openssh")]
+            SftpAuxiliaryData::ArcedOpensshSession(session) => Some(Arc::clone(session)),
+            _ => None,
+        };
 
         // Drop handle.
         drop(handle);
@@ -298,6 +316,20 @@ impl Sftp {
         // read_task would order the shutdown of read_task,
         // so we just need to wait for it here.
         flush_task.await??;
+
+        #[cfg(feature = "openssh")]
+        if let Some(session) = session {
+            Arc::try_unwrap(session)
+                .unwrap()
+                .recover_session_err()
+                .await?;
+        }
+
+        #[cfg(not(feature = "openssh"))]
+        {
+            // Help session infer generic T in Option<T>
+            let _: Option<()> = session;
+        }
 
         Ok(())
     }
@@ -340,7 +372,7 @@ impl Sftp {
     }
 }
 
-#[cfg(feature = "ci-tests")]
+#[cfg(feature = "__ci-tests")]
 impl Sftp {
     /// The maximum amount of bytes that can be written in one request.
     /// Writing more than that, then your write will be split into multiple requests

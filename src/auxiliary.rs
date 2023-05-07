@@ -52,11 +52,11 @@ pub(super) struct Auxiliary {
     /// and then [`std::mem::forget`] them.
     pub(super) active_user_count: AtomicU64,
 
-    pub(super) _auxiliary: SftpAuxiliaryData,
+    pub(super) auxiliary_data: SftpAuxiliaryData,
 }
 
 impl Auxiliary {
-    pub(super) fn new(max_pending_requests: u16, auxiliary: SftpAuxiliaryData) -> Self {
+    pub(super) fn new(max_pending_requests: u16, auxiliary_data: SftpAuxiliaryData) -> Self {
         Self {
             conn_info: OnceCell::new(),
 
@@ -74,7 +74,7 @@ impl Auxiliary {
             shutdown_stage: AtomicU8::new(0),
             active_user_count: AtomicU64::new(1),
 
-            _auxiliary: auxiliary,
+            auxiliary_data,
         }
     }
 
