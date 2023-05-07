@@ -20,12 +20,12 @@ members = [
 ]
 
 [features]
-openssh = ["dep:openssh"]
+openssh = ["dep:openssh", "openssh-sftp-error/openssh"]
 # This feature is for internal testing only!!!
-__ci-tests = ["openssh"]
+__ci-tests = []
 
 [package.metadata.docs.rs]
-features = ["openssh", "openssh-sftp-error/openssh"]
+features = ["openssh"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]

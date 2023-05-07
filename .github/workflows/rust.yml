@@ -45,7 +45,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-index-
       - uses: mozilla-actions/sccache-action@v0.0.3
 
-      - run: cargo check --all-features
+      - run: cargo check --features __ci-tests
 
   check:
     runs-on: ubuntu-latest

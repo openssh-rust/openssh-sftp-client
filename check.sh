@@ -18,7 +18,5 @@ done
 
 run_check
 
-run_check
-
 export RUSTDOCFLAGS="--cfg docsrs"
 exec cargo +nightly doc --no-deps --features openssh
