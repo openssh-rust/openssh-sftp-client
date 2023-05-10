@@ -1,1 +1,3 @@
  - Use [`buf-list`](https://docs.rs/buf-list) to archive zero-copy using `Sink` trait
+ - Make `SftpAuxiliaryData` an opaque struct
+ - Hide doc of `OpensshSession`
