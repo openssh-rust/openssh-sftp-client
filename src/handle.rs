@@ -32,7 +32,18 @@ impl Drop for OwnedHandle {
                 // the `flush_task`.
                 self.get_auxiliary().wakeup_flush_task();
                 tokio::spawn(async move {
-                    let _ = response.wait().await;
+                    #[cfg(not(feature = "tracing"))]
+                    {
+                        let _ = response.wait().await;
+                    }
+                    #[cfg(feature = "tracing")]
+                    {
+                        let res = response.wait().await;
+                        match res {
+                            Ok(_) => tracing::debug!("close handle success"),
+                            Err(err) => tracing::error!(?err, "failed to close handle"),
+                        }
+                    }
                 });
             }
         }
