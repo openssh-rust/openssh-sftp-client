@@ -27,11 +27,14 @@ impl Drop for OwnedHandle {
         if Arc::strong_count(handle) == 1 {
             // This is the last reference to the arc
             let id = write_end.get_id_mut();
-            let _ = write_end.send_close_request(id, Cow::Borrowed(handle));
-
-            // Requests is already added to write buffer, so wakeup
-            // the `flush_task`.
-            self.get_auxiliary().wakeup_flush_task();
+            if let Ok(response) = write_end.send_close_request(id, Cow::Borrowed(handle)) {
+                // Requests is already added to write buffer, so wakeup
+                // the `flush_task`.
+                self.get_auxiliary().wakeup_flush_task();
+                tokio::spawn(async move {
+                    let _ = response.wait().await;
+                });
+            }
         }
     }
 }

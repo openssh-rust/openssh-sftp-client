@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Improved
+/// - Fix: change the drop of `OwnedHandle` to wait for the close request in order to
+///   avoid invalid response id after closing file
 #[doc(hidden)]
 pub mod unreleased {}
 
