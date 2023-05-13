@@ -27,13 +27,32 @@ impl Drop for OwnedHandle {
         if Arc::strong_count(handle) == 1 {
             // This is the last reference to the arc
             let id = write_end.get_id_mut();
-            if let Ok(response) = write_end.send_close_request(id, Cow::Borrowed(handle)) {
-                // Requests is already added to write buffer, so wakeup
-                // the `flush_task`.
-                self.get_auxiliary().wakeup_flush_task();
-                tokio::spawn(async move {
-                    let _ = response.wait().await;
-                });
+            match write_end.send_close_request(id, Cow::Borrowed(handle)) {
+                Ok(response) => {
+                    // Requests is already added to write buffer, so wakeup
+                    // the `flush_task`.
+                    self.get_auxiliary().wakeup_flush_task();
+
+                    // Reasons for moving future out of the async block:
+                    // 1. `response.wait()` is basically a no-op, which simply takes out the inner value of
+                    //    AwaitableStatus and wrap it with a corresponding AwaitableStatusFuture
+                    // 2. `rustc` isn't very good at optimizing moves in the future, it often results in the
+                    //    size of the Future blows out, becomes double of its size.
+                    // 3. the more states the Futures have, the harder it is to optimize and take advantage of the niche.
+                    let future = response.wait();
+                    tokio::spawn(async move {
+                        let _res = future.await;
+                        #[cfg(feature = "tracing")]
+                        match _res {
+                            Ok(_) => tracing::debug!("close handle success"),
+                            Err(err) => tracing::error!(?err, "failed to close handle"),
+                        }
+                    });
+                }
+                Err(_err) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!(?_err, "failed to send close request");
+                }
             }
         }
     }
