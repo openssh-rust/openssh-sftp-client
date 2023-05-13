@@ -1,11 +1,18 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Improved
 /// - Fix: change the drop of `OwnedHandle` to wait for the close request in order to
 ///   avoid invalid response id after closing file
-#[doc(hidden)]
-pub mod unreleased {}
+/// - Add log for droping OwnedHandle
+///
+/// ## Other changes
+/// - Add msrv 1.64 in `Cargo.toml`
+/// - Bump `edition` to 2021 in `Cargo.toml`
+pub mod v_0_13_4 {}
 
 /// ## Improved
 ///  - If `Sftp` is created using `Sftp::from_session`, then dropping it would
