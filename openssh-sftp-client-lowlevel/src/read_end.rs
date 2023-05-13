@@ -211,6 +211,11 @@ where
             Err(err) => {
                 drop(drain);
 
+                if packet_type == openssh_sftp_protocol::constants::SSH_FXP_STATUS {
+                    let _ = self.consume_packet(len, err).await;
+                    return Ok(());
+                }
+
                 // Consume the invalid data to return self to a valid state
                 // where read_in_one_packet can be called again.
                 return self.consume_packet(len, err).await;
