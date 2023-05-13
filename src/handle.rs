@@ -36,18 +36,16 @@ impl Drop for OwnedHandle {
                     tokio::spawn(async move {
                         let _res = future.await;
                         #[cfg(feature = "tracing")]
-                        match res {
+                        match _res {
                             Ok(_) => tracing::debug!("close handle success"),
                             Err(err) => tracing::error!(?err, "failed to close handle"),
                         }
                     });
                 }
-                #[cfg(feature = "tracing")]
-                Err(err) => {
-                    tracing::error!(?err, "failed to send close request");
+                Err(_err) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!(?_err, "failed to send close request");
                 }
-                #[cfg(not(feature = "tracing"))]
-                _ => (),
             }
         }
     }
