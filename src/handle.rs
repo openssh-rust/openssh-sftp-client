@@ -47,10 +47,12 @@ impl Drop for OwnedHandle {
                         }
                     });
                 }
+                #[cfg(feature = "tracing")]
                 Err(err) => {
-                    #[cfg(feature = "tracing")]
                     tracing::error!(?err, "failed to send close request");
                 }
+                #[cfg(not(feature = "tracing"))]
+                _ => (),
             }
         }
     }
