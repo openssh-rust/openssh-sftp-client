@@ -32,6 +32,13 @@ impl Drop for OwnedHandle {
                     // Requests is already added to write buffer, so wakeup
                     // the `flush_task`.
                     self.get_auxiliary().wakeup_flush_task();
+
+                    // Reasons for moving future out of the async block:
+                    // 1. `response.wait()` is basically a no-op, which simply takes out the inner value of
+                    //    AwaitableStatus and wrap it with a corresponding AwaitableStatusFuture
+                    // 2. `rustc` isn't very good at optimizing moves in the future, it often results in the
+                    //    size of the Future blows out, becomes double of its size.
+                    // 3. the more states the Futures have, the harder it is to optimize and take advantage of the niche.
                     let future = response.wait();
                     tokio::spawn(async move {
                         let _res = future.await;
