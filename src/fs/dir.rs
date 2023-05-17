@@ -17,7 +17,7 @@ use std::{
 };
 
 use futures_core::stream::{FusedStream, Stream};
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use tokio_util::sync::WaitForCancellationFutureOwned;
 
 type ResponseFuture = crate::lowlevel::AwaitableNameEntriesFuture<crate::Buffer>;
@@ -53,7 +53,7 @@ impl DirEntry {
 
 /// Reads the the entries in a directory.
 #[derive(Debug)]
-#[pin_project]
+#[pin_project(PinnedDrop)]
 pub struct ReadDir {
     dir: Dir,
 
@@ -162,5 +162,45 @@ impl Stream for ReadDir {
 impl FusedStream for ReadDir {
     fn is_terminated(&self) -> bool {
         self.entries.is_none()
+    }
+}
+
+impl ReadDir {
+    async fn do_drop(mut dir: Dir, future: Option<ResponseFuture>) {
+        if let Some(future) = future {
+            if let Ok((id, _)) = future.await {
+                dir.0.cache_id_mut(id);
+            }
+        }
+
+        if let Err(_err) = dir.close().await {
+            #[cfg(feature = "tracing")]
+            tracing::error!(?_err, "failed to close handle");
+        }
+    }
+}
+
+/// We need to keep polling the future stored internally, otherwise it would
+/// drop the internal request ids too early, causing read task to fail
+/// when they should not fail.
+#[pinned_drop]
+impl PinnedDrop for ReadDir {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+
+        let dir = this.dir.clone();
+        let future = this.future.take();
+
+        let cancellation_fut = dir.0.get_auxiliary().cancel_token.clone().cancelled_owned();
+        let do_drop_fut = Self::do_drop(dir, future);
+
+        tokio::spawn(async move {
+            tokio::select! {
+                biased;
+
+                _ = cancellation_fut => (),
+                _ = do_drop_fut => (),
+            }
+        });
     }
 }
