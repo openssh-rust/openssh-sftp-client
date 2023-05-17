@@ -354,7 +354,7 @@ impl AsyncSeek for TokioCompatFile {
                 if offset > this.buffer.len() {
                     this.buffer.clear();
                 } else {
-                    self.consume(offset);
+                    this.buffer.advance(offset);
                 }
             } else {
                 this.buffer.clear();
