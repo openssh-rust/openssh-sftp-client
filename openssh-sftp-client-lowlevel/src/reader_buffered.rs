@@ -94,9 +94,6 @@ impl<R: AsyncRead> AsyncBufRead for ReaderBuffered<R> {
     fn consume(self: Pin<&mut Self>, amt: usize) {
         let buffer = &mut self.project().buffer;
 
-        let len = buffer.len();
-        let amt = min(len, amt);
-
         buffer.advance(amt);
     }
 }

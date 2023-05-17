@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Changed
+///  - Fix [`ReaderBuffered`]: Leave error of exceeding buffer len in `consume` to handle by `BytesMut`
 #[doc(hidden)]
 pub mod unreleased {}
 
