@@ -385,6 +385,8 @@ impl Sftp {
     }
 
     /// Check if the remote server supports the limits extension.
+    ///
+    /// If it returns true, then the client will follow the limits set by the server.
     pub fn support_limits(&self) -> bool {
         self.handle
             .get_auxiliary()
@@ -393,6 +395,8 @@ impl Sftp {
     }
 
     /// Check if the remote server supports the expand path extension.
+    ///
+    /// If it returns true, then [`Fs::canonicalize`] with expand path is supported.
     pub fn support_expand_path(&self) -> bool {
         self.handle
             .get_auxiliary()
@@ -401,6 +405,8 @@ impl Sftp {
     }
 
     /// Check if the remote server supports the fsync extension.
+    ///
+    /// If it returns true, then [`File::sync_all`] is supported.
     pub fn support_fsync(&self) -> bool {
         self.handle
             .get_auxiliary()
@@ -409,6 +415,8 @@ impl Sftp {
     }
 
     /// Check if the remote server supports the hardlink extension.
+    ///
+    /// If it returns true, then [`Fs::hard_link`] is supported.
     pub fn support_hardlink(&self) -> bool {
         self.handle
             .get_auxiliary()
@@ -417,6 +425,8 @@ impl Sftp {
     }
 
     /// Check if the remote server supports the posix rename extension.
+    ///
+    /// If it returns true, then [`Fs::rename`] will use posix rename.
     pub fn support_posix_rename(&self) -> bool {
         self.handle
             .get_auxiliary()
@@ -425,6 +435,8 @@ impl Sftp {
     }
 
     /// Check if the remote server supports the copy data extension.
+    ///
+    /// If it returns true, then [`File::copy_to`] and [`File::copy_all_to`] are supported.
     pub fn support_copy(&self) -> bool {
         self.handle
             .get_auxiliary()

@@ -351,6 +351,12 @@ impl File {
     /// This function will attempt to ensure that all in-core data
     /// reaches the filesystem before returning.
     ///
+    /// # Precondition
+    ///
+    /// Require extension `fsync`
+    ///
+    /// You can check it with [`Sftp::support_fsync`](crate::sftp::Sftp::support_fsync).
+    ///
     /// # Cancel Safety
     ///
     /// This function is cancel safe.
@@ -692,8 +698,10 @@ impl File {
     ///
     /// # Precondition
     ///
-    /// Requires extension copy_data.
+    /// Requires extension `copy-data`.
     /// For [openssh-portable], this is available from V_9_0_P1.
+    ///
+    /// You can check it with [`Sftp::support_copy`](crate::sftp::Sftp::support_copy).
     ///
     /// If the extension is not supported by the server, this function
     /// would fail with [`Error::UnsupportedExtension`].
@@ -719,8 +727,10 @@ impl File {
     ///
     /// # Precondition
     ///
-    /// Requires extension copy_data.
+    /// Requires extension `copy-data`.
     /// For [openssh-portable], this is available from V_9_0_P1.
+    ///
+    /// You can check it with [`Sftp::support_copy`](crate::sftp::Sftp::support_copy).
     ///
     /// If the extension is not supported by the server, this function
     /// would fail with [`Error::UnsupportedExtension`].
