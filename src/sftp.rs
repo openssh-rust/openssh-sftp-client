@@ -384,16 +384,6 @@ impl Sftp {
         Fs::new(self.handle.clone().write_end(), "".into())
     }
 
-    /// Check if the remote server supports the limits extension.
-    ///
-    /// If it returns true, then the client will follow the limits set by the server.
-    pub fn support_limits(&self) -> bool {
-        self.handle
-            .get_auxiliary()
-            .extensions()
-            .contains(Extensions::LIMITS)
-    }
-
     /// Check if the remote server supports the expand path extension.
     ///
     /// If it returns true, then [`Fs::canonicalize`] with expand path is supported.

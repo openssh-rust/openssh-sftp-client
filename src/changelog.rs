@@ -11,7 +11,6 @@ use crate::*;
 ///    otherwise it would drop the internal request ids too early, causing read task to fail
 ///    when they should not fail.
 /// ## Added
-///  - Add new fn [`Sftp::support_limits`] to check if the server supports limits extension
 ///  - Add new fn [`Sftp::support_expand_path`] to check if the server supports expand-path extension
 ///  - Add new fn [`Sftp::support_fsync`] to check if the server supports fsync extension
 ///  - Add new fn [`Sftp::support_hardlink`] to check if the server supports hardlink extension
