@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Fixed
 ///  - Fixed #80 [`file::TokioCompatFile`]: Incorrect behavior about `AsyncSeek`
 ///  - Fixed [`file::TokioCompatFile`]: leave error of exceeding buffer len in `consume` to handle by `BytesMut`
@@ -16,8 +19,7 @@ use crate::*;
 ///  - Add new fn [`Sftp::support_hardlink`] to check if the server supports hardlink extension
 ///  - Add new fn [`Sftp::support_posix_rename`] to check if the server supports posix-rename extension
 ///  - Add new fn [`Sftp::support_copy`] to check if the server supports copy extension
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_13_5 {}
 
 /// ## Improved
 /// - Fix: change the drop of `OwnedHandle` to wait for the close request in order to

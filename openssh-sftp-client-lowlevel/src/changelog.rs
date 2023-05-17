@@ -1,10 +1,21 @@
 #[allow(unused_imports)]
 use crate::*;
 
-/// ## Changed
-///  - Fix: Leave error of exceeding buffer len in `ReaderBuffered::consume` to handle by `BytesMut`
 #[doc(hidden)]
 pub mod unreleased {}
+
+/// ## Changed
+///  - Fix: Leave error of exceeding buffer len in `ReaderBuffered::consume` to handle by `BytesMut`
+pub mod v0_5_1 {}
+
+/// ## Changed
+///  - Make `openssh_sftp_client_lowlevel::connect` regular fn
+///  - Make `WriteEnd::send_hello` regular fn
+pub mod v0_5_0 {}
+
+/// ## Other
+///  - Bump [`openssh-sftp-protocol`] to v0.24.0
+pub mod v0_4_1 {}
 
 /// ## Changed
 ///  - Fix [`openssh-sftp-error`]: Ensure stable api (#49)
