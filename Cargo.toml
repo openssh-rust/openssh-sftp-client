@@ -27,7 +27,7 @@ tracing = ["dep:tracing"]
 __ci-tests = []
 
 [package.metadata.docs.rs]
-features = ["openssh"]
+features = ["openssh", "tracing"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]

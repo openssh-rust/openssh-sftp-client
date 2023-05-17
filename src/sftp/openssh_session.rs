@@ -72,12 +72,12 @@ async fn create_session_task(
         );
     }
 
-    let session_str = format!("{session:?}");
+    let _session_str = format!("{session:?}");
     let occuring_error = session.close().await.err().map(Error::from);
 
     #[cfg(feature = "tracing")]
     if let Some(err) = &occuring_error {
-        tracing::error!("Closing session failed: {err}, session = {session_str}");
+        tracing::error!("Closing session failed: {err}, session = {_session_str}");
     }
 
     match (original_error, occuring_error) {
