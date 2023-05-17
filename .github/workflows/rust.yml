@@ -1,6 +1,13 @@
 name: Rust
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 env:
+  RUSTFLAGS: -Dwarnings
+  RUSTDOCFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -21,31 +28,42 @@ on:
 
 jobs:
   os-check:
-    runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    name: os check on ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - { target: x86_64-pc-windows-msvc, args: "--exclude-features openssh" }
+          - { target: x86_64-apple-darwin }
+          - { target: x86_64-unknown-linux-gnu }
     steps:
       - uses: actions/checkout@v3
       - name: Install toolchain
-        run: rustup toolchain install stable --no-self-update --profile minimal
+        run: |
+          rustup toolchain install stable --no-self-update --profile minimal --target ${{ matrix.target }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
 
       - name: Create Cargo.lock for caching
         run: cargo update
       - uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-index-
+          key: cargo-index-os-check-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-index-os-check-${{ matrix.target }}
+            cargo-index-os-check-
+            cargo-index-
+
       - uses: mozilla-actions/sccache-action@v0.0.3
 
-      - run: cargo check --features __ci-tests
+      - run: |
+          cargo hack check --feature-powerset --target ${{ matrix.target }} ${{ matrix.args }}
 
   check:
     runs-on: ubuntu-latest
@@ -64,17 +82,16 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: |
-          ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-index-
+        key: cargo-index-check-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-index-check-
+          cargo-index-
     - uses: mozilla-actions/sccache-action@v0.0.3
 
     - run: ./check.sh
-      env:
-        RUSTDOCFLAGS: -Dwarnings
 
   build:
     runs-on: ubuntu-latest
@@ -92,12 +109,13 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: |
-          ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-index-
+        key: cargo-index-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-index-build-
+          cargo-index-
     - uses: mozilla-actions/sccache-action@v0.0.3
 
     - name: Compile tests
