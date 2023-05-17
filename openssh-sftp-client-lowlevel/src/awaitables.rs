@@ -133,6 +133,15 @@ macro_rules! def_awaitable {
         }
 
         /// Awaitable
+        ///
+        /// You must call `wait()` and poll the return future to end, otherwise
+        /// the request/response id might be dropped early and
+        /// [`ReadEnd::read_in_one_packet_pinned`] or
+        /// [`ReadEnd::read_in_one_packet`] might fail due to unexpected
+        /// response id.
+        ///
+        /// Alternatively, you can choose to ignore these errors, but it's not
+        /// recommended.
         #[repr(transparent)]
         #[derive(Debug)]
         pub struct $name<Buffer: Send + Sync>(AwaitableInner<Buffer>);

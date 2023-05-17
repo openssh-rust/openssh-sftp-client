@@ -12,6 +12,7 @@ use std::{
     convert::TryInto,
     future::Future,
     io::{self, IoSlice},
+    mem,
     num::{NonZeroU32, NonZeroUsize},
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -20,7 +21,7 @@ use std::{
 
 use bytes::{Buf, Bytes, BytesMut};
 use derive_destructure2::destructure;
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use tokio_io_utility::ready;
 use tokio_util::sync::WaitForCancellationFutureOwned;
@@ -59,7 +60,7 @@ where
 /// [`AsyncWrite`], which is compatible with
 /// [`tokio::fs::File`](https://docs.rs/tokio/latest/tokio/fs/struct.File.html).
 #[derive(Debug, destructure)]
-#[pin_project]
+#[pin_project(PinnedDrop)]
 pub struct TokioCompatFile {
     inner: File,
 
@@ -587,5 +588,66 @@ impl AsyncWrite for TokioCompatFile {
 
     fn is_write_vectored(&self) -> bool {
         true
+    }
+}
+
+impl TokioCompatFile {
+    async fn do_drop(
+        file: File,
+        read_future: Option<AwaitableDataFuture<Buffer>>,
+        write_futures: VecDeque<AwaitableStatusFuture<Buffer>>,
+    ) {
+        if let Some(read_future) = read_future {
+            // read_future error is ignored since users are no longer interested
+            // in this.
+            read_future.await.ok();
+        }
+        for write_future in write_futures {
+            // There are some pending writes that aren't flushed.
+            //
+            // While users have dropped TokioCompatFile, presumably because
+            // they assume the data has already been written and flushed, it
+            // fails and we need to notify our users of the error.
+            if let Err(_err) = write_future.await {
+                #[cfg(feature = "tracing")]
+                tracing::error!(?_err, "failed to write to File");
+            }
+        }
+        if let Err(_err) = file.close().await {
+            #[cfg(feature = "tracing")]
+            tracing::error!(?_err, "failed to close handle");
+        }
+    }
+}
+
+/// We need to keep polling the read and write futures, otherwise it would drop
+/// the internal request ids too early, causing read task to fail
+/// when they should not fail.
+#[pinned_drop]
+impl PinnedDrop for TokioCompatFile {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+
+        let file = this.inner.clone();
+        let read_future = this.read_future.take();
+        let write_futures = mem::take(this.write_futures);
+
+        let cancellation_fut = file
+            .inner
+            .get_auxiliary()
+            .cancel_token
+            .clone()
+            .cancelled_owned();
+
+        let do_drop_fut = Self::do_drop(file, read_future, write_futures);
+
+        tokio::spawn(async move {
+            tokio::select! {
+                biased;
+
+                _ = cancellation_fut => (),
+                _ = do_drop_fut => (),
+            }
+        });
     }
 }

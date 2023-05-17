@@ -4,6 +4,9 @@ use crate::*;
 /// ## Fixed
 ///  - Fixed #80 [`file::TokioCompatFile`]: Incorrect behavior about `AsyncSeek`
 ///  - Fixed [`file::TokioCompatFile`]: leave error of exceeding buffer len in `consume` to handle by `BytesMut`
+///  - Fixed `TokioCompatFile`: Implement `PinnedDrop` to poll read and write futures to end,
+///    otherwise it would drop the internal request ids too early, causing read task to fail
+///    when they should not fail.
 #[doc(hidden)]
 pub mod unreleased {}
 
