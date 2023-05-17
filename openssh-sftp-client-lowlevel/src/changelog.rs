@@ -2,7 +2,7 @@
 use crate::*;
 
 /// ## Changed
-///  - Fix [`ReaderBuffered`]: Leave error of exceeding buffer len in `consume` to handle by `BytesMut`
+///  - Fix: Leave error of exceeding buffer len in `ReaderBuffered::consume` to handle by `BytesMut`
 #[doc(hidden)]
 pub mod unreleased {}
 
