@@ -10,6 +10,8 @@ use crate::*;
 ///  - Fixed [`fs::ReadDir`]: Implement `PinnedDrop` to poll future stored internally,
 ///    otherwise it would drop the internal request ids too early, causing read task to fail
 ///    when they should not fail.
+/// ## Added
+///  - Exposing some methods in [`Sftp`] to check available extensions
 #[doc(hidden)]
 pub mod unreleased {}
 

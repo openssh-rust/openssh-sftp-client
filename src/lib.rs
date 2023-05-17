@@ -30,6 +30,7 @@
 //!  - fsync
 //!  - hardlink
 //!  - posix rename
+//!  - copy data
 //!
 //! [openssh]: https://crates.io/crates/openssh
 //! [sftp v3]: https://www.openssh.com/txt/draft-ietf-secsh-filexfer-02.txt
