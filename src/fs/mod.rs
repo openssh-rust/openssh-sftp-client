@@ -121,6 +121,10 @@ impl Fs {
 
     /// Returns the canonical, absolute form of a path with all intermediate
     /// components normalized and symbolic links resolved.
+    ///
+    /// If the remote server supports the `expand-path` extension, then this
+    /// method will also expand tilde characters (“~”) in the path. You can
+    /// check it with [`Sftp::support_expand_path`](crate::sftp::Sftp::support_expand_path).
     pub async fn canonicalize(&mut self, path: impl AsRef<Path>) -> Result<PathBuf, Error> {
         async fn inner(this: &mut Fs, path: &Path) -> Result<PathBuf, Error> {
             let path = this.concat_path_if_needed(path);
@@ -164,6 +168,12 @@ impl Fs {
     }
 
     /// Creates a new hard link on the remote filesystem.
+    ///
+    /// # Precondition
+    ///
+    /// Require extension `hardlink`
+    ///
+    /// You can check it with [`Sftp::support_hardlink`](crate::sftp::Sftp::support_hardlink).
     pub async fn hard_link(
         &mut self,
         src: impl AsRef<Path>,
@@ -196,6 +206,9 @@ impl Fs {
     }
 
     /// Renames a file or directory to a new name, replacing the original file if to already exists.
+    ///
+    /// If the server supports the `posix-rename` extension, it will be used.
+    /// You can check it with [`Sftp::support_posix_rename`](crate::sftp::Sftp::support_posix_rename).
     ///
     /// This will not work if the new name is on a different mount point.
     pub async fn rename(

@@ -383,6 +383,56 @@ impl Sftp {
     pub fn fs(&self) -> Fs {
         Fs::new(self.handle.clone().write_end(), "".into())
     }
+
+    /// Check if the remote server supports the expand path extension.
+    ///
+    /// If it returns true, then [`Fs::canonicalize`] with expand path is supported.
+    pub fn support_expand_path(&self) -> bool {
+        self.handle
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::EXPAND_PATH)
+    }
+
+    /// Check if the remote server supports the fsync extension.
+    ///
+    /// If it returns true, then [`File::sync_all`] is supported.
+    pub fn support_fsync(&self) -> bool {
+        self.handle
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::FSYNC)
+    }
+
+    /// Check if the remote server supports the hardlink extension.
+    ///
+    /// If it returns true, then [`Fs::hard_link`] is supported.
+    pub fn support_hardlink(&self) -> bool {
+        self.handle
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::HARDLINK)
+    }
+
+    /// Check if the remote server supports the posix rename extension.
+    ///
+    /// If it returns true, then [`Fs::rename`] will use posix rename.
+    pub fn support_posix_rename(&self) -> bool {
+        self.handle
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::POSIX_RENAME)
+    }
+
+    /// Check if the remote server supports the copy data extension.
+    ///
+    /// If it returns true, then [`File::copy_to`] and [`File::copy_all_to`] are supported.
+    pub fn support_copy(&self) -> bool {
+        self.handle
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::COPY_DATA)
+    }
 }
 
 #[cfg(feature = "__ci-tests")]

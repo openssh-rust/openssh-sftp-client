@@ -10,6 +10,12 @@ use crate::*;
 ///  - Fixed [`fs::ReadDir`]: Implement `PinnedDrop` to poll future stored internally,
 ///    otherwise it would drop the internal request ids too early, causing read task to fail
 ///    when they should not fail.
+/// ## Added
+///  - Add new fn [`Sftp::support_expand_path`] to check if the server supports expand-path extension
+///  - Add new fn [`Sftp::support_fsync`] to check if the server supports fsync extension
+///  - Add new fn [`Sftp::support_hardlink`] to check if the server supports hardlink extension
+///  - Add new fn [`Sftp::support_posix_rename`] to check if the server supports posix-rename extension
+///  - Add new fn [`Sftp::support_copy`] to check if the server supports copy extension
 #[doc(hidden)]
 pub mod unreleased {}
 
