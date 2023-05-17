@@ -593,14 +593,16 @@ impl AsyncWrite for TokioCompatFile {
 
 impl TokioCompatFile {
     async fn do_drop(
-        file: File,
+        mut file: File,
         read_future: Option<AwaitableDataFuture<Buffer>>,
         write_futures: VecDeque<AwaitableStatusFuture<Buffer>>,
     ) {
         if let Some(read_future) = read_future {
             // read_future error is ignored since users are no longer interested
             // in this.
-            read_future.await.ok();
+            if let Ok((id, _)) = read_future.await {
+                file.inner.cache_id_mut(id);
+            }
         }
         for write_future in write_futures {
             // There are some pending writes that aren't flushed.
@@ -608,9 +610,12 @@ impl TokioCompatFile {
             // While users have dropped TokioCompatFile, presumably because
             // they assume the data has already been written and flushed, it
             // fails and we need to notify our users of the error.
-            if let Err(_err) = write_future.await {
-                #[cfg(feature = "tracing")]
-                tracing::error!(?_err, "failed to write to File");
+            match write_future.await {
+                Ok((id, _)) => file.inner.cache_id_mut(id),
+                Err(_err) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!(?_err, "failed to write to File")
+                }
             }
         }
         if let Err(_err) = file.close().await {
