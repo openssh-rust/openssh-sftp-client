@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Fixed
+///  - Fixed #80 [`file::TokioCompatFile`]: Incorrect behavior about `AsyncSeek`
+///  - Fixed [`file::TokioCompatFile`]: leave error of exceeding buffer len in `consume` to handle by `BytesMut`
 #[doc(hidden)]
 pub mod unreleased {}
 

@@ -351,7 +351,11 @@ impl AsyncSeek for TokioCompatFile {
             if new_offset < prev_offset {
                 this.buffer.clear();
             } else if let Ok(offset) = (new_offset - prev_offset).try_into() {
-                self.consume(offset);
+                if offset > this.buffer.len() {
+                    this.buffer.clear();
+                } else {
+                    this.buffer.advance(offset);
+                }
             } else {
                 this.buffer.clear();
             }
@@ -384,7 +388,6 @@ impl AsyncBufRead for TokioCompatFile {
         let this = self.project();
 
         let buffer = this.buffer;
-        let amt = min(buffer.len(), amt);
 
         buffer.advance(amt);
         this.inner.offset += amt as u64;
