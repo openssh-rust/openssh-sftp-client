@@ -738,6 +738,7 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
 
     // close sftp and child
     sftp.close().await.unwrap();
+    sftp2.close().await.unwrap();
     assert!(child.wait().await.unwrap().success());
     assert!(child2.wait().await.unwrap().success());
 }
