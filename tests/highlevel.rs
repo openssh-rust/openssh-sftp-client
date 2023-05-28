@@ -18,10 +18,7 @@ use openssh::{KnownHosts, Session, SessionBuilder};
 use openssh_sftp_client::*;
 use pretty_assertions::assert_eq;
 use sftp_test_common::*;
-use tokio::{
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
-    time::sleep,
-};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_io_utility::write_vectored_all;
 
 async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
@@ -686,7 +683,9 @@ async fn sftp_test_from_sessions() {
 async fn sftp_tokio_compact_file_write_buffer_limit() {
     let path = gen_path("sftp_tokio_compact_file_write_buffer_limit");
     let content = b"HELLO, WORLD!\n".repeat(100);
-    let option = SftpOptions::new().tokio_compat_file_write_limit(NonZeroUsize::new(1000).unwrap());
+    let option = SftpOptions::new()
+        .flush_interval(Duration::from_millis(100))
+        .tokio_compat_file_write_limit(NonZeroUsize::new(1000).unwrap());
 
     let (mut child, sftp) = connect(option).await;
     let (mut child2, sftp2) = connect(Default::default()).await;
