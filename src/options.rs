@@ -133,9 +133,10 @@ impl SftpOptions {
         self
     }
 
-    pub(super) fn get_tokio_compat_file_write_limit(&self) -> NonZeroUsize {
+    pub(super) fn get_tokio_compat_file_write_limit(&self) -> usize {
         self.tokio_compat_file_write_limit
-            .unwrap_or_else(|| NonZeroUsize::new(usize::MAX).unwrap())
+            .map(NonZeroUsize::get)
+            .unwrap_or(usize::MAX)
     }
 }
 

@@ -68,7 +68,7 @@ pub struct TokioCompatFile {
     buffer_len: NonZeroUsize,
     buffer: BytesMut,
 
-    write_len: AtomicUsize,
+    write_len: usize,
 
     read_future: Option<AwaitableDataFuture<Buffer>>,
     write_futures: VecDeque<AwaitableStatusFuture<Buffer>>,
@@ -474,10 +474,22 @@ impl AsyncWrite for TokioCompatFile {
             .map(|n| min(n, max_write_len))
             .unwrap_or(max_write_len);
 
-        if self.write_len.fetch_add(n as usize, Ordering::Relaxed) + (n as usize)
-            > self.get_auxiliary().tokio_compat_file_write_limit()
-        {
-            ready!(self.as_mut().poll_flush(cx))?;
+        let write_limit = self.get_auxiliary().tokio_compat_file_write_limit();
+        let write_len = self.project().write_len;
+        match write_len.checked_add(n as usize) {
+            Some(new_write_len) if new_write_len > write_limit => {
+                ready!(self.as_mut().poll_flush(cx))?;
+            }
+            None => {
+                // overflow. This has to be a separate cases since
+                // write_limit could be set to usize::MAX, in which case
+                // saturating_add would never return anything larger
+                // than it.
+                ready!(self.as_mut().poll_flush(cx))?;
+            }
+            Some(new_write_len) => {
+                *write_len = new_write_len;
+            }
         }
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
@@ -527,7 +539,7 @@ impl AsyncWrite for TokioCompatFile {
             return Poll::Ready(Err(sftp_to_io_error(cancel_error())));
         }
 
-        this.write_len.store(0, Ordering::Relaxed);
+        *this.write_len = 0;
 
         loop {
             let res = if let Some(future) = this.write_futures.front_mut() {

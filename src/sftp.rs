@@ -145,7 +145,7 @@ impl Sftp {
                 write_end_buffer_size.get(),
                 options.get_max_pending_requests(),
                 auxiliary,
-                options.get_tokio_compat_file_write_limit().get(),
+                options.get_tokio_compat_file_write_limit(),
             ))?;
 
             let flush_task = create_flush_task(
