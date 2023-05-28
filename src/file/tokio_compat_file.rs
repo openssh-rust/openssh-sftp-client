@@ -16,7 +16,6 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::{Deref, DerefMut},
     pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
 
@@ -481,7 +480,8 @@ impl AsyncWrite for TokioCompatFile {
                 ready!(self.as_mut().poll_flush(cx))?;
             }
             None => {
-                // overflow. This has to be a separate cases since
+                // case overflow
+                // This has to be a separate cases since
                 // write_limit could be set to usize::MAX, in which case
                 // saturating_add would never return anything larger
                 // than it.

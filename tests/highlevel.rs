@@ -690,7 +690,7 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
     let (mut child, sftp) = connect(option).await;
     let (mut child2, sftp2) = connect(Default::default()).await;
 
-    let content = &content[..min(sftp.max_write_len() as usize, content.len())];
+    let content = &content[..content.len().min(sftp.max_write_len() as usize)];
     assert!(content.len() > 1000 && content.len() < 2000);
 
     let read_entire_file = || async {
