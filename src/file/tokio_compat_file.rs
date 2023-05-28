@@ -16,6 +16,7 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     ops::{Deref, DerefMut},
     pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
 
@@ -67,6 +68,8 @@ pub struct TokioCompatFile {
     buffer_len: NonZeroUsize,
     buffer: BytesMut,
 
+    write_len: AtomicUsize,
+
     read_future: Option<AwaitableDataFuture<Buffer>>,
     write_futures: VecDeque<AwaitableStatusFuture<Buffer>>,
 
@@ -96,6 +99,8 @@ impl TokioCompatFile {
 
             buffer: BytesMut::new(),
             buffer_len,
+
+            write_len: AtomicUsize::new(0),
 
             read_future: None,
             write_futures: VecDeque::new(),
@@ -451,7 +456,7 @@ impl AsyncRead for TokioCompatFile {
 impl AsyncWrite for TokioCompatFile {
     fn poll_write(
         mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.check_for_writable_io_err()?;
@@ -468,6 +473,12 @@ impl AsyncWrite for TokioCompatFile {
             .try_into()
             .map(|n| min(n, max_write_len))
             .unwrap_or(max_write_len);
+
+        if self.write_len.fetch_add(n as usize, Ordering::Relaxed) + (n as usize)
+            > self.get_auxiliary().tokio_compat_file_write_limit()
+        {
+            ready!(self.as_mut().poll_flush(cx))?;
+        }
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let buf = &buf[..(n as usize)];
@@ -515,6 +526,8 @@ impl AsyncWrite for TokioCompatFile {
         if this.cancellation_future.poll(cx).is_ready() {
             return Poll::Ready(Err(sftp_to_io_error(cancel_error())));
         }
+
+        this.write_len.store(0, Ordering::Relaxed);
 
         loop {
             let res = if let Some(future) = this.write_futures.front_mut() {

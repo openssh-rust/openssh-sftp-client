@@ -5,10 +5,11 @@ use std::{
     env, fs,
     future::ready,
     io::IoSlice,
-    num::{NonZeroU32, NonZeroU64},
+    num::{NonZeroU32, NonZeroU64, NonZeroUsize},
     path::Path,
     path::PathBuf,
     stringify,
+    time::Duration,
 };
 
 use bytes::BytesMut;
@@ -17,7 +18,10 @@ use openssh::{KnownHosts, Session, SessionBuilder};
 use openssh_sftp_client::*;
 use pretty_assertions::assert_eq;
 use sftp_test_common::*;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::{
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+    time::sleep,
+};
 use tokio_io_utility::write_vectored_all;
 
 async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
@@ -675,4 +679,66 @@ async fn sftp_test_from_sessions() {
 
         sftp.close().await.unwrap();
     }
+}
+
+#[tokio::test]
+/// Test write buffer limit for tokio compat file
+async fn sftp_tokio_compact_file_write_buffer_limit() {
+    let path = gen_path("sftp_tokio_compact_file_write_buffer_limit");
+    let content = b"HELLO, WORLD!\n".repeat(100);
+    let option = SftpOptions::new().tokio_compat_file_write_limit(NonZeroUsize::new(1000).unwrap());
+
+    let (mut child, sftp) = connect(option).await;
+    let (mut child2, sftp2) = connect(Default::default()).await;
+
+    let content = &content[..min(sftp.max_write_len() as usize, content.len())];
+    assert!(content.len() > 1000 && content.len() < 2000);
+
+    let read_entire_file = || async {
+        let mut buffer = Vec::with_capacity(content.len());
+
+        let file = sftp2
+            .open(&path)
+            .await
+            .map(file::TokioCompatFile::from)
+            .unwrap();
+        tokio::pin!(file);
+        file.read_to_end(&mut buffer).await.unwrap();
+
+        buffer
+    };
+
+    {
+        let mut fs = sftp.fs();
+
+        let file = sftp
+            .options()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await
+            .map(file::TokioCompatFile::from)
+            .unwrap();
+        tokio::pin!(file);
+
+        let len = content.len();
+
+        let (content1, content2) = content.split_at(len / 2);
+
+        // Create new file (fail if already exists) and write to it.
+        file.write_all(content1).await.unwrap();
+        debug_assert_eq!(read_entire_file().await.len(), 0);
+        file.write_all(content2).await.unwrap();
+        debug_assert_eq!(read_entire_file().await.len(), content1.len());
+        file.flush().await.unwrap();
+        debug_assert_eq!(read_entire_file().await.len(), content.len());
+
+        // remove the file
+        fs.remove_file(&path).await.unwrap();
+    }
+
+    // close sftp and child
+    sftp.close().await.unwrap();
+    assert!(child.wait().await.unwrap().success());
+    assert!(child2.wait().await.unwrap().success());
 }

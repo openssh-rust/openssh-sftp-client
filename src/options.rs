@@ -13,6 +13,7 @@ pub struct SftpOptions {
     write_end_buffer_size: Option<NonZeroUsize>,
     flush_interval: Option<Duration>,
     max_pending_requests: Option<NonZeroU16>,
+    tokio_compat_file_write_limit: Option<NonZeroUsize>,
 
     #[cfg(feature = "__ci-tests")]
     max_read_len: Option<NonZeroU32>,
@@ -28,6 +29,7 @@ impl SftpOptions {
             write_end_buffer_size: None,
             flush_interval: None,
             max_pending_requests: None,
+            tokio_compat_file_write_limit: None,
 
             #[cfg(feature = "__ci-tests")]
             max_read_len: None,
@@ -117,6 +119,23 @@ impl SftpOptions {
     pub(super) fn get_read_end_buffer_size(&self) -> NonZeroUsize {
         self.read_end_buffer_size
             .unwrap_or_else(|| NonZeroUsize::new(1024).unwrap())
+    }
+
+    /// Set the write buffer limit for tokio compat file.
+    /// If the write buffer size is larger than the limit in tokio compat file,
+    /// then the buffer will be flushed and following async write operation will
+    /// be pending until flush operation is completed.
+    ///
+    /// It is set to usize::MAX by default.
+    #[must_use]
+    pub const fn tokio_compat_file_write_limit(mut self, limit: NonZeroUsize) -> Self {
+        self.tokio_compat_file_write_limit = Some(limit);
+        self
+    }
+
+    pub(super) fn get_tokio_compat_file_write_limit(&self) -> NonZeroUsize {
+        self.tokio_compat_file_write_limit
+            .unwrap_or_else(|| NonZeroUsize::new(usize::MAX).unwrap())
     }
 }
 
