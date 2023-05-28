@@ -99,7 +99,7 @@ impl TokioCompatFile {
             buffer: BytesMut::new(),
             buffer_len,
 
-            write_len: AtomicUsize::new(0),
+            write_len: 0,
 
             read_future: None,
             write_futures: VecDeque::new(),
@@ -474,7 +474,7 @@ impl AsyncWrite for TokioCompatFile {
             .unwrap_or(max_write_len);
 
         let write_limit = self.get_auxiliary().tokio_compat_file_write_limit();
-        let write_len = self.project().write_len;
+        let write_len = self.as_mut().project().write_len;
         match write_len.checked_add(n as usize) {
             Some(new_write_len) if new_write_len > write_limit => {
                 ready!(self.as_mut().poll_flush(cx))?;
