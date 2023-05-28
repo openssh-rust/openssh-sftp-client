@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// ## Added
+///  - Add new option [`SftpOptions::tokio_compat_file_write_limit()`] to set write buffer limit
+///    for [`file::TokioCompatFile`].
 #[doc(hidden)]
 pub mod unreleased {}
 
