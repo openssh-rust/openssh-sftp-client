@@ -684,7 +684,7 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
     let path = gen_path("sftp_tokio_compact_file_write_buffer_limit");
     let content = b"HELLO, WORLD!\n".repeat(100);
     let option = SftpOptions::new()
-        .flush_interval(Duration::from_millis(100))
+        .flush_interval(Duration::from_secs(10000))
         .tokio_compat_file_write_limit(NonZeroUsize::new(1000).unwrap());
 
     let (mut child, sftp) = connect(option).await;
@@ -710,6 +710,7 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
     {
         let mut fs = sftp.fs();
 
+        sftp.manual_flush();
         let file = sftp
             .options()
             .write(true)
@@ -719,8 +720,7 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
             .map(file::TokioCompatFile::from)
             .unwrap();
         tokio::pin!(file);
-
-        let len = content.len();
+        let len = 1400;
 
         let (content1, content2) = content.split_at(len / 2);
 
@@ -728,12 +728,14 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
         file.write_all(content1).await.unwrap();
         debug_assert_eq!(read_entire_file().await.len(), 0);
         file.write_all(content2).await.unwrap();
-        debug_assert_eq!(read_entire_file().await.len(), content1.len());
+        debug_assert_eq!(read_entire_file().await.len(), 700);
         file.flush().await.unwrap();
-        debug_assert_eq!(read_entire_file().await.len(), content.len());
+        debug_assert_eq!(read_entire_file().await.len(), 1400);
 
         // remove the file
+        sftp.manual_flush();
         fs.remove_file(&path).await.unwrap();
+        sftp.manual_flush();
     }
 
     // close sftp and child

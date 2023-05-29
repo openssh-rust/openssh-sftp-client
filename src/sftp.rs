@@ -458,4 +458,9 @@ impl Sftp {
     pub fn max_read_len(&self) -> u32 {
         self.handle.get_auxiliary().limits().read_len
     }
+
+    /// Trigger flush task manually.
+    pub fn manual_flush(&self) {
+        self.handle.get_auxiliary().trigger_flushing()
+    }
 }
