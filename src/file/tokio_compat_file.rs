@@ -86,16 +86,6 @@ struct WriteFutureElement {
     write_len: usize,
 }
 
-impl WriteFutureElement {
-    fn new(future: AwaitableStatusFuture<Buffer>, write_len: usize) -> Self {
-        Self { future, write_len }
-    }
-
-    fn write_len(&self) -> usize {
-        self.write_len
-    }
-}
-
 impl TokioCompatFile {
     /// Create a [`TokioCompatFile`] using [`DEFAULT_BUFLEN`].
     pub fn new(inner: File) -> Self {
@@ -322,7 +312,7 @@ impl TokioCompatFile {
     fn flush_pending_requests(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
+    ) -> Result<(), std::io::Error> {
         let this = self.project();
 
         // Flush only if there is pending awaitable writes
@@ -335,23 +325,23 @@ impl TokioCompatFile {
         }
 
         if this.cancellation_future.poll(cx).is_ready() {
-            return Poll::Ready(Err(sftp_to_io_error(cancel_error())));
+            return Err(sftp_to_io_error(cancel_error()));
         }
 
-        Poll::Ready(Ok(()))
+        Ok(())
     }
 
     fn flush_one(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        ready!(self.as_mut().flush_pending_requests(cx))?;
+        self.as_mut().flush_pending_requests(cx)?;
 
         let this = self.project();
 
         let res = if let Some(element) = this.write_futures.front_mut() {
             let res = ready!(Pin::new(&mut element.future).poll(cx));
-            *this.write_len -= element.write_len();
+            *this.write_len -= element.write_len;
             res
         } else {
             // All futures consumed without error
@@ -548,10 +538,10 @@ impl AsyncWrite for TokioCompatFile {
             write_len = self.as_mut().write_len;
         }
 
-        match write_len.checked_add(n as usize) {
+        let new_write_len = match write_len.checked_add(n as usize) {
             Some(new_write_len) if new_write_len > write_limit => {
                 n = (write_limit - write_len) as u32;
-                *self.as_mut().project().write_len = write_limit;
+                write_limit
             }
             None => {
                 // case overflow
@@ -559,12 +549,10 @@ impl AsyncWrite for TokioCompatFile {
                 // write_limit could be set to usize::MAX, in which case
                 // saturating_add would never return anything larger than it.
                 n = (write_limit - write_len) as u32;
-                *self.as_mut().project().write_len = write_limit;
+                write_limit
             }
-            Some(new_write_len) => {
-                *self.as_mut().project().write_len = new_write_len;
-            }
-        }
+            Some(new_write_len) => new_write_len,
+        };
 
         // sftp v3 cannot send more than self.max_write_len() data at once.
         let buf = &buf[..(n as usize)];
@@ -582,8 +570,12 @@ impl AsyncWrite for TokioCompatFile {
         // Since a new request is buffered, flushing is required.
         file.need_flush = true;
 
-        this.write_futures
-            .push_back(WriteFutureElement::new(future, n as usize));
+        this.write_futures.push_back(WriteFutureElement {
+            future,
+            write_len: n as usize,
+        });
+
+        *self.as_mut().project().write_len = new_write_len;
 
         // Adjust offset and reset self.future
         Poll::Ready(
@@ -599,14 +591,14 @@ impl AsyncWrite for TokioCompatFile {
             return Poll::Ready(Ok(()));
         }
 
-        ready!(self.as_mut().flush_pending_requests(cx))?;
+        self.as_mut().flush_pending_requests(cx)?;
 
         let this = self.project();
 
         loop {
             let res = if let Some(element) = this.write_futures.front_mut() {
                 let res = ready!(Pin::new(&mut element.future).poll(cx));
-                *this.write_len -= element.write_len();
+                *this.write_len -= element.write_len;
                 res
             } else {
                 // All futures consumed without error
@@ -641,15 +633,11 @@ impl AsyncWrite for TokioCompatFile {
 
         let max_write_len = self.max_write_len_impl();
 
-        let (n, mut bufs, mut buf) = if let Some(res) = take_io_slices(bufs, max_write_len as usize)
-        {
-            res
-        } else {
+        let Some(n) = take_io_slices(bufs, max_write_len as usize).map(|res| res.0) else {
             return Poll::Ready(Ok(0));
         };
 
         let mut n: u32 = n.try_into().unwrap();
-        let mut length_changed = false;
 
         let write_limit = self.get_auxiliary().tokio_compat_file_write_limit();
         let mut write_len = self.as_mut().write_len;
@@ -659,11 +647,10 @@ impl AsyncWrite for TokioCompatFile {
             write_len = self.as_mut().write_len;
         }
 
-        match write_len.checked_add(n as usize) {
+        let new_write_len = match write_len.checked_add(n as usize) {
             Some(new_write_len) if new_write_len > write_limit => {
                 n = (write_limit - write_len) as u32;
-                length_changed = true;
-                *self.as_mut().project().write_len = write_limit;
+                write_limit
             }
             None => {
                 // case overflow
@@ -671,19 +658,12 @@ impl AsyncWrite for TokioCompatFile {
                 // write_limit could be set to usize::MAX, in which case
                 // saturating_add would never return anything larger than it.
                 n = (write_limit - write_len) as u32;
-                length_changed = true;
-                *self.as_mut().project().write_len = write_limit;
+                write_limit
             }
-            Some(new_write_len) => {
-                *self.as_mut().project().write_len = new_write_len;
-            }
-        }
+            Some(new_write_len) => new_write_len,
+        };
 
-        if length_changed {
-            let (_, new_bufs, new_buf) = take_io_slices(bufs, n as usize).unwrap();
-            bufs = new_bufs;
-            buf = new_buf;
-        }
+        let (_, bufs, buf) = take_io_slices(bufs, n as usize).unwrap();
 
         let buffers = [bufs, &buf];
 
@@ -702,8 +682,12 @@ impl AsyncWrite for TokioCompatFile {
         // Since a new request is buffered, flushing is required.
         file.need_flush = true;
 
-        this.write_futures
-            .push_back(WriteFutureElement::new(future, n as usize));
+        this.write_futures.push_back(WriteFutureElement {
+            future,
+            write_len: n as usize,
+        });
+
+        *self.as_mut().project().write_len = new_write_len;
 
         // Adjust offset and reset self.future
         Poll::Ready(
