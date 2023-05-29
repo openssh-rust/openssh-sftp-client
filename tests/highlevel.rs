@@ -18,7 +18,10 @@ use openssh::{KnownHosts, Session, SessionBuilder};
 use openssh_sftp_client::*;
 use pretty_assertions::assert_eq;
 use sftp_test_common::*;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::{
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+    time::sleep,
+};
 use tokio_io_utility::write_vectored_all;
 
 async fn connect(options: SftpOptions) -> (process::Child, Sftp) {
@@ -728,17 +731,19 @@ async fn sftp_tokio_compact_file_write_buffer_limit() {
         file.write_all(content1).await.unwrap();
         debug_assert_eq!(read_entire_file().await.len(), 0);
         file.write_all(content2).await.unwrap();
-        debug_assert_eq!(read_entire_file().await.len(), 700);
+        sleep(Duration::from_millis(100)).await;
+        debug_assert_eq!(read_entire_file().await.len(), 1000);
         file.flush().await.unwrap();
+        sleep(Duration::from_millis(100)).await;
         debug_assert_eq!(read_entire_file().await.len(), 1400);
 
         // remove the file
         sftp.manual_flush();
         fs.remove_file(&path).await.unwrap();
-        sftp.manual_flush();
     }
 
     // close sftp and child
+    sftp.manual_flush();
     sftp.close().await.unwrap();
     sftp2.close().await.unwrap();
     assert!(child.wait().await.unwrap().success());
