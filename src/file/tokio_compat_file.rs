@@ -680,7 +680,7 @@ impl AsyncWrite for TokioCompatFile {
         }
 
         if length_changed {
-            let (_, new_bufs, new_buf) = take_io_slices(&bufs, n as usize).unwrap();
+            let (_, new_bufs, new_buf) = take_io_slices(bufs, n as usize).unwrap();
             bufs = new_bufs;
             buf = new_buf;
         }
