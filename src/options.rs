@@ -123,7 +123,7 @@ impl SftpOptions {
 
     /// Set the write buffer limit for tokio compat file.
     /// If the write buffer size is larger than the limit in tokio compat file,
-    /// then it will flush write buffer one by one until it has available space 
+    /// then it will flush write buffer one by one until it has available space
     /// and following async write operation will be pending.
     ///
     /// It is set to usize::MAX by default.
