@@ -122,8 +122,9 @@ impl SftpOptions {
     }
 
     /// Set the write buffer limit for tokio compat file.
-    /// If the write buffer size is larger than the limit in tokio compat file,
-    /// then it will flush one write buffer and following async write operation will be pending.
+    /// If [`crate::file::TokioCompatFile`] has hit the write buffer limit
+    /// set here, then it will flush one write buffer and continue
+    /// sending (part of) the buffer to the server, which could be buffered.
     ///
     /// It is set to usize::MAX by default.
     #[must_use]

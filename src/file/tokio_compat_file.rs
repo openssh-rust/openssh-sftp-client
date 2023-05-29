@@ -531,11 +531,11 @@ impl AsyncWrite for TokioCompatFile {
             .unwrap_or(max_write_len);
 
         let write_limit = self.get_auxiliary().tokio_compat_file_write_limit();
-        let mut write_len = self.as_mut().write_len;
+        let mut write_len = self.write_len;
 
         if write_len == write_limit {
             ready!(self.as_mut().flush_one(cx))?;
-            write_len = self.as_mut().write_len;
+            write_len = self.write_len;
         }
 
         let new_write_len = match write_len.checked_add(n as usize) {
@@ -633,18 +633,20 @@ impl AsyncWrite for TokioCompatFile {
 
         let max_write_len = self.max_write_len_impl();
 
-        let Some(n) = take_io_slices(bufs, max_write_len as usize).map(|res| res.0) else {
+        let n = if let Some(res) = take_io_slices(bufs, max_write_len as usize) {
+            res.0
+        } else {
             return Poll::Ready(Ok(0));
         };
 
         let mut n: u32 = n.try_into().unwrap();
 
         let write_limit = self.get_auxiliary().tokio_compat_file_write_limit();
-        let mut write_len = self.as_mut().write_len;
+        let mut write_len = self.write_len;
 
         if write_len == write_limit {
             ready!(self.as_mut().flush_one(cx))?;
-            write_len = self.as_mut().write_len;
+            write_len = self.write_len;
         }
 
         let new_write_len = match write_len.checked_add(n as usize) {
