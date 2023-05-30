@@ -53,10 +53,16 @@ pub(super) struct Auxiliary {
     pub(super) active_user_count: AtomicU64,
 
     pub(super) auxiliary_data: SftpAuxiliaryData,
+
+    pub(super) tokio_compat_file_write_limit: usize,
 }
 
 impl Auxiliary {
-    pub(super) fn new(max_pending_requests: u16, auxiliary_data: SftpAuxiliaryData) -> Self {
+    pub(super) fn new(
+        max_pending_requests: u16,
+        auxiliary_data: SftpAuxiliaryData,
+        tokio_compat_file_write_limit: usize,
+    ) -> Self {
         Self {
             conn_info: OnceCell::new(),
 
@@ -75,6 +81,8 @@ impl Auxiliary {
             active_user_count: AtomicU64::new(1),
 
             auxiliary_data,
+
+            tokio_compat_file_write_limit,
         }
     }
 
@@ -149,5 +157,9 @@ impl Auxiliary {
             // self.active_user_count is now equal to 0, ready for shutdown.
             self.order_shutdown()
         }
+    }
+
+    pub(super) fn tokio_compat_file_write_limit(&self) -> usize {
+        self.tokio_compat_file_write_limit
     }
 }

@@ -145,6 +145,7 @@ impl Sftp {
                 write_end_buffer_size.get(),
                 options.get_max_pending_requests(),
                 auxiliary,
+                options.get_tokio_compat_file_write_limit(),
             ))?;
 
             let flush_task = create_flush_task(
@@ -169,10 +170,15 @@ impl Sftp {
         write_end_buffer_size: usize,
         max_pending_requests: u16,
         auxiliary: SftpAuxiliaryData,
+        tokio_compat_file_write_limit: usize,
     ) -> Result<WriteEnd, Error> {
         connect(
             MpscQueue::with_capacity(write_end_buffer_size),
-            Auxiliary::new(max_pending_requests, auxiliary),
+            Auxiliary::new(
+                max_pending_requests,
+                auxiliary,
+                tokio_compat_file_write_limit,
+            ),
         )
     }
 
@@ -451,5 +457,10 @@ impl Sftp {
     /// Reading more than that, then your read will be split into multiple requests
     pub fn max_read_len(&self) -> u32 {
         self.handle.get_auxiliary().limits().read_len
+    }
+
+    /// Trigger flush task manually.
+    pub fn manual_flush(&self) {
+        self.handle.get_auxiliary().trigger_flushing()
     }
 }
