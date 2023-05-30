@@ -345,6 +345,7 @@ impl TokioCompatFile {
             res
         } else {
             // All futures consumed without error
+            debug_assert_eq!(*this.write_len, 0);
             return Poll::Ready(Ok(()));
         };
 
@@ -602,6 +603,7 @@ impl AsyncWrite for TokioCompatFile {
                 res
             } else {
                 // All futures consumed without error
+                debug_assert_eq!(*this.write_len, 0);
                 break Poll::Ready(Ok(()));
             };
 
