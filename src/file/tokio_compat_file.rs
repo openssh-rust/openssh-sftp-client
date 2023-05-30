@@ -541,7 +541,7 @@ impl AsyncWrite for TokioCompatFile {
 
         let new_write_len = match write_len.checked_add(n as usize) {
             Some(new_write_len) if new_write_len > write_limit => {
-                n = (write_limit - write_len) as u32;
+                n = (write_limit - write_len).try_into().unwrap();
                 write_limit
             }
             None => {
@@ -549,7 +549,7 @@ impl AsyncWrite for TokioCompatFile {
                 // This has to be a separate cases since
                 // write_limit could be set to usize::MAX, in which case
                 // saturating_add would never return anything larger than it.
-                n = (write_limit - write_len) as u32;
+                n = (write_limit - write_len).try_into().unwrap();
                 write_limit
             }
             Some(new_write_len) => new_write_len,
@@ -653,7 +653,7 @@ impl AsyncWrite for TokioCompatFile {
 
         let new_write_len = match write_len.checked_add(n as usize) {
             Some(new_write_len) if new_write_len > write_limit => {
-                n = (write_limit - write_len) as u32;
+                n = (write_limit - write_len).try_into().unwrap();
                 write_limit
             }
             None => {
@@ -661,7 +661,7 @@ impl AsyncWrite for TokioCompatFile {
                 // This has to be a separate cases since
                 // write_limit could be set to usize::MAX, in which case
                 // saturating_add would never return anything larger than it.
-                n = (write_limit - write_len) as u32;
+                n = (write_limit - write_len).try_into().unwrap();
                 write_limit
             }
             Some(new_write_len) => new_write_len,
