@@ -1,11 +1,13 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// ## Added
 ///  - Add new option [`SftpOptions::tokio_compat_file_write_limit()`] to set write buffer limit
 ///    for [`file::TokioCompatFile`].
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_13_6 {}
 
 /// ## Fixed
 ///  - Fixed #80 [`file::TokioCompatFile`]: Incorrect behavior about `AsyncSeek`
