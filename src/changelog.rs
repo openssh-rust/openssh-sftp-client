@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// # Fixed
 ///
 /// `Drop` implementation to make sure they never panic
@@ -9,7 +12,7 @@ use crate::*;
 ///  - [`file::TokioCompatFile::Drop`]
 ///  - [`dir::ReadDir::Drop`]
 #[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_13_7 {}
 
 /// ## Added
 ///  - Add new option [`SftpOptions::tokio_compat_file_write_limit()`] to set write buffer limit
