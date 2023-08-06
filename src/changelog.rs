@@ -1,6 +1,13 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// # Fixed
+///
+/// `Drop` implementation to make sure they never panic
+/// if tokio runtime is not avilable.
+///
+///  - [`file::TokioCompatFile::Drop`]
+///  - [`dir::ReadDir::Drop`]
 #[doc(hidden)]
 pub mod unreleased {}
 

@@ -22,7 +22,10 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use derive_destructure2::destructure;
 use pin_project::{pin_project, pinned_drop};
-use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+use tokio::{
+    io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf},
+    runtime,
+};
 use tokio_io_utility::ready;
 use tokio_util::sync::WaitForCancellationFutureOwned;
 
@@ -760,13 +763,15 @@ impl PinnedDrop for TokioCompatFile {
 
         let do_drop_fut = Self::do_drop(file, read_future, write_futures);
 
-        tokio::spawn(async move {
-            tokio::select! {
-                biased;
+        if let Ok(handle) = runtime::Handle::try_current() {
+            handle.spawn(async move {
+                tokio::select! {
+                    biased;
 
-                _ = cancellation_fut => (),
-                _ = do_drop_fut => (),
-            }
-        });
+                    _ = cancellation_fut => (),
+                    _ = do_drop_fut => (),
+                }
+            });
+        }
     }
 }
