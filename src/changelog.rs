@@ -5,13 +5,17 @@ use crate::*;
 pub mod unreleased {}
 
 /// # Fixed
+/// `Drop` implementation for `OwnedHandle` to make sure they never panic
+/// if tokio runtime is not avilable.
+pub mod v_0_13_8 {}
+
+/// # Fixed
 ///
 /// `Drop` implementation to make sure they never panic
 /// if tokio runtime is not avilable.
 ///
-///  - [`file::TokioCompatFile::Drop`]
-///  - [`dir::ReadDir::Drop`]
-#[doc(hidden)]
+///  - [`file::TokioCompatFile`]
+///  - [`fs::ReadDir`]
 pub mod v_0_13_7 {}
 
 /// ## Added
