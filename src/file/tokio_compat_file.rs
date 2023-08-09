@@ -22,10 +22,7 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use derive_destructure2::destructure;
 use pin_project::{pin_project, pinned_drop};
-use tokio::{
-    io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf},
-    runtime,
-};
+use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use tokio_io_utility::ready;
 use tokio_util::sync::WaitForCancellationFutureOwned;
 
@@ -747,31 +744,24 @@ impl TokioCompatFile {
 /// when they should not fail.
 #[pinned_drop]
 impl PinnedDrop for TokioCompatFile {
-    fn drop(self: Pin<&mut Self>) {
-        let this = self.project();
+    fn drop(mut self: Pin<&mut Self>) {
+        let this = self.as_mut().project();
 
         let file = this.inner.clone();
         let read_future = this.read_future.take();
         let write_futures = mem::take(this.write_futures);
 
-        let cancellation_fut = file
-            .inner
-            .get_auxiliary()
-            .cancel_token
-            .clone()
-            .cancelled_owned();
+        let cancellation_fut = self.auxiliary().cancel_token.clone().cancelled_owned();
 
         let do_drop_fut = Self::do_drop(file, read_future, write_futures);
 
-        if let Ok(handle) = runtime::Handle::try_current() {
-            handle.spawn(async move {
-                tokio::select! {
-                    biased;
+        self.auxiliary().tokio_handle().spawn(async move {
+            tokio::select! {
+                biased;
 
-                    _ = cancellation_fut => (),
-                    _ = do_drop_fut => (),
-                }
-            });
-        }
+                _ = cancellation_fut => (),
+                _ = do_drop_fut => (),
+            }
+        });
     }
 }

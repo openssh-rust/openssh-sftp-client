@@ -18,7 +18,6 @@ use std::{
 
 use futures_core::stream::{FusedStream, Stream};
 use pin_project::{pin_project, pinned_drop};
-use tokio::runtime;
 use tokio_util::sync::WaitForCancellationFutureOwned;
 
 type ResponseFuture = crate::lowlevel::AwaitableNameEntriesFuture<crate::Buffer>;
@@ -195,15 +194,13 @@ impl PinnedDrop for ReadDir {
         let cancellation_fut = dir.0.get_auxiliary().cancel_token.clone().cancelled_owned();
         let do_drop_fut = Self::do_drop(dir, future);
 
-        if let Ok(handle) = runtime::Handle::try_current() {
-            handle.spawn(async move {
-                tokio::select! {
-                    biased;
+        this.dir.0.get_auxiliary().tokio_handle().spawn(async move {
+            tokio::select! {
+                biased;
 
-                    _ = cancellation_fut => (),
-                    _ = do_drop_fut => (),
-                }
-            });
-        }
+                _ = cancellation_fut => (),
+                _ = do_drop_fut => (),
+            }
+        });
     }
 }

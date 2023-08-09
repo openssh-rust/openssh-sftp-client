@@ -18,6 +18,7 @@ use std::{
 use derive_destructure2::destructure;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
+    runtime::Handle,
     sync::oneshot::Receiver,
     task::JoinHandle,
 };
@@ -146,6 +147,7 @@ impl Sftp {
                 options.get_max_pending_requests(),
                 auxiliary,
                 options.get_tokio_compat_file_write_limit(),
+                Handle::current(),
             ))?;
 
             let flush_task = create_flush_task(
@@ -171,6 +173,7 @@ impl Sftp {
         max_pending_requests: u16,
         auxiliary: SftpAuxiliaryData,
         tokio_compat_file_write_limit: usize,
+        tokio_handle: Handle,
     ) -> Result<WriteEnd, Error> {
         connect(
             MpscQueue::with_capacity(write_end_buffer_size),
@@ -178,6 +181,7 @@ impl Sftp {
                 max_pending_requests,
                 auxiliary,
                 tokio_compat_file_write_limit,
+                tokio_handle,
             ),
         )
     }

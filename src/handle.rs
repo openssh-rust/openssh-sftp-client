@@ -40,16 +40,14 @@ impl Drop for OwnedHandle {
                     //    size of the Future blows out, becomes double of its size.
                     // 3. the more states the Futures have, the harder it is to optimize and take advantage of the niche.
                     let future = response.wait();
-                    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                        handle.spawn(async move {
-                            let _res = future.await;
-                            #[cfg(feature = "tracing")]
-                            match _res {
-                                Ok(_) => tracing::debug!("close handle success"),
-                                Err(err) => tracing::error!(?err, "failed to close handle"),
-                            }
-                        });
-                    }
+                    self.get_auxiliary().tokio_handle().spawn(async move {
+                        let _res = future.await;
+                        #[cfg(feature = "tracing")]
+                        match _res {
+                            Ok(_) => tracing::debug!("close handle success"),
+                            Err(err) => tracing::error!(?err, "failed to close handle"),
+                        }
+                    });
                 }
                 Err(_err) => {
                     #[cfg(feature = "tracing")]
