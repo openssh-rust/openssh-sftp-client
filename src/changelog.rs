@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// # Fixed
+/// Invalid response id after closing file caused by the change in v0.13.8
 #[doc(hidden)]
 pub mod unreleased {}
 

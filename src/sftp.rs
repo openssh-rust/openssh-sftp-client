@@ -18,6 +18,7 @@ use std::{
 use derive_destructure2::destructure;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
+    runtime::Handle,
     sync::oneshot::Receiver,
     task::JoinHandle,
 };
@@ -178,6 +179,7 @@ impl Sftp {
                 max_pending_requests,
                 auxiliary,
                 tokio_compat_file_write_limit,
+                Handle::current(),
             ),
         )
     }

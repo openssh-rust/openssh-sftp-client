@@ -3,7 +3,7 @@ use crate::{lowlevel::Extensions, SftpAuxiliaryData};
 use std::sync::atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use once_cell::sync::OnceCell;
-use tokio::sync::Notify;
+use tokio::{runtime::Handle, sync::Notify};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Copy, Clone)]
@@ -55,6 +55,8 @@ pub(super) struct Auxiliary {
     pub(super) auxiliary_data: SftpAuxiliaryData,
 
     pub(super) tokio_compat_file_write_limit: usize,
+
+    pub(super) tokio_handle: Handle,
 }
 
 impl Auxiliary {
@@ -62,6 +64,7 @@ impl Auxiliary {
         max_pending_requests: u16,
         auxiliary_data: SftpAuxiliaryData,
         tokio_compat_file_write_limit: usize,
+        tokio_handle: Handle,
     ) -> Self {
         Self {
             conn_info: OnceCell::new(),
@@ -83,6 +86,8 @@ impl Auxiliary {
             auxiliary_data,
 
             tokio_compat_file_write_limit,
+
+            tokio_handle,
         }
     }
 
@@ -161,5 +166,9 @@ impl Auxiliary {
 
     pub(super) fn tokio_compat_file_write_limit(&self) -> usize {
         self.tokio_compat_file_write_limit
+    }
+
+    pub(super) fn tokio_handle(&self) -> &Handle {
+        &self.tokio_handle
     }
 }
