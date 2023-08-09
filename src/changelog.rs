@@ -1,10 +1,12 @@
 #[allow(unused_imports)]
 use crate::*;
 
-/// # Fixed
-/// Invalid response id after closing file caused by the change in v0.13.8
 #[doc(hidden)]
 pub mod unreleased {}
+
+/// # Fixed
+/// Invalid response id after closing file caused by the change in v0.13.8
+pub mod v_0_13_9 {}
 
 /// # Fixed
 /// `Drop` implementation for `OwnedHandle` to make sure they never panic
