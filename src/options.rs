@@ -126,7 +126,7 @@ impl SftpOptions {
     /// set here, then it will flush one write buffer and continue
     /// sending (part of) the buffer to the server, which could be buffered.
     ///
-    /// It is set to usize::MAX by default.
+    /// It is set to 640KB (640 * 1024 bytes) by default.
     #[must_use]
     pub const fn tokio_compat_file_write_limit(mut self, limit: NonZeroUsize) -> Self {
         self.tokio_compat_file_write_limit = Some(limit);
@@ -136,7 +136,7 @@ impl SftpOptions {
     pub(super) fn get_tokio_compat_file_write_limit(&self) -> usize {
         self.tokio_compat_file_write_limit
             .map(NonZeroUsize::get)
-            .unwrap_or(usize::MAX)
+            .unwrap_or(640 * 1024)
     }
 }
 
