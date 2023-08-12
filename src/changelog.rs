@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// # Changed
+///  - Set [`SftpOptions::tokio_compat_file_write_limit`] to 640KB by default.
 #[doc(hidden)]
 pub mod unreleased {}
 
