@@ -1,10 +1,12 @@
 #[allow(unused_imports)]
 use crate::*;
 
-/// # Changed
-///  - Set [`SftpOptions::tokio_compat_file_write_limit`] to 640KB by default.
 #[doc(hidden)]
 pub mod unreleased {}
+
+/// # Changed
+///  - Set [`SftpOptions::tokio_compat_file_write_limit`] to 640KB by default.
+pub mod v_0_13_10 {}
 
 /// # Fixed
 /// Invalid response id after closing file caused by the change in v0.13.8
