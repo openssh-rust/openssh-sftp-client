@@ -9,8 +9,6 @@ env:
   RUSTDOCFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
   CARGO_INCREMENTAL: 0
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
@@ -50,19 +48,7 @@ jobs:
 
       - name: Create Cargo.lock for caching
         run: cargo update
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: cargo-index-os-check-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-index-os-check-${{ matrix.target }}
-            cargo-index-os-check-
-            cargo-index-
-
-      - uses: mozilla-actions/sccache-action@v0.0.3
+      - uses: Swatinem/rust-cache@v2
 
       - run: |
           cargo hack check --feature-powerset --target ${{ matrix.target }} ${{ matrix.args }}
@@ -81,17 +67,7 @@ jobs:
 
     - name: Create Cargo.lock for caching
       run: cargo update
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: cargo-index-check-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-index-check-
-          cargo-index-
-    - uses: mozilla-actions/sccache-action@v0.0.3
+    - uses: Swatinem/rust-cache@v2
 
     - run: ./check.sh
 
@@ -108,17 +84,7 @@ jobs:
 
     - name: Create Cargo.lock for caching
       run: cargo update
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: cargo-index-build-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-index-build-
-          cargo-index-
-    - uses: mozilla-actions/sccache-action@v0.0.3
+    - uses: Swatinem/rust-cache@v2
 
     - name: Compile tests
       run: cargo test --all-features --workspace --no-run
