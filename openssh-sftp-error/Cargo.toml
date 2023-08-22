@@ -27,4 +27,4 @@ ssh_format_error = "0.1.0"
 
 tokio = { version = "1.11.0", features = ["rt"] }
 
-openssh = { version = "0.9.9", default-features = false, optional = true }
+openssh = { version = "0.10.0", default-features = false, optional = true }
