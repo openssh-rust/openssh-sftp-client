@@ -5,6 +5,10 @@ use crate::*;
 pub mod unreleased {}
 
 /// # Changed
+///  - Bump optional dependency [`openssh`] to v0.10.0.
+pub mod v_0_14_0 {}
+
+/// # Changed
 ///  - Set [`SftpOptions::tokio_compat_file_write_limit`] to 640KB by default.
 pub mod v_0_13_10 {}
 
