@@ -5,6 +5,10 @@ use crate::*;
 pub mod unreleased {}
 
 /// # Changed
+///  - Bump dependency [`openssh-sftp-error`] to v0.4.0.
+pub mod v_0_14_1 {}
+
+/// # Changed
 ///  - Bump optional dependency [`openssh`] to v0.10.0.
 pub mod v_0_14_0 {}
 
