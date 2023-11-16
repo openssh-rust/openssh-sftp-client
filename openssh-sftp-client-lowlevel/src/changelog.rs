@@ -4,6 +4,10 @@ use crate::*;
 #[doc(hidden)]
 pub mod unreleased {}
 
+/// # Changed
+///  - Bump dependency [`openssh-sftp-error`] to v0.4.0.
+pub mod v0_6_0 {}
+
 /// ## Changed
 ///  - Fix: Leave error of exceeding buffer len in `ReaderBuffered::consume` to handle by `BytesMut`
 pub mod v0_5_1 {}
