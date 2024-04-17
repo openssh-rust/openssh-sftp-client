@@ -1,10 +1,12 @@
 #[allow(unused_imports)]
 use crate::*;
 
-/// # Added
-///  - [`Sftp::from_session_with_check_connection`] for checking connection
 #[doc(hidden)]
 pub mod unreleased {}
+
+/// # Added
+///  - [`Sftp::from_session_with_check_connection`] for checking connection
+pub mod v_0_14_2 {}
 
 /// # Changed
 ///  - Bump dependency [`openssh-sftp-error`] to v0.4.0.
