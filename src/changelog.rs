@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// # Added
+///  - [`Sftp::from_session_with_check_connection`] for checking connection
 #[doc(hidden)]
 pub mod unreleased {}
 

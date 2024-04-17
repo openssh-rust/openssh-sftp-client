@@ -28,7 +28,7 @@ use tokio_io_utility::assert_send;
 mod openssh_session;
 
 #[cfg(feature = "openssh")]
-pub use openssh_session::OpensshSession;
+pub use openssh_session::{CheckOpensshConnection, OpensshSession};
 
 #[derive(Debug, destructure)]
 pub(super) struct SftpHandle(SharedData);

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use openssh::{ChildStdin, ChildStdout, Error as OpensshError, Session, Stdio};
 use tokio::{sync::oneshot, task::JoinHandle};
@@ -9,6 +9,32 @@ use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 #[derive(Debug)]
 pub struct OpensshSession(JoinHandle<Option<Error>>);
 
+/// Check for openssh connection to be alive
+pub trait CheckOpensshConnection {
+    /// This function should only return on `Err()`.
+    /// Once the sftp session is closed, the future will be cancelled (dropped).
+    fn check_connection<'session>(
+        self: Box<Self>,
+        session: &'session Session,
+    ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>>;
+}
+
+impl<F> CheckOpensshConnection for F
+where
+    F: for<'session> FnOnce(
+        &'session Session,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>,
+    >,
+{
+    fn check_connection<'session>(
+        self: Box<Self>,
+        session: &'session Session,
+    ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>> {
+        (self)(session)
+    }
+}
+
 impl Drop for OpensshSession {
     fn drop(&mut self) {
         self.0.abort();
@@ -17,11 +43,12 @@ impl Drop for OpensshSession {
 
 #[cfg_attr(
     feature = "tracing",
-    tracing::instrument(name = "session_task", skip(tx))
+    tracing::instrument(name = "session_task", skip(tx, check_openssh_connection))
 )]
 async fn create_session_task(
     session: Session,
     tx: oneshot::Sender<Result<(ChildStdin, ChildStdout), OpensshError>>,
+    check_openssh_connection: Option<Box<dyn CheckOpensshConnection + Send + Sync>>,
 ) -> Option<Error> {
     #[cfg(feature = "tracing")]
     tracing::info!("Connecting to sftp subsystem, session = {session:?}");
@@ -54,15 +81,48 @@ async fn create_session_task(
     let stdout = child.stdout().take().unwrap();
     tx.send(Ok((stdin, stdout))).unwrap(); // Ok
 
-    let original_error = match child.wait().await {
-        Ok(exit_status) => {
-            if !exit_status.success() {
-                Some(Error::SftpServerFailure(exit_status))
+    let original_error = {
+        let check_conn_future = async {
+            if let Some(checker) = check_openssh_connection {
+                checker
+                    .check_connection(&session)
+                    .await
+                    .err()
+                    .map(Error::from)
             } else {
                 None
             }
+        };
+
+        let wait_on_child_future = async {
+            match child.wait().await {
+                Ok(exit_status) => {
+                    if !exit_status.success() {
+                        Some(Error::SftpServerFailure(exit_status))
+                    } else {
+                        None
+                    }
+                }
+                Err(err) => Some(err.into()),
+            }
+        };
+        tokio::pin!(wait_on_child_future);
+
+        tokio::select! {
+            biased;
+
+            original_error = check_conn_future => {
+                let occuring_error = wait_on_child_future.await;
+                match (original_error, occuring_error) {
+                    (Some(original_error), Some(occuring_error)) => {
+                        Some(original_error.error_on_cleanup(occuring_error))
+                    }
+                    (Some(err), None) | (None, Some(err)) => Some(err),
+                    (None, None) => None,
+                }
+            }
+            original_error = &mut wait_on_child_future => original_error,
         }
-        Err(err) => Some(err.into()),
     };
 
     #[cfg(feature = "tracing")]
@@ -100,9 +160,58 @@ impl Sftp {
         session: openssh::Session,
         options: SftpOptions,
     ) -> Result<Self, Error> {
+        Self::from_session_with_check_connection_inner(session, options, None).await
+    }
+
+    /// Similar to [`Sftp::from_session`], but takes an additional parameter
+    /// for checking if the connection is still alive.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    ///
+    /// fn check_connection<'session>(
+    ///     session: &'session openssh::Session,
+    /// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), openssh::Error>> + Send + Sync + 'session>> {
+    ///     Box::pin(async move {
+    ///         loop {
+    ///             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    ///             session.check().await?;
+    ///         }
+    ///         Ok(())
+    ///     })
+    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), openssh_sftp_client::Error> {
+    /// openssh_sftp_client::Sftp::from_session_with_check_connection(
+    ///     openssh::Session::connect_mux("me@ssh.example.com", openssh::KnownHosts::Strict).await?,
+    ///     openssh_sftp_client::SftpOptions::default(),
+    ///     check_connection,
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn from_session_with_check_connection(
+        session: openssh::Session,
+        options: SftpOptions,
+        check_openssh_connection: impl CheckOpensshConnection + Send + Sync + 'static,
+    ) -> Result<Self, Error> {
+        Self::from_session_with_check_connection_inner(
+            session,
+            options,
+            Some(Box::new(check_openssh_connection)),
+        )
+        .await
+    }
+
+    async fn from_session_with_check_connection_inner(
+        session: openssh::Session,
+        options: SftpOptions,
+        check_openssh_connection: Option<Box<dyn CheckOpensshConnection + Send + Sync>>,
+    ) -> Result<Self, Error> {
         let (tx, rx) = oneshot::channel();
 
-        let handle = tokio::spawn(create_session_task(session, tx));
+        let handle = tokio::spawn(create_session_task(session, tx, check_openssh_connection));
 
         let msg = "Task failed without sending anything, so it must have panicked";
 
@@ -111,7 +220,7 @@ impl Sftp {
             Err(_) => return Err(handle.await.expect_err(msg).into()),
         };
 
-        Sftp::new_with_auxiliary(
+        Self::new_with_auxiliary(
             stdin,
             stdout,
             options,
