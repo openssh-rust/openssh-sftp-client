@@ -16,7 +16,7 @@ pub trait CheckOpensshConnection {
     fn check_connection<'session>(
         self: Box<Self>,
         session: &'session Session,
-    ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync>>;
+    ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>>;
 }
 
 impl Drop for OpensshSession {
