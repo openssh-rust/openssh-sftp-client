@@ -19,6 +19,22 @@ pub trait CheckOpensshConnection {
     ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>>;
 }
 
+impl<F> CheckOpensshConnection for F
+where
+    F: for<'session> FnOnce(
+        &'session Session,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>,
+    >,
+{
+    fn check_connection<'session>(
+        self: Box<Self>,
+        session: &'session Session,
+    ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>> {
+        (self)(session)
+    }
+}
+
 impl Drop for OpensshSession {
     fn drop(&mut self) {
         self.0.abort();
@@ -144,12 +160,51 @@ impl Sftp {
         session: openssh::Session,
         options: SftpOptions,
     ) -> Result<Self, Error> {
-        Self::from_session_with_check_connection(session, options, None).await
+        Self::from_session_with_check_connection_inner(session, options, None).await
     }
 
     /// Similar to [`Sftp::from_session`], but takes an additional parameter
     /// for checking if the connection is still alive.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    ///
+    /// fn check_connection<'session>(
+    ///     session: &'session openssh::Session,
+    /// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), openssh::Error>> + Send + Sync + 'session>> {
+    ///     Box::pin(async move {
+    ///         loop {
+    ///             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    ///             session.check().await?;
+    ///         }
+    ///         Ok(())
+    ///     })
+    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), openssh_sftp_client::Error> {
+    /// openssh_sftp_client::Sftp::from_session_with_check_connection(
+    ///     openssh::Session::connect_mux("me@ssh.example.com", openssh::KnownHosts::Strict).await?,
+    ///     openssh_sftp_client::SftpOptions::default(),
+    ///     check_connection,
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn from_session_with_check_connection(
+        session: openssh::Session,
+        options: SftpOptions,
+        check_openssh_connection: impl CheckOpensshConnection + Send + Sync + 'static,
+    ) -> Result<Self, Error> {
+        Self::from_session_with_check_connection_inner(
+            session,
+            options,
+            Some(Box::new(check_openssh_connection)),
+        )
+        .await
+    }
+
+    async fn from_session_with_check_connection_inner(
         session: openssh::Session,
         options: SftpOptions,
         check_openssh_connection: Option<Box<dyn CheckOpensshConnection + Send + Sync>>,
@@ -165,7 +220,7 @@ impl Sftp {
             Err(_) => return Err(handle.await.expect_err(msg).into()),
         };
 
-        Sftp::new_with_auxiliary(
+        Self::new_with_auxiliary(
             stdin,
             stdout,
             options,

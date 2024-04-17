@@ -6,6 +6,7 @@ cd "$(dirname "$(realpath "$0")")"
 
 cargo fmt --all -- --check
 cargo clippy --all-features --all --no-deps
+cargo test --doc --all-features
 
 export RUSTDOCFLAGS="--cfg docsrs"
 exec cargo +nightly doc \
