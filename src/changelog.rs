@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 use crate::*;
 
+/// # Added
+/// - [`Permissions::from`] allows converting a u16 octet to a Permissions struct
+/// - Allows chain call for Permissions::set_* methods
 #[doc(hidden)]
 pub mod unreleased {}
 
