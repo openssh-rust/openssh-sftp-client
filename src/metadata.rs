@@ -285,26 +285,26 @@ impl From<u16> for Permissions {
     ///
     /// The [numerical file mode bits](https://www.gnu.org/software/coreutils/manual/html_node/Numeric-Modes.html) are defined as follows:
     ///
-    /// >           Special mode bits:
-    /// > 4000      Set user ID
-    /// > 2000      Set group ID
-    /// > 1000      Restricted deletion flag or sticky bit
-    /// >
-    /// >           The file's owner:
-    /// >  400      Read
-    /// >  200      Write
-    /// >  100      Execute/search
-    /// >
-    /// >           Other users in the file's group:
-    /// >   40      Read
-    /// >   20      Write
-    /// >   10      Execute/search
-    /// >
-    /// >           Other users not in the file's group:
-    /// >    4      Read
-    /// >    2      Write
-    /// >    1      Execute/search
-    /// 
+    /// Special mode bits:
+    /// 4000      Set user ID
+    /// 2000      Set group ID
+    /// 1000      Restricted deletion flag or sticky bit
+    ///
+    /// The file's owner:
+    ///  400      Read
+    ///  200      Write
+    ///  100      Execute/search
+    ///
+    /// Other users in the file's group:
+    ///   40      Read
+    ///   20      Write
+    ///   10      Execute/search
+    ///
+    /// Other users not in the file's group:
+    ///    4      Read
+    ///    2      Write
+    ///    1      Execute/search
+    ///
     fn from(octet: u16) -> Self {
         let mut result = Permissions::new();
 
