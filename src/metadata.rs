@@ -179,8 +179,9 @@ macro_rules! impl_getter_setter {
         #[doc = "Modify the "]
         #[doc = $variant_name]
         #[doc = " bit."]
-        pub fn $setter_name(&mut self, value: bool) {
+        pub fn $setter_name(&mut self, value: bool) -> &mut Self {
             self.0.set(SftpPermissions::$variant, value);
+            self
         }
     };
 }
@@ -276,5 +277,57 @@ impl Permissions {
         self.set_write_by_owner(writable);
         self.set_write_by_group(writable);
         self.set_write_by_other(writable);
+    }
+}
+
+impl From<u16> for Permissions {
+    /// Converts numeric file mode bits permission into a [`Permissions`] object.
+    ///
+    /// The [numerical file mode bits](https://www.gnu.org/software/coreutils/manual/html_node/Numeric-Modes.html) are defined as follows:
+    ///
+    /// Special mode bits:
+    /// 4000      Set user ID
+    /// 2000      Set group ID
+    /// 1000      Restricted deletion flag or sticky bit
+    ///
+    /// The file's owner:
+    ///  400      Read
+    ///  200      Write
+    ///  100      Execute/search
+    ///
+    /// Other users in the file's group:
+    ///   40      Read
+    ///   20      Write
+    ///   10      Execute/search
+    ///
+    /// Other users not in the file's group:
+    ///    4      Read
+    ///    2      Write
+    ///    1      Execute/search
+    ///
+    fn from(octet: u16) -> Self {
+        let mut result = Permissions::new();
+
+        // Lowest three bits, other
+        result.set_execute_by_other(octet & 0o1 != 0);
+        result.set_write_by_other(octet & 0o2 != 0);
+        result.set_read_by_other(octet & 0o4 != 0);
+
+        // Middle three bits, group
+        result.set_execute_by_group(octet & 0o10 != 0);
+        result.set_write_by_group(octet & 0o20 != 0);
+        result.set_read_by_group(octet & 0o40 != 0);
+
+        // Highest three bits, owner
+        result.set_execute_by_owner(octet & 0o100 != 0);
+        result.set_write_by_owner(octet & 0o200 != 0);
+        result.set_read_by_owner(octet & 0o400 != 0);
+
+        // Extra bits, sticky and setuid/setgid
+        result.set_vtx(octet & 0o1000 != 0);
+        result.set_sgid(octet & 0o2000 != 0);
+        result.set_sgid(octet & 0o4000 != 0);
+
+        result
     }
 }
