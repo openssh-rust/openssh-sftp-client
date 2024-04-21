@@ -29,6 +29,8 @@ This crate support the following extensions:
 
 ## How to run tests
 
+For macOS, please install latest rsync from homebrew.
+
 ```
 ./run_tests.sh
 ```
