@@ -1,11 +1,13 @@
 #[allow(unused_imports)]
 use crate::*;
 
+#[doc(hidden)]
+pub mod unreleased {}
+
 /// # Added
 ///  - [`Permissions::from`] allows converting a u16 octet to a Permissions struct
 ///  - Allows chain call for Permissions::set_* methods
-#[doc(hidden)]
-pub mod unreleased {}
+pub mod v_0_14_3 {}
 
 /// # Added
 ///  - [`Sftp::from_session_with_check_connection`] for checking connection
