@@ -37,6 +37,12 @@ impl MetaDataBuilder {
         self
     }
 
+    /// Set accessed and modified time of the metadata to be built.
+    pub fn time(&mut self, accessed: UnixTimeStamp, modified: UnixTimeStamp) -> &mut Self {
+        self.0.set_time(accessed.0, modified.0);
+        self
+    }
+
     /// Create a [`MetaData`].
     pub fn create(&self) -> MetaData {
         MetaData::new(self.0)
