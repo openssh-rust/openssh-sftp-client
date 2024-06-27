@@ -337,3 +337,9 @@ impl From<u16> for Permissions {
         result
     }
 }
+
+impl Default for Permissions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
