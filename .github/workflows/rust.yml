@@ -13,7 +13,7 @@ env:
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
 on:
-  merge_queue:
+  merge_group:
   push:
     branches:
       - main
