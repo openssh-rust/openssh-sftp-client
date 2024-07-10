@@ -5,7 +5,7 @@ use crate::*;
 pub mod unreleased {}
 
 /// # Added
-///  - [`Permissions::from`] allows converting a u16 octet to a Permissions struct
+///  - `Permissions::from` allows converting a u16 octet to a Permissions struct
 ///  - Allows chain call for Permissions::set_* methods
 pub mod v_0_14_3 {}
 
