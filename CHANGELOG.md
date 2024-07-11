@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.5](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.14.4...openssh-sftp-client-v0.14.5) - 2024-07-11
+
+### Other
+- Implement `Sftp::from_clonable_session*` ([#131](https://github.com/openssh-rust/openssh-sftp-client/pull/131))
+
 ## [0.14.4](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.14.3...openssh-sftp-client-v0.14.4) - 2024-06-27
 
 ### Other
