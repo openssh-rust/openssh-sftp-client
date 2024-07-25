@@ -58,7 +58,8 @@ async fn sftp_file_basics() {
 
     let content = b"HELLO, WORLD!\n".repeat(200);
 
-    let (mut child, sftp) = connect(Default::default()).await;
+    let (mut child, sftp) =
+        connect(SftpOptions::new().flush_interval(Duration::from_secs(0))).await;
 
     let content = &content[..min(sftp.max_write_len() as usize, content.len())];
 
