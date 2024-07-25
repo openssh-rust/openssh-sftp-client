@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.6](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.14.5...openssh-sftp-client-v0.14.6) - 2024-07-25
+
+### Other
+- Fix panic when flush_interval is set to 0 ([#136](https://github.com/openssh-rust/openssh-sftp-client/pull/136))
+
 ## [0.14.5](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.14.4...openssh-sftp-client-v0.14.5) - 2024-07-11
 
 ### Other
