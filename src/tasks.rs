@@ -65,7 +65,7 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         write_end_buffer_size: NonZeroUsize,
         flush_interval: Duration,
     ) -> Result<(), Error> {
-        let mut interval = if flush_interval.is_zero() {
+        let mut interval = if !flush_interval.is_zero() {
             let mut interval = time::interval(flush_interval);
             interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
             Some(interval)
