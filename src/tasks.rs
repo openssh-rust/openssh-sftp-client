@@ -65,8 +65,13 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
         write_end_buffer_size: NonZeroUsize,
         flush_interval: Duration,
     ) -> Result<(), Error> {
-        let mut interval = time::interval(flush_interval);
-        interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
+        let mut interval = if !flush_interval.is_zero() {
+            let mut interval = time::interval(flush_interval);
+            interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
+            Some(interval)
+        } else {
+            None
+        };
 
         let auxiliary = shared_data.get_auxiliary();
         let flush_end_notify = &auxiliary.flush_end_notify;
@@ -133,18 +138,20 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
 
             flush_end_notify.notified().await;
 
-            tokio::select! {
-                biased;
+            if let Some(interval) = interval.as_mut() {
+                tokio::select! {
+                    biased;
 
-                _ = interval.tick() => (),
-                // tokio::sync::Notify is cancel safe, however
-                // cancelling it would lose the place in the queue.
-                //
-                // However, since flush_task is the only one who
-                // calls `flush_immediately.notified()`, it
-                // is totally fine to cancel here.
-                _ = auxiliary.flush_immediately.notified() => (),
-            };
+                    _ = interval.tick() => (),
+                    // tokio::sync::Notify is cancel safe, however
+                    // cancelling it would lose the place in the queue.
+                    //
+                    // However, since flush_task is the only one who
+                    // calls `flush_immediately.notified()`, it
+                    // is totally fine to cancel here.
+                    _ = auxiliary.flush_immediately.notified() => (),
+                };
+            }
         }
     }
 
