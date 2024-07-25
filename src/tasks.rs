@@ -151,6 +151,8 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
                     // is totally fine to cancel here.
                     _ = auxiliary.flush_immediately.notified() => (),
                 };
+            } else {
+                auxiliary.flush_immediately.notified().await;
             }
         }
     }
