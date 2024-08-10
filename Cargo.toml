@@ -32,7 +32,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 openssh-sftp-error = { version = "0.5.0", path = "openssh-sftp-error" }
-openssh-sftp-client-lowlevel = { version = "0.6.1", path = "openssh-sftp-client-lowlevel" }
+openssh-sftp-client-lowlevel = { version = "0.7.0", path = "openssh-sftp-client-lowlevel" }
 
 once_cell = "1.9.0"
 
