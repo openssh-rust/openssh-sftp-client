@@ -1,6 +1,6 @@
 [package]
 name = "openssh-sftp-client-lowlevel"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2018"
 
 authors = ["Jiahao XU <Jiahao_XU@outlook.com>"]
@@ -15,7 +15,7 @@ categories = ["asynchronous", "network-programming", "api-bindings"]
 [dependencies]
 awaitable = "0.4.0"
 openssh-sftp-protocol = { version = "0.24.0", features = ["bytes"] }
-openssh-sftp-error = { version = "0.4.0", path = "../openssh-sftp-error" }
+openssh-sftp-error = { version = "0.5.0", path = "../openssh-sftp-error" }
 concurrent_arena = "0.1.7"
 derive_destructure2 = "0.1.0"
 
