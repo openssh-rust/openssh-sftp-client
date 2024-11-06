@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.1...openssh-sftp-client-v0.15.2) - 2024-11-06
+
+### Other
+
+- updated the following local packages: openssh-sftp-error
+
 ## [0.15.1](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.0...openssh-sftp-client-v0.15.1) - 2024-09-13
 
 ### Other
