@@ -20,7 +20,7 @@ features = ["openssh"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-thiserror = "1.0.29"
+thiserror = "2.0.0"
 awaitable-error = "0.1.0"
 openssh-sftp-protocol-error = "0.1.0"
 ssh_format_error = "0.1.0"
