@@ -47,7 +47,7 @@ pub fn get_sftp_path() -> &'static Path {
         sftp_path.push("openssh-portable");
         sftp_path.push("sftp-server");
 
-        eprintln!("sftp_path = {:#?}", sftp_path);
+        eprintln!("sftp_path = {sftp_path:#?}");
 
         sftp_path
     })
