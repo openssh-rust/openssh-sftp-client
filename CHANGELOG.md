@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.3](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.2...openssh-sftp-client-v0.15.3) - 2025-07-14
+
+### Other
+
+- Fix awaitable_responses use of concurrent-arean in 32 bit platform ([#145](https://github.com/openssh-rust/openssh-sftp-client/pull/145))
+
 ## [0.15.2](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.1...openssh-sftp-client-v0.15.2) - 2024-11-06
 
 ### Other
