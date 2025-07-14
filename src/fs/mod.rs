@@ -52,8 +52,8 @@ impl Fs {
     /// Set current working dir.
     ///
     /// * `cwd` - Can include `~`.
-    ///           If it is empty, then it is set to use the default
-    ///           directory set by the remote `sftp-server`.
+    ///   If it is empty, then it is set to use the default
+    ///   directory set by the remote `sftp-server`.
     pub fn set_cwd(&mut self, cwd: impl Into<PathBuf>) {
         self.cwd = cwd.into().into_boxed_path();
     }
