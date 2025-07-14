@@ -28,7 +28,7 @@ pub(crate) type Awaitable<Buffer> = awaitable::Awaitable<Buffer, Response<Buffer
 
 /// BITARRAY_LEN must be LEN / usize::BITS and LEN must be divisble by usize::BITS.
 const BITARRAY_LEN: usize = 2;
-const LEN: usize = BITARRAY_LEN * usize::BITS;
+const LEN: usize = BITARRAY_LEN * (usize::BITS as usize);
 
 pub(crate) type ArenaArc<Buffer> = concurrent_arena::ArenaArc<Awaitable<Buffer>, BITARRAY_LEN, LEN>;
 
