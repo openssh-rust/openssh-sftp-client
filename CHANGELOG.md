@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.4](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.3...openssh-sftp-client-v0.15.4) - 2025-11-21
+
+### Other
+
+- Bump actions/checkout from 5 to 6 ([#150](https://github.com/openssh-rust/openssh-sftp-client/pull/150))
+- Enable doc_cfg instead of doc_auto_cfg ([#151](https://github.com/openssh-rust/openssh-sftp-client/pull/151))
+- Bump actions/checkout from 4 to 5 ([#147](https://github.com/openssh-rust/openssh-sftp-client/pull/147))
+
 ## [0.15.3](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.2...openssh-sftp-client-v0.15.3) - 2025-07-14
 
 ### Other
