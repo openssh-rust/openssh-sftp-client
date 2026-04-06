@@ -10,7 +10,7 @@ use std::{
 use bytes::Bytes;
 use scopeguard::defer;
 use tokio::{
-    io::{AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     pin,
     sync::oneshot,
     task::{spawn, JoinHandle},
@@ -20,7 +20,7 @@ use tokio_io_utility::{write_all_bytes, ReusableIoSlices};
 
 async fn flush(
     shared_data: &SharedData,
-    writer: Pin<&mut (dyn AsyncWrite + Send)>,
+    mut writer: Pin<&mut (dyn AsyncWrite + Send)>,
     buffer: &mut Vec<Bytes>,
     reusable_io_slices: &mut ReusableIoSlices,
 ) -> Result<(), Error> {
@@ -35,7 +35,13 @@ async fn flush(
     // `Queue` implementation for `MpscQueue` already removes
     // all empty `Bytes`s so that precond of write_all_bytes
     // is satisfied.
-    write_all_bytes(writer, buffer, reusable_io_slices).await?;
+    write_all_bytes(writer.as_mut(), buffer, reusable_io_slices).await?;
+
+    // Flush the writer so that buffered I/O types (e.g. tokio::io::stdout(),
+    // which wraps std::io::Stdout / LineWriter and only flushes on newlines)
+    // actually send the data to the peer. Without this, binary SFTP packets
+    // never reach the sftp-server and the connection hangs.
+    writer.flush().await?;
 
     Ok(())
 }
