@@ -1,7 +1,9 @@
 use super::{
-    lowlevel::{FileAttrs, FileType as SftpFileType, Permissions as SftpPermissions},
+    lowlevel::{FileAttrs, FileType as SftpFileType},
     UnixTimeStamp,
 };
+
+pub use super::lowlevel::Permissions as RawPermissions;
 
 /// Builder of [`MetaData`].
 #[derive(Debug, Default, Copy, Clone)]
@@ -171,7 +173,7 @@ impl FileType {
 
 /// Representation of the various permissions on a file.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct Permissions(SftpPermissions);
+pub struct Permissions(RawPermissions);
 
 macro_rules! impl_getter_setter {
     ($getter_name:ident, $setter_name:ident, $variant:ident, $variant_name:expr) => {
@@ -179,14 +181,14 @@ macro_rules! impl_getter_setter {
         #[doc = $variant_name]
         #[doc = " bit is set."]
         pub fn $getter_name(&self) -> bool {
-            self.0.intersects(SftpPermissions::$variant)
+            self.0.intersects(RawPermissions::$variant)
         }
 
         #[doc = "Modify the "]
         #[doc = $variant_name]
         #[doc = " bit."]
         pub fn $setter_name(&mut self, value: bool) -> &mut Self {
-            self.0.set(SftpPermissions::$variant, value);
+            self.0.set(RawPermissions::$variant, value);
             self
         }
     };
@@ -196,7 +198,7 @@ impl Permissions {
     /// Create a new permissions object with zero permissions
     /// set.
     pub const fn new() -> Self {
-        Self(SftpPermissions::empty())
+        Self(RawPermissions::empty())
     }
 
     impl_getter_setter!(suid, set_suid, SET_UID, "set-user-id");
@@ -286,60 +288,221 @@ impl Permissions {
     }
 }
 
+
 impl From<u16> for Permissions {
-    /// Converts numeric file mode bits permission into a [`Permissions`] object.
-    ///
-    /// The [numerical file mode bits](https://www.gnu.org/software/coreutils/manual/html_node/Numeric-Modes.html) are defined as follows:
-    ///
-    /// Special mode bits:
-    /// 4000      Set user ID
-    /// 2000      Set group ID
-    /// 1000      Restricted deletion flag or sticky bit
-    ///
-    /// The file's owner:
-    ///  400      Read
-    ///  200      Write
-    ///  100      Execute/search
-    ///
-    /// Other users in the file's group:
-    ///   40      Read
-    ///   20      Write
-    ///   10      Execute/search
-    ///
-    /// Other users not in the file's group:
-    ///    4      Read
-    ///    2      Write
-    ///    1      Execute/search
-    ///
     fn from(octet: u16) -> Self {
-        let mut result = Permissions::new();
-
-        // Lowest three bits, other
-        result.set_execute_by_other(octet & 0o1 != 0);
-        result.set_write_by_other(octet & 0o2 != 0);
-        result.set_read_by_other(octet & 0o4 != 0);
-
-        // Middle three bits, group
-        result.set_execute_by_group(octet & 0o10 != 0);
-        result.set_write_by_group(octet & 0o20 != 0);
-        result.set_read_by_group(octet & 0o40 != 0);
-
-        // Highest three bits, owner
-        result.set_execute_by_owner(octet & 0o100 != 0);
-        result.set_write_by_owner(octet & 0o200 != 0);
-        result.set_read_by_owner(octet & 0o400 != 0);
-
-        // Extra bits, sticky and setuid/setgid
-        result.set_vtx(octet & 0o1000 != 0);
-        result.set_sgid(octet & 0o2000 != 0);
-        result.set_sgid(octet & 0o4000 != 0);
-
-        result
+        Self(RawPermissions::from_bits((octet & 0o7777) as u32).unwrap())
     }
 }
 
 impl Default for Permissions {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Permissions;
+
+    #[test]
+    fn permission_from_u16() {
+        let p = Permissions::from(0o777);
+        assert!(p.execute_by_owner());
+        assert!(p.execute_by_group());
+        assert!(p.execute_by_other());
+        assert!(p.read_by_owner());
+        assert!(p.read_by_group());
+        assert!(p.read_by_other());
+        assert!(p.write_by_owner());
+        assert!(p.write_by_group());
+        assert!(p.write_by_other());
+        assert!(!p.svtx());
+        assert!(!p.sgid());
+        assert!(!p.suid());
+        assert_eq!(p.as_raw().bits(), 0o777);
+
+        let p = Permissions::from(0o400);
+        assert!(p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o400);
+
+        let p = Permissions::from(0o200);
+        assert!(!p.read_by_owner());
+        assert!(p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o200);
+
+        let p = Permissions::from(0o100);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o100);
+
+        let p = Permissions::from(0o40);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o40);
+
+        let p = Permissions::from(0o20);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o20);
+
+        let p = Permissions::from(0o10);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o10);
+
+        let p = Permissions::from(0o4);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o4);
+
+        let p = Permissions::from(0o2);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o2);
+
+        let p = Permissions::from(0o1);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o1);
+
+        let p = Permissions::from(0o4000);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(p.suid());
+        assert!(!p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o4000);
+
+        let p = Permissions::from(0o2000);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(p.sgid());
+        assert!(!p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o2000);
+
+        let p = Permissions::from(0o1000);
+        assert!(!p.read_by_owner());
+        assert!(!p.write_by_owner());
+        assert!(!p.execute_by_owner());
+        assert!(!p.read_by_group());
+        assert!(!p.write_by_group());
+        assert!(!p.execute_by_group());
+        assert!(!p.read_by_other());
+        assert!(!p.write_by_other());
+        assert!(!p.execute_by_other());
+        assert!(!p.suid());
+        assert!(!p.sgid());
+        assert!(p.svtx());
+        assert_eq!(p.as_raw().bits(), 0o1000);
+
+        // Excess bits are ignored
+        assert_eq!(Permissions::from(0o177777), Permissions::from(0o7777),);
     }
 }
