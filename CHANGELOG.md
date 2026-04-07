@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- hang with buffered I/O ([#155](https://github.com/openssh-rust/openssh-sftp-client/pull/155))
+- fixed hang with buffered I/O ([#155](https://github.com/openssh-rust/openssh-sftp-client/pull/155))
 
 ## [0.15.4](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.3...openssh-sftp-client-v0.15.4) - 2025-11-21
 
