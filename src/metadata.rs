@@ -286,8 +286,17 @@ impl Permissions {
         self.set_write_by_group(writable);
         self.set_write_by_other(writable);
     }
-}
 
+    /// Get the raw permission bitflags.
+    pub fn as_raw(&self) -> RawPermissions {
+        self.0
+    }
+
+    /// Create a new instance of `Permissions` from raw permission flags.
+    pub fn from_raw(p: RawPermissions) -> Self {
+        Self(p)
+    }
+}
 
 impl From<u16> for Permissions {
     fn from(octet: u16) -> Self {
