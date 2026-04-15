@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.6](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.5...openssh-sftp-client-v0.15.6) - 2026-04-15
+
+### Other
+
+- Improve `metadata::Permission` bits access ([#157](https://github.com/openssh-rust/openssh-sftp-client/pull/157))
+
 ## [0.15.5](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.4...openssh-sftp-client-v0.15.5) - 2026-04-07
 
 ### Fixed
