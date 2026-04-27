@@ -1,9 +1,6 @@
-use super::{
-    lowlevel::{FileAttrs, FileType as SftpFileType},
-    UnixTimeStamp,
-};
+use super::{lowlevel::FileAttrs, UnixTimeStamp};
 
-pub use super::lowlevel::Permissions as RawPermissions;
+pub use super::lowlevel::{FileType as RawFileType, Permissions as RawPermissions};
 
 /// Builder of [`MetaData`].
 #[derive(Debug, Default, Copy, Clone)]
@@ -132,42 +129,52 @@ impl MetaData {
 /// A structure representing a type of file with accessors for each file type.
 /// It is returned by [`MetaData::file_type`] method.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct FileType(SftpFileType);
+pub struct FileType(RawFileType);
 
 impl FileType {
+    /// Get raw file type bits.
+    pub fn as_raw(&self) -> RawFileType {
+        self.0
+    }
     /// Tests whether this file type represents a directory.
     pub fn is_dir(&self) -> bool {
-        self.0 == SftpFileType::Directory
+        self.0 == RawFileType::Directory
     }
 
     /// Tests whether this file type represents a regular file.
     pub fn is_file(&self) -> bool {
-        self.0 == SftpFileType::RegularFile
+        self.0 == RawFileType::RegularFile
     }
 
     /// Tests whether this file type represents a symbolic link.
     pub fn is_symlink(&self) -> bool {
-        self.0 == SftpFileType::Symlink
+        self.0 == RawFileType::Symlink
     }
 
     /// Tests whether this file type represents a fifo.
     pub fn is_fifo(&self) -> bool {
-        self.0 == SftpFileType::FIFO
+        self.0 == RawFileType::FIFO
     }
 
     /// Tests whether this file type represents a socket.
     pub fn is_socket(&self) -> bool {
-        self.0 == SftpFileType::Socket
+        self.0 == RawFileType::Socket
     }
 
     /// Tests whether this file type represents a block device.
     pub fn is_block_device(&self) -> bool {
-        self.0 == SftpFileType::BlockDevice
+        self.0 == RawFileType::BlockDevice
     }
 
     /// Tests whether this file type represents a character device.
     pub fn is_char_device(&self) -> bool {
-        self.0 == SftpFileType::CharacterDevice
+        self.0 == RawFileType::CharacterDevice
+    }
+}
+
+impl From<RawFileType> for FileType {
+    fn from(value: RawFileType) -> Self {
+        Self(value)
     }
 }
 
