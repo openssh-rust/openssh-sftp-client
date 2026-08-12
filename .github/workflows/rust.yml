@@ -47,7 +47,7 @@ jobs:
       - name: Install toolchain
         run: |
           rustup toolchain install stable --no-self-update --profile minimal --target ${{ matrix.target }}
-      - uses: taiki-e/install-action@v2.85.3
+      - uses: taiki-e/install-action@v2.85.11
         with:
           tool: cargo-hack
 
