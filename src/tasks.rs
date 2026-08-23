@@ -212,7 +212,9 @@ pub(super) fn create_read_task<R: AsyncRead + Send + 'static>(
         // Receive version and extensions
         let extensions = read_end.as_mut().receive_server_hello_pinned().await?;
 
-        tx.send(extensions).unwrap();
+        if tx.send(extensions).is_err() {
+            return Ok(());
+        }
 
         loop {
             read_end_notify.notified().await;
