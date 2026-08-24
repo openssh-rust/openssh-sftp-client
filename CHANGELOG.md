@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.8](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.7...openssh-sftp-client-v0.15.8) - 2026-08-24
+
+### Fixed
+
+- a cancelled connect panics --> shutdown read task instead ([#176](https://github.com/openssh-rust/openssh-sftp-client/pull/176))
+
+### Other
+
+- Bump taiki-e/install-action from 2.85.3 to 2.86.3 ([#173](https://github.com/openssh-rust/openssh-sftp-client/pull/173))
+- Bump taiki-e/install-action from 2 to 2.85.3 ([#163](https://github.com/openssh-rust/openssh-sftp-client/pull/163))
+- Bump actions/checkout from 6 to 7 ([#161](https://github.com/openssh-rust/openssh-sftp-client/pull/161))
+
 ## [0.15.7](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.6...openssh-sftp-client-v0.15.7) - 2026-04-27
 
 ### Other
