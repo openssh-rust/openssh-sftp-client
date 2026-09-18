@@ -132,7 +132,13 @@ impl Auxiliary {
         //
         // Once it shutdowns, it will automatically order
         // shutdown of flush_task.
-        self.shutdown_stage.store(1, Ordering::Relaxed);
+        //
+        // read_task might have already exited (e.g. EOF before the version
+        // exchange) and ordered the shutdown of flush_task by storing 2.
+        // Never regress the stage back to 1 in that case, otherwise
+        // flush_task would wait forever and `Sftp::close` would hang
+        // (see issue #183).
+        self.shutdown_stage.fetch_max(1, Ordering::Relaxed);
 
         self.flush_immediately.notify_one();
         self.flush_end_notify.notify_one();
