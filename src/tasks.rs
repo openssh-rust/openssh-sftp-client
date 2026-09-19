@@ -123,7 +123,10 @@ pub(super) fn create_flush_task<W: AsyncWrite + Send + 'static>(
                 }
             }
 
-            if shutdown_stage.load(Ordering::Relaxed) == 2 {
+            // `>= 2` rather than `== 2`: the stage only ever moves forward
+            // (see `Auxiliary::order_shutdown`), so treat any stage at or
+            // past "flush_task should shutdown" as the shutdown order.
+            if shutdown_stage.load(Ordering::Relaxed) >= 2 {
                 #[cfg(feature = "tracing")]
                 tracing::info!("flush_task graceful shutdown, shared_data = {shared_data:p}");
 
