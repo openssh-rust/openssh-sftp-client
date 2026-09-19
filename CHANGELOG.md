@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.9](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.8...openssh-sftp-client-v0.15.9) - 2026-09-19
+
+### Fixed
+
+- `Sftp::new` hangs on multi-thread runtime when server EOFs before version exchange ([#190](https://github.com/openssh-rust/openssh-sftp-client/pull/190))
+
 ## [0.15.8](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.7...openssh-sftp-client-v0.15.8) - 2026-08-24
 
 ### Fixed
