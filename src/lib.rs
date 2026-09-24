@@ -26,6 +26,7 @@
 //!
 //! This crate support the following extensions:
 //!  - limits
+//!  - statvfs
 //!  - expand path
 //!  - fsync
 //!  - hardlink

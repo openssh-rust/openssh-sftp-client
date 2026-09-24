@@ -485,6 +485,32 @@ async fn sftp_fs_hardlink() {
 }
 
 #[tokio::test]
+/// Test statvfs
+async fn sftp_fs_statvfs() {
+    let filename = gen_path("sftp_fs_statvfs");
+
+    let (mut child, sftp) = connect(Default::default()).await;
+
+    assert!(sftp.support_statvfs());
+
+    {
+        let mut fs = sftp.fs();
+
+        fs.write(&filename, b"hello, world!\n").await.unwrap();
+
+        let statvfs = fs.statvfs(&filename).await.unwrap();
+        assert!(statvfs.blocks > 0);
+        assert!(statvfs.bavail <= statvfs.blocks);
+
+        fs.remove_file(&filename).await.unwrap();
+    }
+
+    // close sftp and child
+    sftp.close().await.unwrap();
+    assert!(child.wait().await.unwrap().success());
+}
+
+#[tokio::test]
 /// Test creation of rename and canonicalize
 async fn sftp_fs_rename() {
     let filename = gen_path("sftp_fs_rename_file");
