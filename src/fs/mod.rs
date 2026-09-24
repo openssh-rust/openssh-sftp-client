@@ -17,6 +17,8 @@ use bytes::BytesMut;
 mod dir;
 pub use dir::{DirEntry, ReadDir};
 
+pub use lowlevel::Statvfs;
+
 type AwaitableStatus = lowlevel::AwaitableStatus<Buffer>;
 type AwaitableAttrs = lowlevel::AwaitableAttrs<Buffer>;
 type SendLinkingRequest =
@@ -307,6 +309,33 @@ impl Fs {
     pub async fn symlink_metadata(&mut self, path: impl AsRef<Path>) -> Result<MetaData, Error> {
         self.metadata_impl(path.as_ref(), WriteEnd::send_lstat_request)
             .await
+    }
+
+    /// Returns statistics of the file system containing `path`.
+    ///
+    /// # Precondition
+    ///
+    /// Require extension `statvfs`
+    ///
+    /// You can check it with [`Sftp::support_statvfs`](crate::sftp::Sftp::support_statvfs).
+    pub async fn statvfs(&mut self, path: impl AsRef<Path>) -> Result<Statvfs, Error> {
+        async fn inner(this: &mut Fs, path: &Path) -> Result<Statvfs, Error> {
+            if !this
+                .get_auxiliary()
+                .extensions()
+                .contains(Extensions::STATVFS)
+            {
+                return Err(Error::UnsupportedExtension(&"statvfs"));
+            }
+
+            let path = this.concat_path_if_needed(path);
+
+            this.write_end
+                .send_request(|write_end, id| Ok(write_end.send_statvfs_request(id, path)?.wait()))
+                .await
+        }
+
+        inner(self, path.as_ref()).await
     }
 
     /// Reads the entire contents of a file into a bytes.
