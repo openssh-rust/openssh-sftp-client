@@ -794,6 +794,85 @@ async fn test_limits() {
 }
 
 #[tokio::test]
+async fn test_statvfs() {
+    let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+    assert!(extensions.contains(lowlevel::Extensions::STATVFS));
+
+    let id = write_end.create_response_id();
+
+    let tempdir = create_tmpdir();
+
+    let awaitable = write_end
+        .send_statvfs_request(id, Cow::Borrowed(tempdir.path()))
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let (id, statvfs) = awaitable.wait().await.unwrap();
+
+    assert!(statvfs.frsize > 0);
+    assert!(statvfs.blocks > 0);
+    assert!(statvfs.bfree <= statvfs.blocks);
+    assert!(statvfs.bavail <= statvfs.bfree);
+    assert!(statvfs.namemax > 0);
+
+    drop(id);
+    drop(write_end);
+    drop(read_end);
+
+    assert!(child.wait().await.unwrap().success());
+}
+
+#[tokio::test]
+async fn test_fstatvfs() {
+    let (mut write_end, mut read_end, mut child, extensions) = connect_with_extensions().await;
+    assert!(extensions.contains(lowlevel::Extensions::STATVFS));
+    assert!(extensions.contains(lowlevel::Extensions::FSTATVFS));
+
+    let id = write_end.create_response_id();
+
+    let tempdir = create_tmpdir();
+    let filename = tempdir.path().join("file");
+    fs::File::create(&filename).unwrap();
+
+    // statvfs
+    let awaitable = write_end
+        .send_statvfs_request(id, Cow::Borrowed(&filename))
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let (id, statvfs) = awaitable.wait().await.unwrap();
+
+    // open
+    let awaitable = write_end
+        .send_open_file_request(
+            id,
+            OpenOptions::new().read(true).open(Cow::Borrowed(&filename)),
+        )
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let (id, handle) = awaitable.wait().await.unwrap();
+
+    // fstatvfs
+    let awaitable = write_end
+        .send_fstatvfs_request(id, Cow::Borrowed(&handle))
+        .unwrap();
+
+    read_one_packet(&mut read_end).await;
+    let (id, fstatvfs) = awaitable.wait().await.unwrap();
+
+    assert_eq!(fstatvfs.fsid, statvfs.fsid);
+    assert_eq!(fstatvfs.frsize, statvfs.frsize);
+    assert_eq!(fstatvfs.blocks, statvfs.blocks);
+
+    drop(id);
+    drop(write_end);
+    drop(read_end);
+
+    assert!(child.wait().await.unwrap().success());
+}
+
+#[tokio::test]
 async fn test_expand_path() {
     let home: path::PathBuf = env::var("HOME").unwrap().into();
 

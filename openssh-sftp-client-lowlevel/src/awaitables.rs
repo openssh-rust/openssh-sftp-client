@@ -279,3 +279,15 @@ def_awaitable!(AwaitableLimits, AwaitableLimitsFuture, Limits, |response| {
         _ => Err(Error::InvalidResponse(&"Expected extended reply response")),
     }
 });
+
+def_awaitable!(
+    AwaitableStatvfs,
+    AwaitableStatvfsFuture,
+    Statvfs,
+    |response| {
+        match response {
+            Response::ExtendedReply(boxed) => Ok(ssh_format::from_bytes(&boxed)?.0),
+            _ => Err(Error::InvalidResponse(&"Expected extended reply response")),
+        }
+    }
+);

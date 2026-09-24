@@ -441,6 +441,16 @@ impl Sftp {
             .extensions()
             .contains(Extensions::COPY_DATA)
     }
+
+    /// Check if the remote server supports the statvfs extension.
+    ///
+    /// If it returns true, then [`Fs::statvfs`] is supported.
+    pub fn support_statvfs(&self) -> bool {
+        self.handle
+            .get_auxiliary()
+            .extensions()
+            .contains(Extensions::STATVFS)
+    }
 }
 
 #[cfg(feature = "__ci-tests")]

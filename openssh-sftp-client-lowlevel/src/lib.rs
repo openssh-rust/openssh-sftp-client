@@ -11,6 +11,8 @@
 //! This crate supports all operations supported by sftp v3, in additional to
 //! the following extensions:
 //!  - [`WriteEnd::send_limits_request`]
+//!  - [`WriteEnd::send_statvfs_request`]
+//!  - [`WriteEnd::send_fstatvfs_request`]
 //!  - [`WriteEnd::send_expand_path_request`]
 //!  - [`WriteEnd::send_fsync_request`]
 //!  - [`WriteEnd::send_hardlink_request`]
@@ -21,7 +23,7 @@ pub use openssh_sftp_protocol::{
     file_attrs::{FileAttrs, FileType, Permissions, UnixTimeStamp},
     open_options::{CreateFlags, OpenOptions},
     request::OpenFileRequest,
-    response::{Extensions, Limits, NameEntry},
+    response::{Extensions, Limits, NameEntry, Statvfs},
     Handle, HandleOwned,
 };
 
@@ -55,7 +57,7 @@ pub use awaitables::{
     AwaitableAttrs, AwaitableAttrsFuture, AwaitableData, AwaitableDataFuture, AwaitableHandle,
     AwaitableHandleFuture, AwaitableLimits, AwaitableLimitsFuture, AwaitableName,
     AwaitableNameEntries, AwaitableNameEntriesFuture, AwaitableNameFuture, AwaitableStatus,
-    AwaitableStatusFuture, Data,
+    AwaitableStatusFuture, AwaitableStatvfs, AwaitableStatvfsFuture, Data,
 };
 
 mod buffer;
