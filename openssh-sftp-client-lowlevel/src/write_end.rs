@@ -328,6 +328,34 @@ where
             .map(AwaitableLimits::new)
     }
 
+    /// Return statistics of the file system containing `path`
+    ///
+    /// # Precondition
+    ///
+    /// Requires `extensions::contains(Extensions::STATVFS)` to be true.
+    pub fn send_statvfs_request(
+        &mut self,
+        id: Id<Buffer>,
+        path: Cow<'_, Path>,
+    ) -> Result<AwaitableStatvfs<Buffer>, Error> {
+        self.send_request(id, RequestInner::Statvfs(path), None)
+            .map(AwaitableStatvfs::new)
+    }
+
+    /// Return statistics of the file system containing the file `handle`
+    ///
+    /// # Precondition
+    ///
+    /// Requires `extensions::contains(Extensions::FSTATVFS)` to be true.
+    pub fn send_fstatvfs_request(
+        &mut self,
+        id: Id<Buffer>,
+        handle: Cow<'_, Handle>,
+    ) -> Result<AwaitableStatvfs<Buffer>, Error> {
+        self.send_request(id, RequestInner::Fstatvfs(handle), None)
+            .map(AwaitableStatvfs::new)
+    }
+
     /// This supports canonicalisation of relative paths and those that need
     /// tilde-expansion, i.e. "~", "~/..." and "~user/...".
     ///
