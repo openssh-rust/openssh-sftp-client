@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.11](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.10...openssh-sftp-client-v0.15.11) - 2026-10-15
+
+### Other
+
+- Bump taiki-e/install-action from 2.87.20 to 2.87.28 ([#207](https://github.com/openssh-rust/openssh-sftp-client/pull/207))
+
 ## [0.15.10](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.9...openssh-sftp-client-v0.15.10) - 2026-10-01
 
 ### Added
