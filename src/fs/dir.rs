@@ -40,6 +40,16 @@ impl DirEntry {
         &mut self.0.filename
     }
 
+    /// Return the server-provided longname bytes.
+    pub fn longname(&self) -> &[u8] {
+        &self.0.longname
+    }
+
+    /// Display the server-provided longname, replacing invalid UTF-8 lossily.
+    pub fn long_display(&self) -> impl std::fmt::Display + '_ {
+        self.0.long_display()
+    }
+
     /// Return metadata for the dir entry.
     pub fn metadata(&self) -> MetaData {
         MetaData::new(self.0.attrs)
