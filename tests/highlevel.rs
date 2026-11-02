@@ -708,6 +708,75 @@ async fn sftp_test_from_sessions() {
     }
 }
 
+/// Kill the ssh master process behind `control_socket`, as if the connection
+/// had dropped.
+fn kill_ssh_master(control_socket: &Path) {
+    let out = std::process::Command::new("ssh")
+        .arg("-S")
+        .arg(control_socket)
+        .args(["-O", "check", "unused"])
+        .output()
+        .unwrap();
+    let said = String::from_utf8_lossy(&out.stderr);
+    let pid: String = said
+        .split("pid=")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no master pid in {said:?}"))
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    let status = std::process::Command::new("kill")
+        .args(["-9", &pid])
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+/// Regression test: `Sftp::close` used to panic at
+/// `Arc::try_unwrap(session).unwrap()` when the connection had died and a
+/// `TokioCompatFile` was dropped just before it, because the task spawned by
+/// `TokioCompatFile`'s `Drop` still held a reference to the session.
+#[tokio::test]
+async fn sftp_close_after_connection_dies_from_sessions() {
+    let path = Path::new("sftp_close_after_connection_dies_from_sessions");
+
+    for (session, name) in connects_with_name().await {
+        let control_socket = session.control_socket().to_path_buf();
+        let sftp = Sftp::from_session(session, Default::default())
+            .await
+            .unwrap();
+
+        // Large enough that the first read cannot buffer all of it.
+        sftp.fs()
+            .write(path, vec![b'x'; 4 * 1024 * 1024])
+            .await
+            .unwrap();
+
+        let file = file::TokioCompatFile::new(sftp.open(path).await.unwrap());
+        tokio::pin!(file);
+        let mut buf = vec![0; 64 * 1024];
+        assert_ne!(file.read(&mut buf).await.unwrap(), 0);
+
+        kill_ssh_master(&control_socket);
+
+        // Reads fail once whatever was already buffered is used up.
+        loop {
+            match tokio::time::timeout(Duration::from_secs(10), file.read(&mut buf)).await {
+                Ok(Ok(0)) => panic!("{name}: unexpected EOF"),
+                Ok(Ok(_)) => continue,
+                Ok(Err(_)) => break,
+                Err(_) => panic!("{name}: read did not fail after the connection died"),
+            }
+        }
+
+        // Give up on the session, as an application does after an error.
+        drop(file);
+        sftp.close()
+            .await
+            .expect_err("close after a dead connection should report it");
+    }
+}
+
 #[tokio::test]
 /// Test write buffer limit for tokio compat file
 async fn sftp_tokio_compact_file_write_buffer_limit() {

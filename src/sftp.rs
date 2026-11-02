@@ -333,11 +333,10 @@ impl Sftp {
 
         let session_error: Option<Error> = match session {
             #[cfg(feature = "openssh")]
-            Some(session) => Arc::try_unwrap(session)
-                .unwrap()
-                .recover_session_err()
-                .await
-                .err(),
+            // Other references to the session may still be alive here, e.g. in
+            // the task spawned by `TokioCompatFile`'s `Drop` when the connection
+            // has died, so do not require exclusive ownership.
+            Some(session) => session.recover_session_err().await.err(),
 
             #[cfg(not(feature = "openssh"))]
             Some(_) => unreachable!(),
