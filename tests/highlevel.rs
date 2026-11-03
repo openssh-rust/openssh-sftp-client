@@ -638,14 +638,20 @@ fn get_known_hosts_path() -> PathBuf {
     path
 }
 
-async fn connects_with_name() -> Vec<(Session, &'static str)> {
-    let mut sessions = Vec::with_capacity(2);
-
+fn session_builder() -> SessionBuilder {
     let mut builder = SessionBuilder::default();
 
     builder
         .user_known_hosts_file(get_known_hosts_path())
         .known_hosts_check(KnownHosts::Accept);
+
+    builder
+}
+
+async fn connects_with_name() -> Vec<(Session, &'static str)> {
+    let mut sessions = Vec::with_capacity(2);
+
+    let builder = session_builder();
 
     sessions.push((builder.connect(&addr()).await.unwrap(), "process-mux"));
     sessions.push((builder.connect_mux(&addr()).await.unwrap(), "native-mux"));
@@ -736,7 +742,12 @@ fn kill_ssh_master(control_socket: &Path) {
 /// `Arc::try_unwrap(session).unwrap()` when the connection had died and a
 /// `TokioCompatFile` was dropped just before it, because the task spawned by
 /// `TokioCompatFile`'s `Drop` still held a reference to the session.
-#[tokio::test]
+///
+/// The ordering relies on the single-threaded runtime: `close` must reach
+/// the session before the task spawned by the file's `Drop` gets polled. On
+/// a multi-threaded runtime that task can run first and the panic becomes
+/// a race.
+#[tokio::test(flavor = "current_thread")]
 async fn sftp_close_after_connection_dies_from_sessions() {
     let path = Path::new("sftp_close_after_connection_dies_from_sessions");
 
@@ -779,15 +790,13 @@ async fn sftp_close_after_connection_dies_from_sessions() {
             .expect_err("close after a dead connection should report it");
     }
 
-    // The sessions above are dead, so remove the file with fresh ones; the
-    // second finds it already gone.
-    for (session, _name) in connects_with_name().await {
-        let sftp = Sftp::from_session(session, Default::default())
-            .await
-            .unwrap();
-        sftp.fs().remove_file(path).await.ok();
-        sftp.close().await.unwrap();
-    }
+    // The sessions above are dead, so remove the file with a fresh one.
+    let session = session_builder().connect_mux(&addr()).await.unwrap();
+    let sftp = Sftp::from_session(session, Default::default())
+        .await
+        .unwrap();
+    sftp.fs().remove_file(path).await.unwrap();
+    sftp.close().await.unwrap();
 }
 
 #[tokio::test]

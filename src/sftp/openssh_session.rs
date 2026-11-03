@@ -300,10 +300,6 @@ impl Sftp {
         rx: oneshot::Receiver<Result<(ChildStdin, ChildStdout), OpensshError>>,
         handle: JoinHandle<Option<Error>>,
     ) -> Result<Self, Error> {
-        // Wrap it right away, so that dropping this future before it
-        // completes aborts the task instead of leaking it.
-        let handle = AbortOnDropHandle::new(handle);
-
         let msg = "Task failed without sending anything, so it must have panicked";
 
         let (stdin, stdout) = match rx.await {
@@ -316,7 +312,7 @@ impl Sftp {
             stdout,
             options,
             SftpAuxiliaryData::ArcedOpensshSession(Arc::new(OpensshSession(Mutex::new(Some(
-                handle,
+                AbortOnDropHandle::new(handle),
             ))))),
         )
         .await
