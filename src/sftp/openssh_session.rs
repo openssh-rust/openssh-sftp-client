@@ -8,6 +8,7 @@ use std::{
 
 use openssh::{ChildStdin, ChildStdout, Error as OpensshError, Session, Stdio};
 use tokio::{sync::oneshot, task::JoinHandle};
+use tokio_util::task::AbortOnDropHandle;
 
 use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 
@@ -17,8 +18,12 @@ use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 /// can take it out through a shared reference: other clones of the `Arc`
 /// holding this may legitimately still be alive when `close` runs (for
 /// example inside the task spawned by `TokioCompatFile`'s `Drop`).
+///
+/// It is an [`AbortOnDropHandle`], so the task is aborted when the last
+/// reference goes away without [`Sftp::close`] having been awaited to
+/// completion, including when `close` itself is cancelled.
 #[derive(Debug)]
-pub struct OpensshSession(Mutex<Option<JoinHandle<Option<Error>>>>);
+pub struct OpensshSession(Mutex<Option<AbortOnDropHandle<Option<Error>>>>);
 
 /// Check for openssh connection to be alive
 pub trait CheckOpensshConnection {
@@ -43,18 +48,6 @@ where
         session: &'session Session,
     ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>> {
         (self)(session)
-    }
-}
-
-impl Drop for OpensshSession {
-    fn drop(&mut self) {
-        let handle = match self.0.get_mut() {
-            Ok(handle) => handle,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        if let Some(handle) = handle {
-            handle.abort();
-        }
     }
 }
 
@@ -307,6 +300,10 @@ impl Sftp {
         rx: oneshot::Receiver<Result<(ChildStdin, ChildStdout), OpensshError>>,
         handle: JoinHandle<Option<Error>>,
     ) -> Result<Self, Error> {
+        // Wrap it right away, so that dropping this future before it
+        // completes aborts the task instead of leaking it.
+        let handle = AbortOnDropHandle::new(handle);
+
         let msg = "Task failed without sending anything, so it must have panicked";
 
         let (stdin, stdout) = match rx.await {

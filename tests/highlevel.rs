@@ -752,28 +752,41 @@ async fn sftp_close_after_connection_dies_from_sessions() {
             .await
             .unwrap();
 
-        let file = file::TokioCompatFile::new(sftp.open(path).await.unwrap());
-        tokio::pin!(file);
-        let mut buf = vec![0; 64 * 1024];
-        assert_ne!(file.read(&mut buf).await.unwrap(), 0);
+        // The file lives in its own block so that it is dropped, not just
+        // its pinned reference, before `close` runs.
+        {
+            let file = file::TokioCompatFile::new(sftp.open(path).await.unwrap());
+            tokio::pin!(file);
+            let mut buf = vec![0; 64 * 1024];
+            assert_ne!(file.read(&mut buf).await.unwrap(), 0);
 
-        kill_ssh_master(&control_socket);
+            kill_ssh_master(&control_socket);
 
-        // Reads fail once whatever was already buffered is used up.
-        loop {
-            match tokio::time::timeout(Duration::from_secs(10), file.read(&mut buf)).await {
-                Ok(Ok(0)) => panic!("{name}: unexpected EOF"),
-                Ok(Ok(_)) => continue,
-                Ok(Err(_)) => break,
-                Err(_) => panic!("{name}: read did not fail after the connection died"),
+            // Reads fail once whatever was already buffered is used up.
+            loop {
+                match tokio::time::timeout(Duration::from_secs(10), file.read(&mut buf)).await {
+                    Ok(Ok(0)) => panic!("{name}: unexpected EOF"),
+                    Ok(Ok(_)) => continue,
+                    Ok(Err(_)) => break,
+                    Err(_) => panic!("{name}: read did not fail after the connection died"),
+                }
             }
         }
 
         // Give up on the session, as an application does after an error.
-        drop(file);
         sftp.close()
             .await
             .expect_err("close after a dead connection should report it");
+    }
+
+    // The sessions above are dead, so remove the file with fresh ones; the
+    // second finds it already gone.
+    for (session, _name) in connects_with_name().await {
+        let sftp = Sftp::from_session(session, Default::default())
+            .await
+            .unwrap();
+        sftp.fs().remove_file(path).await.ok();
+        sftp.close().await.unwrap();
     }
 }
 
