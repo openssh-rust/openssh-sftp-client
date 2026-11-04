@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.12](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.11...openssh-sftp-client-v0.15.12) - 2026-11-04
+
+### Fixed
+
+- `Sftp::close` panics after the connection dies (sessions from `Sftp::from_session`) ([#214](https://github.com/openssh-rust/openssh-sftp-client/pull/214))
+
 ## [0.15.11](https://github.com/openssh-rust/openssh-sftp-client/compare/openssh-sftp-client-v0.15.10...openssh-sftp-client-v0.15.11) - 2026-11-02
 
 ### Other
