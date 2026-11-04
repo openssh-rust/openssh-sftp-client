@@ -1,13 +1,29 @@
-use std::{fmt::Debug, future::Future, ops::Deref, pin::Pin, sync::Arc};
+use std::{
+    fmt::Debug,
+    future::Future,
+    ops::Deref,
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
 
 use openssh::{ChildStdin, ChildStdout, Error as OpensshError, Session, Stdio};
 use tokio::{sync::oneshot, task::JoinHandle};
+use tokio_util::task::AbortOnDropHandle;
 
 use crate::{utils::ErrorExt, Error, Sftp, SftpAuxiliaryData, SftpOptions};
 
 /// The openssh session
+///
+/// The task handle sits behind a `Mutex<Option<_>>` so that [`Sftp::close`]
+/// can take it out through a shared reference: other clones of the `Arc`
+/// holding this may legitimately still be alive when `close` runs (for
+/// example inside the task spawned by `TokioCompatFile`'s `Drop`).
+///
+/// It is an [`AbortOnDropHandle`], so the task is aborted when the last
+/// reference goes away without [`Sftp::close`] having been awaited to
+/// completion, including when `close` itself is cancelled.
 #[derive(Debug)]
-pub struct OpensshSession(JoinHandle<Option<Error>>);
+pub struct OpensshSession(Mutex<Option<AbortOnDropHandle<Option<Error>>>>);
 
 /// Check for openssh connection to be alive
 pub trait CheckOpensshConnection {
@@ -32,12 +48,6 @@ where
         session: &'session Session,
     ) -> Pin<Box<dyn Future<Output = Result<(), OpensshError>> + Send + Sync + 'session>> {
         (self)(session)
-    }
-}
-
-impl Drop for OpensshSession {
-    fn drop(&mut self) {
-        self.0.abort();
     }
 }
 
@@ -301,18 +311,31 @@ impl Sftp {
             stdin,
             stdout,
             options,
-            SftpAuxiliaryData::ArcedOpensshSession(Arc::new(OpensshSession(handle))),
+            SftpAuxiliaryData::ArcedOpensshSession(Arc::new(OpensshSession(Mutex::new(Some(
+                AbortOnDropHandle::new(handle),
+            ))))),
         )
         .await
     }
 }
 
 impl OpensshSession {
-    pub(super) async fn recover_session_err(mut self) -> Result<(), Error> {
-        if let Some(err) = (&mut self.0).await? {
-            Err(err)
-        } else {
-            Ok(())
+    /// Wait for the session task and return its error, if any.
+    ///
+    /// Takes `&self` rather than `self`, so it works however many other
+    /// references to the enclosing `Arc` are still alive.
+    pub(super) async fn recover_session_err(&self) -> Result<(), Error> {
+        let handle = match self.0.lock() {
+            Ok(mut guard) => guard.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        };
+        match handle {
+            Some(handle) => match handle.await? {
+                Some(err) => Err(err),
+                None => Ok(()),
+            },
+            // Already taken by an earlier call.
+            None => Ok(()),
         }
     }
 }

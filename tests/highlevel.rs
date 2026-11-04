@@ -638,14 +638,20 @@ fn get_known_hosts_path() -> PathBuf {
     path
 }
 
-async fn connects_with_name() -> Vec<(Session, &'static str)> {
-    let mut sessions = Vec::with_capacity(2);
-
+fn session_builder() -> SessionBuilder {
     let mut builder = SessionBuilder::default();
 
     builder
         .user_known_hosts_file(get_known_hosts_path())
         .known_hosts_check(KnownHosts::Accept);
+
+    builder
+}
+
+async fn connects_with_name() -> Vec<(Session, &'static str)> {
+    let mut sessions = Vec::with_capacity(2);
+
+    let builder = session_builder();
 
     sessions.push((builder.connect(&addr()).await.unwrap(), "process-mux"));
     sessions.push((builder.connect_mux(&addr()).await.unwrap(), "native-mux"));
@@ -706,6 +712,91 @@ async fn sftp_test_from_sessions() {
 
         sftp.close().await.unwrap();
     }
+}
+
+/// Kill the ssh master process behind `control_socket`, as if the connection
+/// had dropped.
+fn kill_ssh_master(control_socket: &Path) {
+    let out = std::process::Command::new("ssh")
+        .arg("-S")
+        .arg(control_socket)
+        .args(["-O", "check", "unused"])
+        .output()
+        .unwrap();
+    let said = String::from_utf8_lossy(&out.stderr);
+    let pid: String = said
+        .split("pid=")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no master pid in {said:?}"))
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    let status = std::process::Command::new("kill")
+        .args(["-9", &pid])
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+/// Regression test: `Sftp::close` used to panic at
+/// `Arc::try_unwrap(session).unwrap()` when the connection had died and a
+/// `TokioCompatFile` was dropped just before it, because the task spawned by
+/// `TokioCompatFile`'s `Drop` still held a reference to the session.
+///
+/// The ordering relies on the single-threaded runtime: `close` must reach
+/// the session before the task spawned by the file's `Drop` gets polled. On
+/// a multi-threaded runtime that task can run first and the panic becomes
+/// a race.
+#[tokio::test(flavor = "current_thread")]
+async fn sftp_close_after_connection_dies_from_sessions() {
+    let path = Path::new("sftp_close_after_connection_dies_from_sessions");
+
+    for (session, name) in connects_with_name().await {
+        let control_socket = session.control_socket().to_path_buf();
+        let sftp = Sftp::from_session(session, Default::default())
+            .await
+            .unwrap();
+
+        // Large enough that the first read cannot buffer all of it.
+        sftp.fs()
+            .write(path, vec![b'x'; 4 * 1024 * 1024])
+            .await
+            .unwrap();
+
+        // The file lives in its own block so that it is dropped, not just
+        // its pinned reference, before `close` runs.
+        {
+            let file = file::TokioCompatFile::new(sftp.open(path).await.unwrap());
+            tokio::pin!(file);
+            let mut buf = vec![0; 64 * 1024];
+            assert_ne!(file.read(&mut buf).await.unwrap(), 0);
+
+            kill_ssh_master(&control_socket);
+
+            // Reads fail once whatever was already buffered is used up.
+            loop {
+                match tokio::time::timeout(Duration::from_secs(10), file.read(&mut buf)).await {
+                    Ok(Ok(0)) => panic!("{name}: unexpected EOF"),
+                    Ok(Ok(_)) => continue,
+                    Ok(Err(_)) => break,
+                    Err(_) => panic!("{name}: read did not fail after the connection died"),
+                }
+            }
+        }
+
+        // Give up on the session, as an application does after an error.
+        sftp.close()
+            .await
+            .expect_err("close after a dead connection should report it");
+    }
+
+    // The sessions above are dead, so remove the file with a fresh one.
+    let session = session_builder().connect_mux(&addr()).await.unwrap();
+    let sftp = Sftp::from_session(session, Default::default())
+        .await
+        .unwrap();
+    sftp.fs().remove_file(path).await.unwrap();
+    sftp.close().await.unwrap();
 }
 
 #[tokio::test]
